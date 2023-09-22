@@ -6,18 +6,25 @@ class SettingsHandler:
     """
     Singleton class for managing ScriptManager Application settings.
 
-    This class provides methods to manage various settings for the ScriptManager application,
-    including logging, debugging, Selenium optimizations, custom driver settings, and more.
+    This class provides methods to manage various settings for the
+    ScriptManager application,
+    including logging, debugging, Selenium optimizations, custom driver
+    settings, and more.
 
     Attributes:
         app_dir (str): The root directory of the application.
         log_mode (bool): Whether logging is enabled.
         debug_mode (bool): Whether debugging is enabled.
-        clean_up_logs_after_n_days (int): Number of days after which log files should be cleaned up.
-        selenium_optimizations_mode (bool): Whether Selenium optimizations are enabled.
-        selenium_custom_driver_mode (bool): Whether custom Selenium driver mode is enabled.
-        selenium_custom_driver_version (int): The major version of Chrome to use with custom Selenium driver.
-        selenium_chrome_url (str): The URL for downloading Chrome binaries/drivers.
+        clean_up_logs_after_n_days (int): Number of days after which log files
+            should be cleaned up.
+        selenium_optimizations_mode (bool): Whether Selenium optimizations are
+            enabled.
+        selenium_custom_driver_mode (bool): Whether custom Selenium driver mode
+            is enabled.
+        selenium_custom_driver_version (int): The major version of Chrome to
+            use with custom Selenium driver.
+        selenium_chrome_url (str): The URL for downloading Chrome
+            binaries/drivers.
 
     Methods:
         init(app_dir: str, log_mode: bool, debug_mode: bool) -> None:
@@ -90,8 +97,17 @@ class SettingsHandler:
         self.app_dir = app_dir
         self.log_mode = log_mode
         self.debug_mode = debug_mode
-        log_msg = {"app_dir": app_dir, "log": log_mode, "debug": debug_mode}
-        self._log_change("Script Manager", json.dumps(log_msg, indent=4))
+
+        from .logs import LogHandler
+
+        LogHandler("Script Manager").message(
+            message="The application has been initialized as follows:",
+            details={
+                "app_dir": app_dir,
+                "log_mode": log_mode,
+                "debug_mode": debug_mode,
+            },
+        )
 
     def enable_logging(self) -> None:
         """

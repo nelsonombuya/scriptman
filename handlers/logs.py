@@ -101,7 +101,7 @@ class LogHandler:
         """
         message = f"{self.name}: {message}"
         message += (
-            "\n\t\n\t".join([f"{k}: {v}" for k, v in details.items()])
+            "\n\t" + ("\n\t".join([f"{k}: {v}" for k, v in details.items()]))
             if details
             else ""
         )

@@ -1,3 +1,5 @@
+from typing import Callable
+
 from .chrome import Chrome
 
 
@@ -31,4 +33,4 @@ class SeleniumHandler:
             WebDriver instances.
     """
 
-    chrome = Chrome()
+    chrome: Callable = Chrome

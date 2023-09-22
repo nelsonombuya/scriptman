@@ -14,10 +14,10 @@ class CleanUpHandler:
 
     def __init__(self) -> None:
         self._log = LogHandler("CleanUp Manager")
-        self._directories = DirectoryHandler().directories
+        self.directory_handler = DirectoryHandler()
 
-        self._remove_pycache_folders(self._directories["scriptman"])
-        self._remove_pycache_folders(self._directories["root"])
+        self._remove_pycache_folders(self.directory_handler.script_man_dir)
+        self._remove_pycache_folders(self.directory_handler.root_dir)
         self._remove_custom_driver_folder()
         self._remove_old_log_files()
         self._remove_csv_files()
@@ -54,7 +54,7 @@ class CleanUpHandler:
             number_of_days (int): The threshold for log file deletion
                 (default: 30 days).
         """
-        logs_directory = os.path.join(self._directories["root"], "logs")
+        logs_directory = os.path.join(self.directory_handler.root_dir, "logs")
 
         if logs_directory and os.path.exists(logs_directory):
             days_ago = datetime.now() - timedelta(days=number_of_days)
@@ -85,9 +85,7 @@ class CleanUpHandler:
         """
         Remove the custom driver folder.
         """
-        downloads_dir = os.path.join(self._directories["root"], "downloads")
-        custom_driver_directory = os.path.join(downloads_dir, "selenium")
-
+        custom_driver_directory = self.directory_handler.selenium_dir
         if os.path.exists(custom_driver_directory):
             shutil.rmtree(custom_driver_directory)
             self._log.message(
@@ -104,8 +102,7 @@ class CleanUpHandler:
                 tickets (default: True).
         """
         try:
-            root_dir = self._directories["root"]
-            downloads_dir = os.path.join(root_dir, "downloads")
+            downloads_dir = self.directory_handler.downloads_dir
             if downloads_dir:
                 files = os.listdir(downloads_dir)
                 for file in files:

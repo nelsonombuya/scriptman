@@ -32,7 +32,7 @@ class Chrome(SeleniumInteractionHandler):
         """
         Initialize Chrome instance and set the downloads directory.
         """
-        self._downloads_directory = DirectoryHandler().directories["downloads"]
+        self._downloads_directory = DirectoryHandler().downloads_dir
         self.driver = self._get_driver()
         super().__init__(self.driver)
 
@@ -120,10 +120,8 @@ class ChromeDownloadHandler:
         """
         Initialize ChromeDownloadHandler instance and set directories.
         """
-        directory_handler = DirectoryHandler()
-        directory_handler.create_selenium_directory()
         self._log = LogHandler("Chrome Download Manager")
-        self._downloads_dir = directory_handler.directories["downloads"]
+        self._selenium_dir = DirectoryHandler().selenium_dir
 
     def download(
         self,
@@ -238,8 +236,7 @@ class ChromeDownloadHandler:
             else "chrome.exe"
         )
         path = os.path.join(
-            self._downloads_dir,
-            "selenium",
+            self._selenium_dir,
             f"{app}-{self._get_system_platform()}",
             filename,
         )
@@ -268,19 +265,17 @@ class ChromeDownloadHandler:
         response = requests.get(url)
         response.raise_for_status()
         zip_download_path = os.path.join(
-            self._downloads_dir,
-            "selenium",
+            self._selenium_dir,
             f"chrome{'driver' if app == 'chromedriver' else ''}.zip",
         )
 
         with open(zip_download_path, "wb") as file:
             file.write(response.content)
 
-        extraction_path = os.path.join(self._downloads_dir, "selenium")
         with ZipFile(zip_download_path, "r") as zip_ref:
-            zip_ref.extractall(extraction_path)
+            zip_ref.extractall(self._selenium_dir)
 
         return os.path.join(
-            extraction_path,
+            self._selenium_dir,
             f"{app}-{self._get_system_platform()}",
         )

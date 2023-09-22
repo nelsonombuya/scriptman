@@ -55,7 +55,7 @@ class SeleniumInteractionHandler:
                 (Chrome or Firefox).
         """
         self._driver = driver
-        self._downloads_directory = DirectoryHandler().directories["downloads"]
+        self._downloads_directory = DirectoryHandler().downloads_dir
 
     def interact_with_element(
         self,

@@ -34,7 +34,7 @@ class LogHandler:
     ) -> None:
         self.level: LogLevel = level
         self.name: str = name.upper()
-        self.directories: Dict[str, str] = DirectoryHandler().directories
+        self.directory_handler: DirectoryHandler = DirectoryHandler()
         self.file: Optional[str] = self._get_log_file(filename)
         self.description: str = description or self.name
         self._configure_logging()
@@ -42,7 +42,7 @@ class LogHandler:
     def _get_log_file(self, filename: str) -> Optional[str]:
         if not settings.log_mode:
             return None
-        directory = self.directories["logs"]
+        directory = self.directory_handler.logs_dir
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         return rf"{directory}\{filename} - {timestamp}.log"
 

@@ -5,6 +5,50 @@ from typing import Any, Optional
 class SettingsHandler:
     """
     Singleton class for managing ScriptManager Application settings.
+
+    This class provides methods to manage various settings for the ScriptManager application,
+    including logging, debugging, Selenium optimizations, custom driver settings, and more.
+
+    Attributes:
+        app_dir (str): The root directory of the application.
+        log_mode (bool): Whether logging is enabled.
+        debug_mode (bool): Whether debugging is enabled.
+        clean_up_logs_after_n_days (int): Number of days after which log files should be cleaned up.
+        selenium_optimizations_mode (bool): Whether Selenium optimizations are enabled.
+        selenium_custom_driver_mode (bool): Whether custom Selenium driver mode is enabled.
+        selenium_custom_driver_version (int): The major version of Chrome to use with custom Selenium driver.
+        selenium_chrome_url (str): The URL for downloading Chrome binaries/drivers.
+
+    Methods:
+        init(app_dir: str, log_mode: bool, debug_mode: bool) -> None:
+            Initialize the application settings.
+        enable_logging() -> None:
+            Enable logging mode.
+        disable_logging() -> None:
+            Disable logging mode.
+        enable_debugging() -> None:
+            Enable debugging mode.
+        disable_debugging() -> None:
+            Disable debugging mode.
+        enable_selenium_optimizations_mode() -> None:
+            Enable Selenium optimizations.
+        disable_selenium_optimizations_mode() -> None:
+            Disable Selenium optimizations.
+        enable_selenium_custom_driver_mode() -> None:
+            Enable custom Selenium driver mode.
+        disable_selenium_custom_driver_mode() -> None:
+            Disable custom Selenium driver mode.
+        set_selenium_custom_driver_version(version: int) -> None:
+            Set the version of Chrome to use with custom Selenium driver.
+        set_selenium_chrome_url(url: str) -> None:
+            Set the URL for downloading Chrome binaries/drivers.
+        set_app_dir(directory: str) -> None:
+            Set the main app's directory.
+        set_clean_up_logs_after_n_days(days: int) -> None:
+            Set the number of days after which log files should be cleaned up.
+        __str__() -> str:
+            Get a string representation of the current settings.
+
     """
 
     _instance = None
@@ -33,6 +77,21 @@ class SettingsHandler:
             "https://googlechromelabs.github.io/chrome-for-testing/"
             "known-good-versions-with-downloads.json"
         )
+
+    def init(self, app_dir: str, log_mode: bool, debug_mode: bool) -> None:
+        """
+        Initialize the application settings.
+
+        Args:
+            app_dir (str): The root directory of the application.
+            log_mode (bool): Whether logging is enabled.
+            debug_mode (bool): Whether debugging is enabled.
+        """
+        self.app_dir = app_dir
+        self.log_mode = log_mode
+        self.debug_mode = debug_mode
+        log_msg = {"app_dir": app_dir, "log": log_mode, "debug": debug_mode}
+        self._log_change("Script Manager", json.dumps(log_msg, indent=4))
 
     def enable_logging(self) -> None:
         """
@@ -64,36 +123,35 @@ class SettingsHandler:
 
     def enable_selenium_optimizations_mode(self) -> None:
         """
-        Enable selenium optimizations.
+        Enable Selenium optimizations.
         """
         self.selenium_optimizations_mode = True
         self._log_change("selenium_optimizations_mode", True)
 
     def disable_selenium_optimizations_mode(self) -> None:
         """
-        Disable selenium optimizations.
+        Disable Selenium optimizations.
         """
         self.selenium_optimizations_mode = False
         self._log_change("selenium_optimizations_mode", False)
 
     def enable_selenium_custom_driver_mode(self) -> None:
         """
-        Enable selenium custom driver mode.
+        Enable custom Selenium driver mode.
         """
         self.selenium_custom_driver_mode = True
         self._log_change("selenium_custom_driver_mode", True)
 
     def disable_selenium_custom_driver_mode(self) -> None:
         """
-        Disable selenium custom driver mode.
+        Disable custom Selenium driver mode.
         """
         self.selenium_custom_driver_mode = False
         self._log_change("selenium_custom_driver_mode", False)
 
     def set_selenium_custom_driver_version(self, version: int) -> None:
         """
-        Set the version of Chrome to use with SeleniumManager when using a
-        custom driver.
+        Set the version of Chrome to use with custom Selenium driver.
 
         Args:
             version (int): The major version of Chrome to use.
@@ -118,11 +176,8 @@ class SettingsHandler:
         Args:
             directory (str): The directory path to set as the app's root dir.
         """
-        from .directories import DirectoryHandler
-
         self.app_dir = directory
-        DirectoryHandler()  # Update Directories
-        self._log_change("app_dir", self.app_dir)
+        self._log_change("app_dir", directory)
 
     def set_clean_up_logs_after_n_days(self, days: int) -> None:
         """
@@ -158,12 +213,10 @@ class SettingsHandler:
 
     def __str__(self) -> str:
         """
-        Returns a string representation of the current settings by converting
-        its attributes to a dictionary.
+        Get a string representation of the current settings.
 
         Returns:
-            str: A string representation of the current settings in the format
-            of a dictionary.
+            str: A string representation of the current settings.
         """
         return json.dumps(vars(self), indent=4)
 

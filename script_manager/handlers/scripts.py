@@ -197,6 +197,8 @@ class ScriptExecutor:
                 message="The script failed to run and couldn't recover.",
             )
             return False
+        finally:
+            self.script_log.stop()
 
     def _handle_script_exceptions(self, recovery_function: Callable) -> None:
         """

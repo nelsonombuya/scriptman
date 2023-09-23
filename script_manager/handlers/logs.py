@@ -71,10 +71,10 @@ class LogHandler:
         section = self.description.replace("_", " ")
         self.message(f"{section.title()} started.")
 
-    def end(self) -> None:
+    def stop(self) -> None:
         """
-        Record the end time of an operation, log an end message, and calculate
-        the duration.
+        Stop and record the end time of an operation, log an end message, and
+        calculate the duration.
         """
         self.end_time = time.time()
         section = self.description.replace("_", " ")

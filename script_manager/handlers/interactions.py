@@ -63,7 +63,7 @@ class SeleniumInteractionHandler:
         mode: Interaction = Interaction.CLICK,
         keys: Optional[str] = None,
         timeout: int = 30,
-        rest: int = 2,
+        rest: int = 1,
     ) -> None:
         """
         Interact with a web element on the page.
@@ -84,7 +84,7 @@ class SeleniumInteractionHandler:
             timeout (int, optional): The maximum time (in seconds) to wait for
                 the element to become clickable or invisible. Default is 30.
             rest (int, optional): The time (in seconds) to rest after the
-                interaction. Default is 2.
+                interaction. Default is 1.
 
         Raises:
             ValueError: If an invalid interaction mode is provided.

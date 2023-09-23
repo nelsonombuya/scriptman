@@ -1,6 +1,7 @@
 from typing import Callable
 
 from script_manager.handlers.cleanup import CleanUpHandler
+from script_manager.handlers.cli import CLIHandler
 from script_manager.handlers.directories import DirectoryHandler
 from script_manager.handlers.logs import LogHandler
 from script_manager.handlers.scripts import ScriptsHandler
@@ -18,6 +19,8 @@ class HandlerManager:
     CleanUpHandler, SeleniumHandler, DirectoryHandler, and SettingsHandler.
 
     Attributes:
+        cli (Callable): A callable reference to the CLIHandler class, which
+            can be used to run scripts from the CLI.
         logs (Callable): A callable reference to the LogHandler class, which
             can be used to manage logs.
         cleanup (Callable): A callable reference to the CleanUpHandler class,
@@ -45,6 +48,7 @@ class HandlerManager:
         exist in the current module or package.
     """
 
+    cli: Callable = CLIHandler
     logs: Callable = LogHandler
     cleanup: Callable = CleanUpHandler
     scripts: Callable = ScriptsHandler

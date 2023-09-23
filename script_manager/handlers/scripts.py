@@ -44,7 +44,7 @@ class ScriptsHandler:
         settings.enable_logging()
         settings.disable_debugging()
 
-        for file in scripts or self.get_python_scripts():
+        for file in scripts or self.get_scripts():
             self._execute_script(file, self.scripts_dir)
 
     def test_scripts(self, scripts: Optional[List[str]] = None) -> None:
@@ -60,7 +60,7 @@ class ScriptsHandler:
         settings.disable_logging()
         settings.enable_debugging()
 
-        for file in scripts or self.get_python_scripts():
+        for file in scripts or self.get_scripts():
             self._execute_script(file, self.scripts_dir)
 
     def run_custom_scripts(self, script_paths: List[str]) -> None:
@@ -93,7 +93,7 @@ class ScriptsHandler:
             directory = os.path.dirname(file_path)
             self._execute_script(filename, directory)
 
-    def get_python_scripts(self) -> List[str]:
+    def get_scripts(self) -> List[str]:
         """
         Get a list of Python script filenames in the scripts directory.
 

@@ -12,12 +12,14 @@ class ScriptManager:
     Attributes:
         handlers (HandlerManager): A manager for various handlers such as logs,
             Selenium, directories, and settings.
-        settings (SettingsHandler): An instance of the SettingsHandler class
-            for managing application settings.
+        cli (CLIHandler): An instance of the CLIHandler class, for running and
+            managing scripts from the terminal.
         scripts (ScriptHandler): An instance of the ScriptHandler class,
             for running and managing scripts.
         directories (DirectoryHandler): An instance of the DirectoryHandler
             class for managing directories.
+        settings (SettingsHandler): An instance of the SettingsHandler class
+            for managing application settings.
 
     Usage:
         The ScriptManager class provides access to various application handlers
@@ -31,6 +33,7 @@ class ScriptManager:
     handlers = HandlerManager()
 
     # Exposed Properties and Methods
+    cli: Callable = handlers.cli
     Scripts: Callable = handlers.scripts
     Directories: Callable = handlers.directories
     settings: SettingsHandler = handlers.settings

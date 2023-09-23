@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Callable, List, Optional
 
 import selenium.common.exceptions as sce
@@ -163,8 +164,18 @@ class ScriptExecutor:
         self.script_log = LogHandler(script_name)
 
         try:
+            with open(script_path, "r") as script_file:
+                script_content = script_file.read()
+
+            script_content = re.sub(
+                r'^if __name__ == "__main__":',
+                f'if __name__ == "{__name__}":',
+                script_content,
+                flags=re.MULTILINE,
+            )
+
             self.script_log.start()
-            exec(open(script_path).read(), globals())
+            exec(script_content, globals())
             message = f"{script_name} Script ran successfully"
             message += " after recovery." if self.recovery_mode else "."
             self.script_log.message(message)

@@ -119,7 +119,12 @@ class SettingsHandler:
             "known-good-versions-with-downloads.json"
         )
 
-    def init(self, app_dir: str, logging: bool = True) -> None:
+    def init(
+        self,
+        app_dir: str,
+        logging: bool = True,
+        debugging: bool = False,
+    ) -> None:
         """
         Initialize the application settings.
 
@@ -127,8 +132,11 @@ class SettingsHandler:
             app_dir (str): The root directory of the application.
             logging (bool): Flag for enabling logging for the session.
                 Default is True.
+            debugging (bool): Flag for enabling debugging mode for the session.
+                Default is False.
         """
         self.log_mode = logging
+        self.debug_mode = debugging
         self.set_app_dir(app_dir)
 
         from script_manager.handlers.directories import DirectoryHandler

@@ -10,6 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
 from script_manager.handlers.directories import DirectoryHandler
+from script_manager.handlers.settings import settings
 
 AnyDriver = Union[webdriver.Chrome, webdriver.Firefox]
 
@@ -63,7 +64,7 @@ class SeleniumInteractionHandler:
         mode: Interaction = Interaction.CLICK,
         keys: Optional[str] = None,
         timeout: int = 30,
-        rest: int = 1,
+        rest: float = 0.5,
     ) -> None:
         """
         Interact with a web element on the page.
@@ -83,8 +84,8 @@ class SeleniumInteractionHandler:
                 Interaction.SEND_KEYS.
             timeout (int, optional): The maximum time (in seconds) to wait for
                 the element to become clickable or invisible. Default is 30.
-            rest (int, optional): The time (in seconds) to rest after the
-                interaction. Default is 1.
+            rest (float, optional): The time (in seconds) to rest after the
+                interaction. Default is 0.5.
 
         Raises:
             ValueError: If an invalid interaction mode is provided.
@@ -110,7 +111,7 @@ class SeleniumInteractionHandler:
             )
         else:
             raise ValueError(f"Passed Invalid Mode: {mode}")
-        time.sleep(rest)
+        time.sleep(2 if settings.debug_mode else rest)
 
     def wait_for_downloads_to_finish(self) -> None:
         """

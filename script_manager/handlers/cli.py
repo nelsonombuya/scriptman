@@ -35,6 +35,11 @@ class CLIHandler:
             if arg in ("-h", "--help"):
                 self._print_help()
                 sys.exit(0)  # Exit after printing help
+
+            if arg in ("-ls", "--list_scripts"):
+                [print(script) for script in self.script_handler.get_scripts()]
+                sys.exit(0)  # Exit after printing the list of scripts
+
             arg_function = {
                 "-dl": settings.disable_logging,
                 "--disable_logging": settings.disable_logging,
@@ -48,10 +53,11 @@ class CLIHandler:
 
             if self._is_valid_script_arg(arg):
                 self.scripts.append(arg)
-            else:
-                print(f"Invalid argument {arg} passed! \n\n")
-                self._print_help()
-                sys.exit(0)  # Exit after having an error.
+                continue
+
+            print(f"Invalid argument {arg} passed! \n\n")
+            self._print_help()
+            sys.exit(0)  # Exit after having an error.
 
     def _is_valid_script_arg(self, arg: str) -> bool:
         """
@@ -80,6 +86,7 @@ class CLIHandler:
         -h, --help              Show this help message and exit.
         -dl, --disable_logging  Disable logging.
         -d, --debug             Enable debugging mode.
+        -ls, --list_scripts     List scripts contained in the scripts folder.
 
         script_names            Names of the scripts to execute.
         """

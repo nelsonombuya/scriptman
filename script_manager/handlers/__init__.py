@@ -2,6 +2,7 @@ from typing import Callable
 
 from script_manager.handlers.cleanup import CleanUpHandler
 from script_manager.handlers.cli import CLIHandler
+from script_manager.handlers.database import DatabaseHandler
 from script_manager.handlers.directories import DirectoryHandler
 from script_manager.handlers.etl import ETLHandler
 from script_manager.handlers.logs import LogHandler
@@ -27,6 +28,8 @@ class HandlerManager:
             data when needed.
         logs (Callable): A callable reference to the LogHandler class, which
             can be used to manage logs.
+        db (Callable): A callable reference to the DatabaseHandler class, which
+            can be used to run CRUD processes for databases.
         cleanup (Callable): A callable reference to the CleanUpHandler class,
             which can be used to manage cleanup tasks.
         scripts (Callable): A callable reference to the ScriptHandler class,
@@ -55,6 +58,7 @@ class HandlerManager:
     cli: Callable = CLIHandler
     etl: Callable = ETLHandler
     logs: Callable = LogHandler
+    db: Callable = DatabaseHandler
     cleanup: Callable = CleanUpHandler
     scripts: Callable = ScriptsHandler
     selenium: Callable = SeleniumHandler

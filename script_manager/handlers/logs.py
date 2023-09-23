@@ -33,16 +33,16 @@ class LogHandler:
         description: Optional[str] = None,
     ) -> None:
         self.level: LogLevel = level
-        self.name: str = name.upper()
-        self.directory_handler: DirectoryHandler = DirectoryHandler()
+        self.name: str = name.upper().replace(" ", "_")
+        self.title: str = name.title().replace("_", " ")
+        self.description: str = description or self.title
         self.file: Optional[str] = self._get_log_file(filename)
-        self.description: str = description or self.name
         self._configure_logging()
 
     def _get_log_file(self, filename: str) -> Optional[str]:
         if not settings.log_mode:
             return None
-        directory = self.directory_handler.logs_dir
+        directory = DirectoryHandler().logs_dir
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         return rf"{directory}\{filename} - {timestamp}.log"
 

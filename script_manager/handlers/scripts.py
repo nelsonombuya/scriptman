@@ -175,7 +175,7 @@ class ScriptExecutor:
             )
 
             exec(script_content, globals())
-            message = f"{self.script_log.name} Script ran successfully"
+            message = f"{self.script_log.title} Script ran successfully"
             message += " after recovery." if self.recovery_mode else "!"
             self.script_log.message(message)
             return True
@@ -185,7 +185,7 @@ class ScriptExecutor:
         except self.selenium_optimization_exceptions:
             if settings.selenium_optimizations_mode:
                 raise Exception(
-                    f"{self.script_log.name} failed due to a Web Page Issue."
+                    f"{self.script_log.title} failed due to a Web Page Issue."
                 )  # Prevents recursive loop
             self._handle_script_exceptions(self._disable_optimizations)
             return self.execute(file, directory)

@@ -99,13 +99,16 @@ class SettingsHandler:
             "known-good-versions-with-downloads.json"
         )
 
-    def init(self, app_dir: str) -> None:
+    def init(self, app_dir: str, logging: bool = True) -> None:
         """
         Initialize the application settings.
 
         Args:
             app_dir (str): The root directory of the application.
+            logging (bool): Flag for enabling logging for the session.
+                Default is True.
         """
+        self.log_mode = logging
         self.set_app_dir(app_dir)
 
         from script_manager.handlers.directories import DirectoryHandler

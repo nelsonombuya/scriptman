@@ -1,3 +1,5 @@
 app
 .venv
 *.pyc
+__pycache__
+script_manager.egg-info

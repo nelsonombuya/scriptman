@@ -8,7 +8,6 @@ from .settings import SettingsHandler
 from .settings import settings as settings_handler
 
 
-# NOTE: Handler Manager to expose handler classes and methods
 class HandlerManager:
     """
     A manager class for handling various functionalities and operations using

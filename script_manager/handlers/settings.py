@@ -29,6 +29,10 @@ class SettingsHandler:
     Methods:
         init(app_dir: str, log_mode: bool, debug_mode: bool) -> None:
             Initialize the application settings.
+        get_setting(setting: str, default: Any) -> Any:
+            Get the value of a specific setting and return the default value if
+            the setting is not found. Returns None if the default value is not
+            set.
         enable_logging() -> None:
             Enable logging mode.
         disable_logging() -> None:
@@ -108,6 +112,24 @@ class SettingsHandler:
                 "debug_mode": debug_mode,
             },
         )
+
+    def get_setting(self, setting: str, default: Any = None) -> Any:
+        """
+        Retrieve the value of a specific setting from the object.
+
+        Args:
+            setting (str): The name of the setting to retrieve.
+            default (Any): The default value to return if the setting doesn't
+                exist (default is None).
+
+        Returns:
+            The value of the requested setting, or the default value if the
+            setting is not found.
+        """
+        try:
+            return getattr(self, setting)
+        except AttributeError:
+            return default
 
     def enable_logging(self) -> None:
         """

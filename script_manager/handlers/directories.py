@@ -19,12 +19,14 @@ class DirectoryHandler:
             dictionary.
         HELPERS_DIR (str): The key for the helpers directory in the directories
             dictionary.
+        SELENIUM_DIR (str): The key for the selenium custom driver directory in
+            the directories dictionary.
+        HANDLERS_DIR (str): The key for the handlers directory in the
+            directories dictionary.
         DOWNLOADS_DIR (str): The key for the downloads directory in the
             directories dictionary.
         SCRIPT_MAN_DIR (str): The key for the ScriptManager directory in the
             directories dictionary.
-        SELENIUM_DIR (str): The key for the selenium custom driver directory in
-            the directories dictionary.
         DEFAULT_DIRECTORIES (List[str]): A list of default directory names to
             be created.
 
@@ -46,6 +48,7 @@ class DirectoryHandler:
     SCRIPTS_DIR = "scripts"
     HELPERS_DIR = "helpers"
     SELENIUM_DIR = "selenium"
+    HANDLERS_DIR = "handlers"
     DOWNLOADS_DIR = "downloads"
     SCRIPT_MAN_DIR = "scriptman"
     DEFAULT_DIRECTORIES = [DOWNLOADS_DIR, LOGS_DIR, SCRIPTS_DIR, HELPERS_DIR]
@@ -130,6 +133,16 @@ class DirectoryHandler:
         )
 
     @property
+    def handlers_dir(self) -> str:
+        """
+        Get the handlers directory for the ScriptManager Package Files.
+
+        Returns:
+            str: The path to the handlers directory.
+        """
+        return os.path.dirname(os.path.abspath(__file__))
+
+    @property
     def downloads_dir(self) -> str:
         """
         Get the downloads directory for the ScriptManager Package Files.
@@ -150,8 +163,7 @@ class DirectoryHandler:
         Returns:
             str: The path to the ScriptManager directory.
         """
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        return os.path.abspath(os.path.join(current_dir, ".."))
+        return os.path.abspath(os.path.join(self.handlers_dir, "..", ".."))
 
     def create_and_set_directories(self) -> None:
         """

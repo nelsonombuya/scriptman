@@ -1,9 +1,4 @@
 import atexit
-import os
-import sys
-
-# NOTE: Adding to path temporarily to resolve import issues
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 
 class ScriptManager:
@@ -27,7 +22,7 @@ class ScriptManager:
     """
 
     # Initialization
-    from handlers import HandlerManager
+    from .handlers import HandlerManager
 
     handlers = HandlerManager()
 

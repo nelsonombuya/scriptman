@@ -1,6 +1,7 @@
 import os
 import shutil
 from datetime import datetime, timedelta
+from typing import Optional
 
 from .directories import DirectoryHandler
 from .logs import LogHandler, LogLevel
@@ -54,7 +55,7 @@ class CleanUpHandler:
             number_of_days (int): The threshold for log file deletion
                 (default: 30 days).
         """
-        logs_directory = os.path.join(self.directory_handler.root_dir, "logs")
+        logs_directory = self.directory_handler.logs_dir
 
         if logs_directory and os.path.exists(logs_directory):
             days_ago = datetime.now() - timedelta(days=number_of_days)
@@ -94,12 +95,12 @@ class CleanUpHandler:
                 message=f"Deleted {custom_driver_directory}",
             )
 
-    def _remove_csv_files(self, remove_tickets_csv: bool = True):
+    def _remove_csv_files(self, ignore_filename: Optional[str] = None):
         """
         Remove CSV files from the downloads directory.
         Args:
-            remove_tickets_csv (bool): Whether to remove CSV files related to
-                tickets (default: True).
+            ignore_filename (Optional[str]): Filename of csv to ignore when
+                deleting csv files (default: None).
         """
         try:
             downloads_dir = self.directory_handler.downloads_dir
@@ -108,7 +109,8 @@ class CleanUpHandler:
                 for file in files:
                     if file.endswith(".csv"):
                         filename = file.lower()
-                        if not remove_tickets_csv and "tickets" in filename:
+                        if ignore_filename and ignore_filename in filename:
+                            self._log.message(f"Skipped deleting {filename}")
                             continue
 
                         file_path = os.path.join(downloads_dir, file)

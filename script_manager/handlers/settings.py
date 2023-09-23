@@ -108,8 +108,8 @@ class SettingsHandler:
         self.log_mode: bool = True
         self.debug_mode: bool = False
         self.clean_up_folders: List[str] = []
+        self.database_connection_strings = {}
         self.clean_up_logs_after_n_days: int = 7
-        self.default_database_connection_strings = {}
         self.selenium_optimizations_mode: bool = True
         self.selenium_custom_driver_mode: bool = False
         self.selenium_custom_driver_version: int = 116
@@ -305,12 +305,12 @@ class SettingsHandler:
         connection_string: Dict[str, str],
     ) -> None:
         """
-        Add or update default database connection strings.
+        Add or update a database connection strings.
 
-        This method allows you to add or update default database connection
-        strings. You can provide a dictionary where keys represent connection
-        names, and values represent connection strings. If a connection name
-        already exists, its connection string will be updated.
+        This method allows you to add or update database connection strings.
+        You can provide a dictionary where keys represent connection names, and
+        values represent connection strings. If a connection name already
+        exists, its connection string will be updated.
 
         Args:
             connection_string (Dict[str, str]): A dictionary containing
@@ -323,10 +323,10 @@ class SettingsHandler:
                 {"Connection1": "mysql://user:password@localhost/db1"}
             )
         """
-        self.default_database_connection_strings.update(connection_string)
+        self.database_connection_strings.update(connection_string)
         self._log_change(
             "default_database_connection_strings",
-            self.default_database_connection_strings,
+            self.database_connection_strings,
         )
 
     def gen_and_add_db_connection_string(
@@ -339,10 +339,10 @@ class SettingsHandler:
         port: Optional[str] = None,
     ) -> None:
         """
-        Generate and add or update a default database connection string.
+        Generate and add or update a database connection string.
 
         This method generates a connection string based on the provided
-        parameters and adds or updates it to the default database connection
+        parameters and adds or updates it to the database connection
         strings dictionary.
 
         Args:
@@ -381,15 +381,15 @@ class SettingsHandler:
                 f"PWD={password}"
             )
         )
-        self.default_database_connection_strings[database] = connection_string
+        self.database_connection_strings[database] = connection_string
         self._log_change(
             "default_database_connection_strings",
-            self.default_database_connection_strings,
+            self.database_connection_strings,
         )
 
-    def view_default_database_connection_strings(self):
+    def view_database_connection_strings(self):
         """
-        View the default database connection strings.
+        View the database connection strings.
 
         This method displays the currently stored default database connection
         strings in a readable JSON format with an indentation of 4 spaces.
@@ -398,14 +398,14 @@ class SettingsHandler:
             settings = SettingsHandler()
             settings.view_default_database_connection_strings()
         """
-        print(json.dumps(self.default_database_connection_strings, indent=4))
+        print(json.dumps(self.database_connection_strings, indent=4))
 
-    def remove_default_database_connection_string(self, key: str) -> None:
+    def remove_database_connection_string(self, key: str) -> None:
         """
-        Remove a default database connection string.
+        Remove a database connection string.
 
-        This method allows you to remove a default database connection string
-        by providing its key (connection name).
+        This method allows you to remove a database connection string by
+        providing its key (connection name).
 
         Args:
             key (str): The key (connection name) of the connection string to be
@@ -415,7 +415,7 @@ class SettingsHandler:
             settings = SettingsHandler()
             settings.remove_default_database_connection_string("Connection1")
         """
-        removed_value = self.default_database_connection_strings.pop(key)
+        removed_value = self.database_connection_strings.pop(key)
         self._log_change(
             f"default_database_connection_strings[{key}]",
             removed_value,

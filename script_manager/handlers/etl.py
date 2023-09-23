@@ -74,20 +74,24 @@ class ETLHandler:
         self._data = pd.DataFrame(data)
         return self._data
 
-    def extract_csv(self, filename: str, csv_directory: str) -> pd.DataFrame:
+    def extract_csv(
+        self,
+        filename: str,
+        directory: Optional[str] = None,
+    ) -> pd.DataFrame:
         """
         Extract data from a CSV file.
 
         Args:
             filename (str): The name of the CSV file.
-            csv_directory (str): The directory where the CSV file is located.
-
+            directory (optional, str): The directory where the CSV file is
+                located. Defaults to the downloads directory.
         Returns:
             pd.DataFrame: The extracted data as a DataFrame.
         """
         self._log.message("Data extraction started...")
         csv_handler = CSVHandler()
-        csv_file = csv_handler.find_csv_file(filename, csv_directory)
+        csv_file = csv_handler.find_csv_file(filename, directory)
         self._data = csv_handler.extract_csv(csv_file)
         self._log.message("Data extraction complete.")
         return self._data

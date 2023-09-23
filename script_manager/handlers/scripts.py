@@ -164,9 +164,9 @@ class ScriptExecutor:
         self.script_log = LogHandler(script_name)
 
         try:
+            # Replace 'if __name__ == "__main__":' with the module name
             with open(script_path, "r") as script_file:
                 script_content = script_file.read()
-
             script_content = re.sub(
                 r'^if __name__ == "__main__":',
                 f'if __name__ == "{__name__}":',

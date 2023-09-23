@@ -314,6 +314,51 @@ class SettingsHandler:
             self.default_database_connection_strings,
         )
 
+    def generate_and_add_default_database_connection_string(
+        self,
+        driver: str,
+        server: str,
+        database: str,
+        username: str,
+        password: str,
+    ) -> None:
+        """
+        Generate and add or update a default database connection string.
+
+        This method generates a connection string based on the provided
+        parameters and adds or updates it to the default database connection
+        strings dictionary.
+
+        Args:
+            driver (str): The database driver name (e.g., "SQL Server").
+            server (str): The database server address (e.g., "localhost").
+            database (str): The database name.
+            username (str): The username for authentication.
+            password (str): The password for authentication.
+
+        Example:
+            settings = SettingsHandler()
+            settings.generate_and_add_default_database_connection_string(
+                driver="SQL Server",
+                server="localhost",
+                database="db",
+                username="user",
+                password="password"
+            )
+        """
+        connection_string = (
+            f"Driver={driver};"
+            f"Server={server};"
+            f"Database={database};"
+            f"UID={username};"
+            f"PWD={password}"
+        )
+        self.default_database_connection_strings[database] = connection_string
+        self._log_change(
+            "default_database_connection_strings",
+            self.default_database_connection_strings,
+        )
+
     def view_default_database_connection_strings(self):
         """
         View the default database connection strings.

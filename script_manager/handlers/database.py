@@ -14,6 +14,7 @@ class DatabaseHandler:
         Args:
             db_connection_string (str): The connection string for the database.
         """
+        self._log = LogHandler(self._extract_db_name(db_connection_string))
         self._db_connection_string = db_connection_string
         self._connection = None
         self.connect()
@@ -24,8 +25,6 @@ class DatabaseHandler:
         """
         try:
             self._connection = pyodbc.connect(self._db_connection_string)
-            name = self._connection.getinfo(pyodbc.SQL_DATABASE_NAME)
-            self._log = LogHandler(name)
             self._log.message("Successfully connected to the database")
         except pyodbc.Error as error:
             self._log.message(
@@ -281,6 +280,20 @@ class DatabaseHandler:
         match = re.search(pattern, query, re.IGNORECASE)
         table_name = (match.group(1) if match else "").replace('"', "")
         return table_name
+
+    def _extract_db_name(self, connection_string: str) -> str:
+        """
+        Extracts the name of the database from the given database connection
+        string.
+
+        Args:
+            connection_string (str): The Database Connection String.
+
+        Returns:
+            str: The name of the database, or 'Database Handler' otherwise.
+        """
+        match = re.search(r"Database=([^;]+)", connection_string)
+        return match.group(1) if match else "Database Handler"
 
     def __del__(self) -> None:
         self.disconnect()

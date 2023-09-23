@@ -1,12 +1,12 @@
 from typing import Callable
 
-from cleanup import CleanUpHandler
-from directories import DirectoryHandler
-from logs import LogHandler
-from scripts import ScriptsHandler
-from selenium_handler import SeleniumHandler
-from settings import SettingsHandler
-from settings import settings as settings_handler
+from script_manager.handlers.cleanup import CleanUpHandler
+from script_manager.handlers.directories import DirectoryHandler
+from script_manager.handlers.logs import LogHandler
+from script_manager.handlers.scripts import ScriptsHandler
+from script_manager.handlers.selenium import SeleniumHandler
+from script_manager.handlers.settings import SettingsHandler
+from script_manager.handlers.settings import settings as settings_handler
 
 
 class HandlerManager:

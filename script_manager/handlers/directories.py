@@ -2,7 +2,7 @@ import json
 import os
 from typing import Dict
 
-from settings import settings
+from script_manager.handlers.settings import settings
 
 
 class DirectoryHandler:

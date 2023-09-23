@@ -3,9 +3,9 @@ import shutil
 from datetime import datetime, timedelta
 from typing import Optional
 
-from .directories import DirectoryHandler
-from .logs import LogHandler, LogLevel
-from .settings import settings
+from script_manager.handlers.directories import DirectoryHandler
+from script_manager.handlers.logs import LogHandler, LogLevel
+from script_manager.handlers.settings import settings
 
 
 class CleanUpHandler:

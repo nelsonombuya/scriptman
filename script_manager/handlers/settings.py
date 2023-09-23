@@ -102,7 +102,7 @@ class SettingsHandler:
         self.log_mode = log_mode
         self.debug_mode = debug_mode
 
-        from logs import LogHandler
+        from script_manager.handlers.logs import LogHandler
 
         LogHandler("Script Manager").message(
             message="The application has been initialized as follows:",
@@ -245,7 +245,7 @@ class SettingsHandler:
             name (str): The name of the setting being changed.
             value: The new value of the setting.
         """
-        from logs import LogHandler
+        from script_manager.handlers.logs import LogHandler
 
         LogHandler("Settings Handler").message(f"{name} updated to {value}")
 

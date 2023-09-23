@@ -5,8 +5,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from directories import DirectoryHandler
-from settings import settings
+from script_manager.handlers.directories import DirectoryHandler
+from script_manager.handlers.settings import settings
 
 
 class LogLevel(Enum):

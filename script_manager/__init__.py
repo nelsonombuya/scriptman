@@ -23,7 +23,7 @@ class ScriptManager:
     """
 
     # Initialization
-    from handlers import HandlerManager
+    from script_manager.handlers import HandlerManager
 
     handlers = HandlerManager()
 

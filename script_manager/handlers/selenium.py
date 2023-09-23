@@ -1,6 +1,6 @@
 from typing import Callable
 
-from chrome import Chrome
+from script_manager.handlers.chrome import Chrome
 
 
 class SeleniumHandler:

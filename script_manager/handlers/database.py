@@ -14,8 +14,9 @@ class DatabaseHandler:
         Args:
             db_connection_string (str): The connection string for the database.
         """
-        self._connection = None
         self._db_connection_string = db_connection_string
+        self._connection = None
+        self.connect()
 
     def connect(self):
         """

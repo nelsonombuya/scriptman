@@ -304,7 +304,9 @@ class SettingsHandler:
 
         Example:
             settings = SettingsHandler()
-            settings.add_default_database_connection_string({"Connection1": "mysql://user:password@localhost/db1"})
+            settings.add_default_database_connection_string(
+                {"Connection1": "mysql://user:password@localhost/db1"}
+            )
         """
         self.default_database_connection_strings.update(connection_string)
         self._log_change(
@@ -329,8 +331,8 @@ class SettingsHandler:
         """
         Remove a default database connection string.
 
-        This method allows you to remove a default database connection string by
-        providing its key (connection name).
+        This method allows you to remove a default database connection string
+        by providing its key (connection name).
 
         Args:
             key (str): The key (connection name) of the connection string to be

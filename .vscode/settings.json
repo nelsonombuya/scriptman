@@ -1,9 +1,11 @@
 {
     "cSpell.words": [
+        "dtype",
         "dirman",
         "logman",
         "infobars",
         "cleanman",
+        "iterrows",
         "scriptman",
         "chromeman",
         "crdownload",

@@ -3,6 +3,7 @@ from typing import Callable
 from script_manager.handlers.cleanup import CleanUpHandler
 from script_manager.handlers.cli import CLIHandler
 from script_manager.handlers.directories import DirectoryHandler
+from script_manager.handlers.etl import ETLHandler
 from script_manager.handlers.logs import LogHandler
 from script_manager.handlers.scripts import ScriptsHandler
 from script_manager.handlers.selenium import SeleniumHandler
@@ -21,6 +22,9 @@ class HandlerManager:
     Attributes:
         cli (Callable): A callable reference to the CLIHandler class, which
             can be used to run scripts from the CLI.
+        etl (Callable): A callable reference to the ETLHandler class, which
+            can be used to run etl processes for CSV, JSON and Pandas DataFrame
+            data when needed.
         logs (Callable): A callable reference to the LogHandler class, which
             can be used to manage logs.
         cleanup (Callable): A callable reference to the CleanUpHandler class,
@@ -49,6 +53,7 @@ class HandlerManager:
     """
 
     cli: Callable = CLIHandler
+    etl: Callable = ETLHandler
     logs: Callable = LogHandler
     cleanup: Callable = CleanUpHandler
     scripts: Callable = ScriptsHandler

@@ -1,5 +1,5 @@
 import re
-from typing import List
+from typing import List, Union
 
 import pyodbc
 
@@ -48,7 +48,7 @@ class DatabaseHandler:
         self,
         query: str,
         params: tuple = (),
-    ) -> List[pyodbc.Row]:
+    ) -> Union[List[pyodbc.Row], List[tuple]]:
         """
         Executes the given SQL query with optional parameters and returns the
         results as a list of tuples.

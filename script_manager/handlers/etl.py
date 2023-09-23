@@ -1,6 +1,6 @@
 import json
 import math
-from typing import Any, Callable, Dict, List, MutableMapping, Optional, Tuple
+from typing import Any, Callable, Dict, List, MutableMapping, Optional, Tuple, Union
 
 import pandas as pd
 from tqdm import tqdm
@@ -25,25 +25,26 @@ class ETLHandler:
         """
         self._log = LogHandler("ETL Handler")
 
-    def load_df(self, df: pd.DataFrame) -> pd.DataFrame:
+    def from_df(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Load a DataFrame into the ETLHandler.
+        Extract data from a DataFrame source.
 
         Args:
-            df (pd.DataFrame): The DataFrame to load.
+            df (pd.DataFrame): The DataFrame to extract.
 
         Returns:
-            pd.DataFrame: The loaded DataFrame.
+            pd.DataFrame: The extracted DataFrame.
         """
         self._log.message("Data extraction started...")
         self._data = df
         self._log.message("Data extraction complete.")
         return self._data
 
-    def extract_json(
+    def from_json(
         self,
         extraction_function: Callable[[], List[Dict[str, Any]]],
         extract_data_from_sublists: bool = True,
+        keys: List[str] = [],
     ) -> pd.DataFrame:
         """
         Extract data from a JSON source.
@@ -53,7 +54,8 @@ class ETLHandler:
                 function to extract JSON data.
             extract_data_from_sublists (bool, optional): Whether to extract
                 data from nested dictionaries. Defaults to True.
-
+            keys (List[str]): A list of key columns in the main dataset to use
+                as a reference key when extracting any sublist.
         Returns:
             pd.DataFrame: The extracted and transformed data as a DataFrame.
         """
@@ -68,13 +70,13 @@ class ETLHandler:
         if extract_data_from_sublists:
             self._log.message("Extracting Tables from Nested Dictionaries...")
             self._nested_data: Dict[str, List[Dict[str, Any]]] = {}
-            data = self._extract_nested_data(data)
+            data = self._extract_nested_data(data, keys)
 
         self._log.message("Data transformation complete.")
         self._data = pd.DataFrame(data)
         return self._data
 
-    def extract_csv(
+    def from_csv(
         self,
         filename: str,
         directory: Optional[str] = None,
@@ -96,6 +98,32 @@ class ETLHandler:
         self._log.message("Data extraction complete.")
         return self._data
 
+    def from_db(
+        self,
+        db_connection_string: str,
+        query: str,
+        params: tuple = (),
+    ) -> pd.DataFrame:
+        """
+        Extract data from a database.
+
+        Args:
+            db_connection_string (str): The database connection string to use.
+            query (str): The prepared query to use to extract the data.
+            params (optional, tuple): The parameters to use in the prepared
+                query. Defaults to ()
+
+        Returns:
+            pd.DataFrame: The extracted data as a DataFrame.
+        """
+        self._log.message("Data extraction started...")
+        db = DatabaseHandler(db_connection_string)
+        db.connect()
+        result = db.execute_read_query(query, params)
+        self._data = pd.DataFrame(result)
+        self._log.message("Data extraction complete.")
+        return self._data
+
     def to_csv(self, filename: str, directory: Optional[str] = None) -> str:
         """
         Save the loaded data to a CSV file.
@@ -111,7 +139,17 @@ class ETLHandler:
         if self._data.empty:
             self._log.message("Dataset is empty!", LogLevel.WARN)
             return ""
-        return CSVHandler.save_to_csv(self._data, filename, directory)
+
+        if self._nested_data:
+            self._log.message(f"Separating Nested Data from [{filename}]...")
+            for file, data in self._nested_data.items():
+                nested_etl = ETLHandler()
+                nested_etl.from_json(lambda: data, True)
+                nested_etl.to_csv(f"{filename}_{file}", directory)
+
+        csv_path = CSVHandler.save_to_csv(self._data, filename, directory)
+        self._log.message(f"{csv_path} has been created successfully.")
+        return csv_path
 
     def to_db(
         self,
@@ -141,38 +179,22 @@ class ETLHandler:
         if self._data.empty:
             self._log.message("Dataset is empty!", LogLevel.WARN)
             return
-        self._write_to_db(
-            keys=keys,
-            table=table_name,
-            truncate=truncate,
-            recreate=recreate,
-            force_nvarchar=force_nvarchar,
-            db_connection_string=db_connection_string,
-        )
 
-    def _write_to_db(
-        self,
-        table: str,
-        recreate: bool,
-        truncate: bool,
-        db_connection_string: str,
-        force_nvarchar: bool = False,
-        keys: Optional[List[str]] = None,
-    ) -> None:
-        """
-        Write data to a database table.
+        if self._nested_data:
+            self._log.message(f"Separating Nested Data from [{table_name}]...")
+            for tbl, data in self._nested_data.items():
+                nested_etl = ETLHandler()
+                nested_etl.from_json(lambda: data, True)
+                nested_etl.to_db(
+                    keys=keys,
+                    truncate=truncate,
+                    recreate=recreate,
+                    force_nvarchar=force_nvarchar,
+                    table_name=f"{table_name}_{tbl}",
+                    db_connection_string=db_connection_string,
+                )
 
-        Args:
-            table (str): The name of the database table.
-            recreate (bool): Whether to recreate the table.
-            truncate (bool): Whether to truncate the table.
-            db_connection_string (str): The connection string for the database.
-            force_nvarchar (bool, optional): Whether to force NVARCHAR data
-                type for all columns. Defaults to False.
-            keys (Optional[List[str]], optional): List of keys for updates.
-                Defaults to None.
-        """
-        self._table = table
+        self._table = table_name
         self._force_nvarchar = force_nvarchar
         self._db = DatabaseHandler(db_connection_string)
         self._table_exists = self._db.table_exists(self._table)
@@ -246,6 +268,15 @@ class ETLHandler:
     def _prepare_data(self, keys: Optional[List[str]] = None) -> List[Tuple]:
         """
         Prepare data for insertion into a database table.
+
+        This method shifts the order of values in the tuple to match the order
+        of the keys used in the ETL Process (if keys is set).
+
+        It also converts any nested list or dictionary in the tuples to a
+        string for easier loading onto the database.
+
+        Lastly, it converts any 'nan' values to None for easier loading onto
+        the db.
 
         Args:
             keys (Optional[List[str]]): List of keys for updates.
@@ -459,14 +490,19 @@ class ETLHandler:
         [flat_dict] = pd.json_normalize(flat_dict, sep=sep).to_dict("records")
         return flat_dict
 
-    def _extract_nested_data(self, data: List[MutableMapping]):
+    def _extract_nested_data(
+        self,
+        data: Union[List[MutableMapping], List[dict]],
+        keys: List[str],
+    ):
         """
         Extract nested data from a list of dictionaries.
 
         Args:
-            data (List[MutableMapping]): The list of dictionaries containing
-                nested data.
-
+            data (List[MutableMapping] | List[dict]): The list of dictionaries
+                containing nested data.
+            keys (List[str]): The list of columns to use as keys to reference
+                the parent dataset.
         Returns:
             List[MutableMapping]: The list of dictionaries after extracting
                 nested data.
@@ -477,7 +513,7 @@ class ETLHandler:
                 key
                 for dictionary in data
                 for key, value in dictionary.items()
-                if isinstance(value, list)
+                if isinstance(value, list) and isinstance(value[0], dict)
             ]
         )
 
@@ -486,6 +522,11 @@ class ETLHandler:
             extracted_data = []
             for dictionary in data:
                 if column in dictionary:
+                    for key in keys:
+                        if key in dictionary:
+                            # Add a key column for reference to the main data
+                            for d in dictionary[column]:
+                                d[key] = dictionary[key]
                     extracted_data.append(dictionary[column])
                     del dictionary[column]  # Remove column from original data
 

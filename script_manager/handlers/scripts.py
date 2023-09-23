@@ -134,12 +134,12 @@ class ScriptExecutor:
             sce.WebDriverException,
         )
 
-    def execute(self, filename: str, directory: str) -> bool:
+    def execute(self, file: str, directory: str) -> bool:
         """
         Execute a Python script.
 
         Args:
-            filename (str): The filename of the script to execute.
+            file (str): The script to execute.
             directory (str): The directory of the script to execute.
 
         Returns:
@@ -148,14 +148,17 @@ class ScriptExecutor:
         Raises:
             ValueError: If the provided file is not a python '.py' file.
         """
-        filename = os.path.splitext(filename)[0]
-        extension = os.path.splitext(filename)[1]
+        filename = os.path.splitext(file)[0]
+        extension = os.path.splitext(file)[1]
+
+        if not extension:
+            extension = ".py"
 
         if extension != ".py":
             raise ValueError(f"{filename} is not a Python '.py' file.")
 
         script_name = filename.title().replace("_", " ")
-        script_path = os.path.join(directory, f"{filename}.py")
+        script_path = os.path.join(directory, f"{filename}.{extension}")
 
         self.script_log = LogHandler(script_name)
 

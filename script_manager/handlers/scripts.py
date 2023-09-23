@@ -107,16 +107,31 @@ class ScriptsHandler:
             if filename.endswith(".py")
         ]
 
-    def _execute_script(self, filename: str, directory: str) -> None:
+    def _execute_script(self, file: str, directory: str) -> None:
         """
         Execute a Python script.
 
         Args:
-            filename (str): The filename of the script to execute.
+            file (str): The script to execute.
             directory (str): The directory of the script to execute.
         """
-        if not ScriptExecutor().execute(filename, directory):
+        filename = os.path.splitext(file)[0]
+        extension = os.path.splitext(file)[1]
+
+        if not extension:
+            extension = ".py"
+            file = filename + extension
+
+        if extension != ".py":
+            raise ValueError(f"{file} is not a Python '.py' file.")
+
+        log_handler = LogHandler(filename.title().replace("_", " "))
+        log_handler.start()
+
+        if not ScriptExecutor(log_handler).execute(file, directory):
             self.upon_failure()
+
+        log_handler.stop()
 
 
 class ScriptExecutor:
@@ -124,11 +139,12 @@ class ScriptExecutor:
     Executes Python scripts and handles exceptions.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, log_handler: LogHandler) -> None:
         """
         Initializes the ScriptExecutor.
         """
         self.recovery_mode = False
+        self.script_log = log_handler
         self.selenium_session_exceptions = sce.SessionNotCreatedException
         self.selenium_optimization_exceptions = (
             sce.NoSuchElementException,
@@ -145,27 +161,11 @@ class ScriptExecutor:
 
         Returns:
             bool: True if executed successfully, False otherwise.
-
-        Raises:
-            ValueError: If the provided file is not a python '.py' file.
         """
-        filename = os.path.splitext(file)[0]
-        extension = os.path.splitext(file)[1]
-
-        if not extension:
-            extension = ".py"
-
-        if extension != ".py":
-            raise ValueError(f"{filename} is not a Python '.py' file.")
-
-        script_name = filename.title().replace("_", " ")
-        script_path = os.path.join(directory, f"{filename}{extension}")
-
-        self.script_log = LogHandler(script_name)
 
         try:
             # Replace 'if __name__ == "__main__":' with the module name
-            with open(script_path, "r") as script_file:
+            with open(os.path.join(directory, file), "r") as script_file:
                 script_content = script_file.read()
             script_content = re.sub(
                 r'^if __name__ == "__main__":',
@@ -174,22 +174,21 @@ class ScriptExecutor:
                 flags=re.MULTILINE,
             )
 
-            self.script_log.start()
             exec(script_content, globals())
-            message = f"{script_name} Script ran successfully"
-            message += " after recovery." if self.recovery_mode else "."
+            message = f"{self.script_log.name} Script ran successfully"
+            message += " after recovery." if self.recovery_mode else "!"
             self.script_log.message(message)
             return True
         except self.selenium_session_exceptions:
             self._handle_script_exceptions(self._configure_custom_driver)
-            return self.execute(filename, directory)
+            return self.execute(file, directory)
         except self.selenium_optimization_exceptions:
             if settings.selenium_optimizations_mode:
                 raise Exception(
-                    f"{script_name} failed due to a Selenium Issue."
+                    f"{self.script_log.name} failed due to a Web Page Issue."
                 )  # Prevents recursive loop
             self._handle_script_exceptions(self._disable_optimizations)
-            return self.execute(filename, directory)
+            return self.execute(file, directory)
         except Exception as exception:
             self.script_log.message(
                 level=LogLevel.ERROR,
@@ -197,8 +196,6 @@ class ScriptExecutor:
                 message="The script failed to run and couldn't recover.",
             )
             return False
-        finally:
-            self.script_log.stop()
 
     def _handle_script_exceptions(self, recovery_function: Callable) -> None:
         """

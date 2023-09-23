@@ -89,28 +89,21 @@ class SettingsHandler:
             "known-good-versions-with-downloads.json"
         )
 
-    def init(self, app_dir: str, log_mode: bool, debug_mode: bool) -> None:
+    def init(self, app_dir: str) -> None:
         """
         Initialize the application settings.
 
         Args:
             app_dir (str): The root directory of the application.
-            log_mode (bool): Whether logging is enabled.
-            debug_mode (bool): Whether debugging is enabled.
         """
-        self.app_dir = app_dir
-        self.log_mode = log_mode
-        self.debug_mode = debug_mode
+        self.set_app_dir(app_dir)
 
         from script_manager.handlers.logs import LogHandler
 
         LogHandler("Script Manager").message(
+            details=vars(self),
+            print_to_terminal=self.debug_mode,
             message="The application has been initialized as follows:",
-            details={
-                "app_dir": app_dir,
-                "log_mode": log_mode,
-                "debug_mode": debug_mode,
-            },
         )
 
     def get_setting(self, setting: str, default: Any = None) -> Any:
@@ -247,7 +240,10 @@ class SettingsHandler:
         """
         from script_manager.handlers.logs import LogHandler
 
-        LogHandler("Settings Handler").message(f"{name} updated to {value}")
+        LogHandler("Settings Handler").message(
+            print_to_terminal=self.debug_mode,
+            message=f"{name} updated to {value}",
+        )
 
     def __str__(self) -> str:
         """

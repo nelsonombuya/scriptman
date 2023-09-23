@@ -14,7 +14,7 @@ class CleanUpHandler:
     """
 
     def __init__(self) -> None:
-        self._log = LogHandler("CleanUp Manager")
+        self._log = LogHandler("CleanUp Handler")
         self.directory_handler = DirectoryHandler()
 
         self._remove_pycache_folders(self.directory_handler.script_man_dir)

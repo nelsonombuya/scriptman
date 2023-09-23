@@ -84,6 +84,7 @@ class SettingsHandler:
         self.selenium_optimizations_mode: bool = True
         self.selenium_custom_driver_mode: bool = False
         self.selenium_custom_driver_version: int = 116
+        self.selenium_keep_downloaded_custom_driver: bool = True
         self.selenium_chrome_url: str = (
             "https://googlechromelabs.github.io/chrome-for-testing/"
             "known-good-versions-with-downloads.json"
@@ -189,6 +190,20 @@ class SettingsHandler:
         """
         self.selenium_custom_driver_version = version
         self._log_change("selenium_custom_driver_version", version)
+
+    def keep_selenium_custom_driver_after_use(self) -> None:
+        """
+        Keep the selenium custom driver once it has been downloaded and used.
+        """
+        self.selenium_keep_downloaded_custom_driver = True
+        self._log_change("selenium_keep_downloaded_custom_driver", True)
+
+    def delete_selenium_custom_driver_after_use(self) -> None:
+        """
+        Delete the selenium custom driver once it has been downloaded and used.
+        """
+        self.selenium_keep_downloaded_custom_driver = False
+        self._log_change("selenium_keep_downloaded_custom_driver", False)
 
     def set_selenium_chrome_url(self, url: str) -> None:
         """

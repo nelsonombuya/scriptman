@@ -55,12 +55,11 @@ class CleanUpHandler:
             number_of_days (int): The threshold for log file deletion
                 (default: 30 days).
         """
-        logs_directory = self.directory_handler.logs_dir
 
-        if logs_directory and os.path.exists(logs_directory):
+        if os.path.exists(self.directory_handler.logs_dir):
             days_ago = datetime.now() - timedelta(days=number_of_days)
 
-            for root, dirs, files in os.walk(logs_directory):
+            for root, dirs, files in os.walk(self.directory_handler.logs_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
                     file_creation_time = datetime.fromtimestamp(
@@ -86,13 +85,15 @@ class CleanUpHandler:
         """
         Remove the custom driver folder.
         """
-        custom_driver_directory = self.directory_handler.selenium_dir
-        if os.path.exists(custom_driver_directory):
-            shutil.rmtree(custom_driver_directory)
+        if (
+            os.path.exists(self.directory_handler.selenium_dir)
+            and not settings.selenium_keep_downloaded_custom_driver
+        ):
+            shutil.rmtree(self.directory_handler.selenium_dir)
             self._log.message(
                 level=LogLevel.DEBUG,
                 print_to_terminal=settings.debug_mode,
-                message=f"Deleted {custom_driver_directory}",
+                message=f"Deleted {self.directory_handler.selenium_dir}",
             )
 
     def _remove_csv_files(self, ignore_filename: Optional[str] = None):
@@ -103,9 +104,8 @@ class CleanUpHandler:
                 deleting csv files (default: None).
         """
         try:
-            downloads_dir = self.directory_handler.downloads_dir
-            if downloads_dir:
-                files = os.listdir(downloads_dir)
+            if self.directory_handler.downloads_dir:
+                files = os.listdir(self.directory_handler.downloads_dir)
                 for file in files:
                     if file.endswith(".csv"):
                         filename = file.lower()
@@ -113,7 +113,9 @@ class CleanUpHandler:
                             self._log.message(f"Skipped deleting {filename}")
                             continue
 
-                        file_path = os.path.join(downloads_dir, file)
+                        file_path = os.path.join(
+                            self.directory_handler.downloads_dir, file
+                        )
                         os.remove(file_path)
                         self._log.message(
                             level=LogLevel.DEBUG,

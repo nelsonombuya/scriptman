@@ -67,10 +67,16 @@ class SettingsHandler:
             Set the main app's directory.
         set_clean_up_logs_after_n_days(days: int) -> None:
             Set the number of days after which log files should be cleaned up.
-        add_default_database_connection_string(
-            connection_string: Dict[str, str]
-        ) -> None:
+        add_db_connection_string(connection_string: Dict[str, str]) -> None:
             Add a default database connection string.
+        gen_and_add_db_connection_string(
+            driver: str,
+            server: str,
+            database: str,
+            username: str,
+            password: str,
+        ) -> None:
+            Generate and add a default database connection string.
         view_default_database_connection_strings() -> None:
             View the default database connection strings.
         remove_default_database_connection_string(key: str) -> None:
@@ -286,8 +292,9 @@ class SettingsHandler:
         self.clean_up_logs_after_n_days = days
         self._log_change("clean_up_logs_after_n_days", days)
 
-    def add_default_database_connection_string(
-        self, connection_string: Dict[str, str]
+    def add_db_connection_string(
+        self,
+        connection_string: Dict[str, str],
     ) -> None:
         """
         Add or update default database connection strings.
@@ -304,7 +311,7 @@ class SettingsHandler:
 
         Example:
             settings = SettingsHandler()
-            settings.add_default_database_connection_string(
+            settings.add_db_connection_string(
                 {"Connection1": "mysql://user:password@localhost/db1"}
             )
         """
@@ -314,7 +321,7 @@ class SettingsHandler:
             self.default_database_connection_strings,
         )
 
-    def generate_and_add_default_database_connection_string(
+    def gen_and_add_db_connection_string(
         self,
         driver: str,
         server: str,
@@ -338,7 +345,7 @@ class SettingsHandler:
 
         Example:
             settings = SettingsHandler()
-            settings.generate_and_add_default_database_connection_string(
+            settings.gen_and_add_db_connection_string(
                 driver="SQL Server",
                 server="localhost",
                 database="db",

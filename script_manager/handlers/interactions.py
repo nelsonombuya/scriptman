@@ -1,5 +1,6 @@
 import os
 import time
+from enum import Enum
 from typing import Optional, Union
 
 from selenium import webdriver
@@ -13,7 +14,7 @@ from script_manager.handlers.directories import DirectoryHandler
 AnyDriver = Union[webdriver.Chrome, webdriver.Firefox]
 
 
-class Interaction:
+class Interaction(Enum):
     """
     Interaction defines the possible interaction modes when interacting with
     web elements.
@@ -59,7 +60,7 @@ class SeleniumInteractionHandler:
     def interact_with_element(
         self,
         xpath: str,
-        mode: str = Interaction.CLICK,
+        mode: Interaction = Interaction.CLICK,
         keys: Optional[str] = None,
         timeout: int = 30,
         rest: int = 2,
@@ -74,8 +75,8 @@ class SeleniumInteractionHandler:
 
         Args:
             xpath (str): The XPath expression to locate the web element.
-            mode (str | Interaction, optional): The interaction mode,
-                which can be one of the Interaction enum values.
+            mode (Interaction, optional): The interaction mode, which can be
+                one of the Interaction enum values.
                 (default is Interaction.CLICK)
             keys (str, optional): The text to send to the element when using
                 Interaction.SEND_KEYS mode. Ignored if mode is not

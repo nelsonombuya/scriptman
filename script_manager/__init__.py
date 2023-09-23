@@ -34,8 +34,8 @@ class ScriptManager:
 
     # Exposed Properties and Methods
     cli: Callable = handlers.cli
-    Scripts: Callable = handlers.scripts
-    Directories: Callable = handlers.directories
+    scripts: Callable = handlers.scripts
+    directories: Callable = handlers.directories
     settings: SettingsHandler = handlers.settings
 
     # On Exit

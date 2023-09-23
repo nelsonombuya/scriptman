@@ -2,7 +2,7 @@ import json
 import os
 from typing import Dict
 
-from .settings import settings
+from settings import settings
 
 
 class DirectoryHandler:
@@ -75,6 +75,8 @@ class DirectoryHandler:
         """
         if settings.app_dir:
             return os.path.abspath(os.path.join(settings.app_dir, "app"))
+        elif settings.debug_mode:
+            return os.path.join(os.path.dirname(__file__), "..", "..", "app")
         raise RuntimeError("APP DIR has not been set! Run settings.init()")
 
     @property

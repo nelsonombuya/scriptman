@@ -1,11 +1,11 @@
 from typing import Callable
 
-from .cleanup import CleanUpHandler
-from .directories import DirectoryHandler
-from .logs import LogHandler
-from .selenium import SeleniumHandler
-from .settings import SettingsHandler
-from .settings import settings as settings_handler
+from cleanup import CleanUpHandler
+from directories import DirectoryHandler
+from logs import LogHandler
+from selenium_handler import SeleniumHandler
+from settings import SettingsHandler
+from settings import settings as settings_handler
 
 
 class HandlerManager:

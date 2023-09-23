@@ -1,4 +1,7 @@
 import atexit
+from typing import Callable
+
+from script_manager.handlers.settings import SettingsHandler
 
 
 class ScriptManager:
@@ -28,9 +31,9 @@ class ScriptManager:
     handlers = HandlerManager()
 
     # Exposed Properties and Methods
-    scripts = handlers.scripts
-    settings = handlers.settings
-    directories = handlers.directories
+    Scripts: Callable = handlers.scripts
+    Directories: Callable = handlers.directories
+    settings: SettingsHandler = handlers.settings
 
     # On Exit
     atexit.register(handlers.cleanup)

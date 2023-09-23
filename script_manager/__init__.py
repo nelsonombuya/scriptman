@@ -9,9 +9,10 @@ class ScriptManager:
     Attributes:
         handlers (HandlerManager): A manager for various handlers such as logs,
             Selenium, directories, and settings.
-        cleanup (callable): A function to  perform cleanup tasks on exit.
         settings (SettingsHandler): An instance of the SettingsHandler class
             for managing application settings.
+        scripts (ScriptHandler): An instance of the ScriptHandler class,
+            for running and managing scripts.
         directories (DirectoryHandler): An instance of the DirectoryHandler
             class for managing directories.
 
@@ -27,9 +28,9 @@ class ScriptManager:
     handlers = HandlerManager()
 
     # Exposed Properties and Methods
-    cleanup = handlers.cleanup
+    scripts = handlers.scripts
     settings = handlers.settings
     directories = handlers.directories
 
     # On Exit
-    atexit.register(cleanup)
+    atexit.register(handlers.cleanup)

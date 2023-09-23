@@ -3,6 +3,7 @@ from typing import Callable
 from cleanup import CleanUpHandler
 from directories import DirectoryHandler
 from logs import LogHandler
+from scripts import ScriptsHandler
 from selenium_handler import SeleniumHandler
 from settings import SettingsHandler
 from settings import settings as settings_handler
@@ -21,6 +22,8 @@ class HandlerManager:
             can be used to manage logs.
         cleanup (Callable): A callable reference to the CleanUpHandler class,
             which can be used to manage cleanup tasks.
+        scripts (Callable): A callable reference to the ScriptHandler class,
+            which can be used to manage and run python scripts.
         selenium (Callable): A callable reference to the SeleniumHandler class,
             which can be used to interact with Selenium.
         directories (Callable): A callable reference to the DirectoryHandler
@@ -44,6 +47,7 @@ class HandlerManager:
 
     logs: Callable = LogHandler
     cleanup: Callable = CleanUpHandler
+    scripts: Callable = ScriptsHandler
     selenium: Callable = SeleniumHandler
     directories: Callable = DirectoryHandler
     settings: SettingsHandler = settings_handler

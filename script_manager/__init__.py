@@ -1,7 +1,13 @@
 import atexit
 from typing import Callable
 
+from script_manager.handlers.interactions import Interaction
+from script_manager.handlers.logs import LogLevel as LogLevelEnum
 from script_manager.handlers.settings import SettingsHandler
+
+# Exposing Enums
+LogLevel = LogLevelEnum
+SeleniumInteraction = Interaction
 
 
 class ScriptManager:

@@ -16,12 +16,12 @@ class CleanUpHandler:
     def __init__(self) -> None:
         self._log = LogHandler("CleanUp Handler")
         self.directory_handler = DirectoryHandler()
-
-        self._remove_pycache_folders(self.directory_handler.script_man_dir)
-        self._remove_pycache_folders(self.directory_handler.root_dir)
         self._remove_custom_driver_folder()
         self._remove_old_log_files()
         self._remove_csv_files()
+
+        for folder in settings.clean_up_folders:
+            self._remove_pycache_folders(folder)
 
     def _remove_pycache_folders(self, directory: str) -> None:
         """

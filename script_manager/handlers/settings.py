@@ -1,5 +1,5 @@
 import json
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 
 class SettingsHandler:
@@ -7,9 +7,8 @@ class SettingsHandler:
     Singleton class for managing ScriptManager Application settings.
 
     This class provides methods to manage various settings for the
-    ScriptManager application,
-    including logging, debugging, Selenium optimizations, custom driver
-    settings, and more.
+    ScriptManager application, including logging, debugging, Selenium
+    optimizations, custom driver settings, and more.
 
     Attributes:
         app_dir (str): The root directory of the application.
@@ -19,20 +18,21 @@ class SettingsHandler:
             should be cleaned up.
         selenium_optimizations_mode (bool): Whether Selenium optimizations are
             enabled.
-        selenium_custom_driver_mode (bool): Whether custom Selenium driver mode
-            is enabled.
+        selenium_custom_driver_mode (bool): Whether custom Selenium driver
+            mode is enabled.
         selenium_custom_driver_version (int): The major version of Chrome to
             use with custom Selenium driver.
+        selenium_keep_downloaded_custom_driver (bool): Whether to keep the
+            downloaded custom Selenium driver.
         selenium_chrome_url (str): The URL for downloading Chrome
             binaries/drivers.
 
     Methods:
-        init(app_dir: str, log_mode: bool, debug_mode: bool) -> None:
+        init(app_dir: str) -> None:
             Initialize the application settings.
-        get_setting(setting: str, default: Any) -> Any:
+        get_setting(setting: str, default: Any = None) -> Any:
             Get the value of a specific setting and return the default value if
-            the setting is not found. Returns None if the default value is not
-            set.
+            the setting is not found.
         enable_logging() -> None:
             Enable logging mode.
         disable_logging() -> None:
@@ -41,6 +41,9 @@ class SettingsHandler:
             Enable debugging mode.
         disable_debugging() -> None:
             Disable debugging mode.
+        add_folders_for_cleanup(folders: List[str]) -> None:
+            Add a list of folders to be cleaned up when the ScriptManager is
+            done.
         enable_selenium_optimizations_mode() -> None:
             Enable Selenium optimizations.
         disable_selenium_optimizations_mode() -> None:
@@ -51,15 +54,20 @@ class SettingsHandler:
             Disable custom Selenium driver mode.
         set_selenium_custom_driver_version(version: int) -> None:
             Set the version of Chrome to use with custom Selenium driver.
+        keep_selenium_custom_driver_after_use() -> None:
+            Keep the Selenium custom driver once it has been downloaded and
+            used.
+        delete_selenium_custom_driver_after_use() -> None:
+            Delete the Selenium custom driver once it has been downloaded and
+            used.
         set_selenium_chrome_url(url: str) -> None:
-            Set the URL for downloading Chrome binaries/drivers.
+            Set the URL to use when downloading Chrome binaries/drivers.
         set_app_dir(directory: str) -> None:
             Set the main app's directory.
         set_clean_up_logs_after_n_days(days: int) -> None:
             Set the number of days after which log files should be cleaned up.
         __str__() -> str:
             Get a string representation of the current settings.
-
     """
 
     _instance = None
@@ -80,6 +88,7 @@ class SettingsHandler:
         self.app_dir: str = ""
         self.log_mode: bool = True
         self.debug_mode: bool = False
+        self.clean_up_folders: List[str] = []
         self.clean_up_logs_after_n_days: int = 7
         self.selenium_optimizations_mode: bool = True
         self.selenium_custom_driver_mode: bool = False
@@ -99,8 +108,16 @@ class SettingsHandler:
         """
         self.set_app_dir(app_dir)
 
+        from script_manager.handlers.directories import DirectoryHandler
         from script_manager.handlers.logs import LogHandler
 
+        directory_handler = DirectoryHandler()
+        self.add_folders_for_cleanup(
+            [
+                directory_handler.root_dir,
+                directory_handler.script_man_dir,
+            ]
+        )
         LogHandler("Script Manager").message(
             details=vars(self),
             print_to_terminal=self.debug_mode,
@@ -152,6 +169,13 @@ class SettingsHandler:
         """
         self.debug_mode = False
         self._log_change("debug_mode", False)
+
+    def add_folders_for_cleanup(self, folders: List[str]) -> None:
+        """
+        Add a list of folders to be cleaned up when the ScriptManager is done.
+        """
+        self.clean_up_folders.extend(folders)
+        self._log_change("Folders to be cleaned:", self.clean_up_folders)
 
     def enable_selenium_optimizations_mode(self) -> None:
         """

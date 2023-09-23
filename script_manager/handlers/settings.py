@@ -328,6 +328,7 @@ class SettingsHandler:
         database: str,
         username: str,
         password: str,
+        port: Optional[str] = None,
     ) -> None:
         """
         Generate and add or update a default database connection string.
@@ -342,6 +343,7 @@ class SettingsHandler:
             database (str): The database name.
             username (str): The username for authentication.
             password (str): The password for authentication.
+            port (optional, str): The database server port.
 
         Example:
             settings = SettingsHandler()
@@ -354,11 +356,22 @@ class SettingsHandler:
             )
         """
         connection_string = (
-            f"Driver={driver};"
-            f"Server={server};"
-            f"Database={database};"
-            f"UID={username};"
-            f"PWD={password}"
+            (
+                f"Driver={driver};"
+                f"Server={server};"
+                f"Port={port};"
+                f"Database={database};"
+                f"UID={username};"
+                f"PWD={password}"
+            )
+            if port
+            else (
+                f"Driver={driver};"
+                f"Server={server};"
+                f"Database={database};"
+                f"UID={username};"
+                f"PWD={password}"
+            )
         )
         self.default_database_connection_strings[database] = connection_string
         self._log_change(

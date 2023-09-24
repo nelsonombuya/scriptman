@@ -29,7 +29,6 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "pytz>=2023.3.post1",
     "requests>=2.31.0",
-    "-e git+https://github.com/nelsonombuya/script_manager.git@1e569598188554c567ac044537e01baae4be9827#egg=script_manager",
     "selenium>=4.12.0",
     "six>=1.16.0",
     "sniffio>=1.3.0",

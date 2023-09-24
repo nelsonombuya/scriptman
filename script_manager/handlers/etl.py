@@ -172,7 +172,7 @@ class ETLHandler:
         truncate: bool = False,
         recreate: bool = False,
         force_nvarchar: bool = False,
-        keys: Optional[List[str]] = None,
+        keys: List[str] = [],
     ) -> None:
         """
         Load the data into a database table.
@@ -186,8 +186,8 @@ class ETLHandler:
                 Defaults to False.
             force_nvarchar (bool, optional): Whether to force NVARCHAR data
                 type for all columns. Defaults to False.
-            keys (Optional[List[str]], optional): List of keys for updates.
-                Defaults to None.
+            keys (List[str], optional): List of keys for updates.
+                Defaults to [].
 
         """
         if self._data.empty:
@@ -198,7 +198,7 @@ class ETLHandler:
             self._log.message(f"Separating Nested Data from [{table_name}]...")
             for tbl, data in self._nested_data.items():
                 nested_etl = ETLHandler()
-                nested_etl.from_json(lambda: data, True)
+                nested_etl.from_json(lambda: data, True, keys)
                 nested_etl.to_db(
                     keys=keys,
                     truncate=truncate,
@@ -215,7 +215,7 @@ class ETLHandler:
         self._records_exist = self._db.table_has_records(self._table)
 
         if (
-            keys is None
+            not keys
             or not self._table_exists
             or not self._records_exist
             or truncate

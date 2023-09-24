@@ -124,6 +124,15 @@ class ETLHandler:
         self._log.message("Data extraction complete.")
         return self._data
 
+    def to_df(self) -> pd.DataFrame:
+        """
+        Return extracted data as a Pandas DataFrame.
+
+        Returns:
+            pd.DataFrame: The extracted DataFrame.
+        """
+        return self._data
+
     def to_csv(self, filename: str, directory: Optional[str] = None) -> str:
         """
         Save the loaded data to a CSV file.

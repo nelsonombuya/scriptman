@@ -94,6 +94,11 @@ class SeleniumInteractionHandler:
         if mode == Interaction.WAIT_TILL_INVISIBLE:
             wait.until(EC.invisibility_of_element_located((By.XPATH, xpath)))
             return
+        elif mode == Interaction.DENY_COOKIES:
+            return self.interact_with_element(
+                mode=Interaction.JS_CLICK,
+                xpath=xpath or '//*[@id="tarteaucitronAllDenied2"]',
+            )
 
         element = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
         ActionChains(self._driver).move_to_element(element).perform()
@@ -104,11 +109,6 @@ class SeleniumInteractionHandler:
             self._driver.execute_script("arguments[0].click();", element)
         elif mode == Interaction.SEND_KEYS:
             element.send_keys(keys)
-        elif mode == Interaction.DENY_COOKIES:
-            return self.interact_with_element(
-                mode=Interaction.JS_CLICK,
-                xpath='//*[@id="tarteaucitronAllDenied2"]',
-            )
         else:
             raise ValueError(f"Passed Invalid Mode: {mode}")
         time.sleep(2 if Settings.debug_mode else rest)

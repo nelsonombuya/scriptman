@@ -513,7 +513,9 @@ class ETLHandler:
                 key
                 for dictionary in data
                 for key, value in dictionary.items()
-                if isinstance(value, list) and isinstance(value[0], dict)
+                if isinstance(value, list)
+                for item in value
+                if isinstance(item, dict)
             ]
         )
 

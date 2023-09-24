@@ -37,7 +37,9 @@ class PackagePublishHelper:
         self.package_name = package_name
         self.version = version
 
-        if use_dotenv == "true" or use_dotenv is True:
+        if (isinstance(use_dotenv, str) and use_dotenv.lower() == "true") or (
+            isinstance(use_dotenv, bool) and use_dotenv is True
+        ):
             load_dotenv()
             self.username = os.environ["PYPI_USERNAME"]
             self.password = os.environ["PYPI_PASSWORD"]

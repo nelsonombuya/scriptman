@@ -539,7 +539,7 @@ class ETLHandler:
             for dictionary in data:
                 if column in dictionary:
                     for key in keys:
-                        if key in dictionary:
+                        if key in dictionary and dictionary[column]:
                             # Add a key column for reference to the main data
                             for d in dictionary[column]:
                                 d[key] = dictionary[key]

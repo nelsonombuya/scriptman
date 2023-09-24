@@ -90,15 +90,16 @@ class SeleniumInteractionHandler:
         Raises:
             ValueError: If an invalid interaction mode is provided.
         """
-        wait = WebDriverWait(self._driver, timeout)
-        if mode == Interaction.WAIT_TILL_INVISIBLE:
-            wait.until(EC.invisibility_of_element_located((By.XPATH, xpath)))
-            return
-        elif mode == Interaction.DENY_COOKIES:
+        if mode == Interaction.DENY_COOKIES:
             return self.interact_with_element(
                 mode=Interaction.JS_CLICK,
                 xpath=xpath or '//*[@id="tarteaucitronAllDenied2"]',
             )
+
+        wait = WebDriverWait(self._driver, timeout)
+        if mode == Interaction.WAIT_TILL_INVISIBLE:
+            wait.until(EC.invisibility_of_element_located((By.XPATH, xpath)))
+            return
 
         element = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
         ActionChains(self._driver).move_to_element(element).perform()

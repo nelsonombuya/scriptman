@@ -8,6 +8,7 @@ from tqdm import tqdm
 from script_manager.handlers.csv import CSVHandler
 from script_manager.handlers.database import DatabaseHandler
 from script_manager.handlers.logs import LogHandler, LogLevel
+from script_manager.handlers.settings import settings
 
 
 class ETLHandler:
@@ -38,6 +39,7 @@ class ETLHandler:
         self._log.message("Data extraction started...")
         self._data = df
         self._log.message("Data extraction complete.")
+        self._log_number_of_records()
         return self._data
 
     def from_json(
@@ -74,6 +76,7 @@ class ETLHandler:
 
         self._log.message("Data transformation complete.")
         self._data = pd.DataFrame(data)
+        self._log_number_of_records()
         return self._data
 
     def from_csv(
@@ -96,6 +99,7 @@ class ETLHandler:
         csv_file = csv_handler.find_csv_file(filename, directory)
         self._data = csv_handler.extract_csv(csv_file)
         self._log.message("Data extraction complete.")
+        self._log_number_of_records()
         return self._data
 
     def from_db(
@@ -122,6 +126,7 @@ class ETLHandler:
         result = db.execute_read_query(query, params)
         self._data = pd.DataFrame(result)
         self._log.message("Data extraction complete.")
+        self._log_number_of_records()
         return self._data
 
     def to_df(self) -> pd.DataFrame:
@@ -553,3 +558,14 @@ class ETLHandler:
             self._nested_data.update({column: extracted_data})
 
         return data  # Return remaining data without nested tables
+
+    def _log_number_of_records(self):
+        """
+        Logs the number of records after data extraction.
+
+        Also prints the DataFrame if debugging mode is on.
+        """
+        self._log.message(f"Extracted {len(self._data)} number of records.")
+
+        if settings.debug_mode:
+            print(self._data)

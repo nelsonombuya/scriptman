@@ -3,7 +3,7 @@ build-backend = "setuptools.build_meta"
 requires = ["setuptools", "setuptools-scm"]
 
 [project]
-version = "1.0.0"
+version = "1.0.1"
 name = "script_manager"
 requires-python = ">=3.11"
 description = "Script Manager assists with managing python scripts."
@@ -29,7 +29,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "pytz>=2023.3.post1",
     "requests>=2.31.0",
-    "-e git+https://github.com/nelsonombuya/script_manager.git@0ddecdc5b5f97d57eed13591f94082612a7bea8b#egg=script_manager",
+    "-e git+https://github.com/nelsonombuya/script_manager.git@1e569598188554c567ac044537e01baae4be9827#egg=script_manager",
     "selenium>=4.12.0",
     "six>=1.16.0",
     "sniffio>=1.3.0",
@@ -42,5 +42,4 @@ dependencies = [
     "urllib3>=2.0.5",
     "webdriver-manager>=4.0.0",
     "wsproto>=1.2.0",
-
 ]

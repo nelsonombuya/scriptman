@@ -1,7 +1,10 @@
+import getpass
 import os
 import shutil
 import subprocess
 import sys
+
+from dotenv import load_dotenv
 
 
 class PackagePublishHelper:
@@ -16,6 +19,8 @@ class PackagePublishHelper:
         dir (str): The root directory of the Script Manager application.
         package_name (str): The name of the Python package.
         version (str): The new version to set for the package.
+        use_dotenv (bool|str): Whether to use the credentials from the dotenv
+            file.
 
     Usage:
         Create an instance of PackagePublishHelper with the package name and
@@ -27,10 +32,18 @@ class PackagePublishHelper:
         >>> helper.run()
     """
 
-    def __init__(self, package_name, version):
+    def __init__(self, package_name, version, use_dotenv):
         self.dir = os.path.dirname(__file__)
         self.package_name = package_name
         self.version = version
+
+        if use_dotenv == "true" or use_dotenv is True:
+            load_dotenv()
+            self.username = os.environ["PYPI_USERNAME"]
+            self.password = os.environ["PYPI_PASSWORD"]
+        else:
+            self.username = input("Enter your PyPI username: ")
+            self.password = getpass.getpass("Enter your PyPI password: ")
 
     def delete_dist_folder(self):
         """
@@ -75,6 +88,7 @@ class PackagePublishHelper:
         """
         Build distribution packages using 'python -m build'.
         """
+        subprocess.run(["python", "-m", "pip", "install", "build"])
         subprocess.run(["python", "-m", "build"])
         print("Built distribution packages.")
 
@@ -82,7 +96,14 @@ class PackagePublishHelper:
         """
         Upload distribution packages to Twine using 'twine upload'.
         """
-        subprocess.run(["twine", "upload", "dist/*"])
+        subprocess.run(["python", "-m", "pip", "install", "twine"])
+
+        cmd = ["twine", "upload", "dist/*"]
+
+        # Pass username and password options
+        cmd.extend(["-u", self.username, "-p", self.password])
+
+        subprocess.run(cmd)
         print("Uploaded distribution packages to Twine.")
 
     def run(self):
@@ -100,5 +121,5 @@ class PackagePublishHelper:
 
 
 if __name__ == "__main__":
-    package_name, version = sys.argv[1:]
-    PackagePublishHelper(package_name, version).run()
+    package_name, version, use_dotenv = sys.argv[1:]
+    PackagePublishHelper(package_name, version, use_dotenv).run()

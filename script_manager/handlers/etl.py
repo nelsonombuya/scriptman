@@ -565,7 +565,7 @@ class ETLHandler:
 
         Also prints the DataFrame if debugging mode is on.
         """
-        self._log.message(f"Extracted {len(self._data)} number of records.")
+        self._log.message(f"Extracted {len(self._data)} records.")
 
         if settings.debug_mode:
             print(self._data)

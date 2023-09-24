@@ -446,3 +446,7 @@ class SettingsHandler:
             str: A string representation of the current settings.
         """
         return json.dumps(vars(self), indent=4)
+
+
+# Singleton Instance
+Settings = SettingsHandler()

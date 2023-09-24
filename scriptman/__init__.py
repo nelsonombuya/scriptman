@@ -32,17 +32,16 @@ import atexit
 
 from scriptman.cleanup import CleanUpHandler
 from scriptman.cli import CLIHandler
-from scriptman.csv import CSVHandler
+from scriptman.csv_handler import CSVHandler
 from scriptman.database import DatabaseHandler
 from scriptman.directories import DirectoryHandler
 from scriptman.etl import ETLHandler
 from scriptman.interactions import Interaction as SeleniumInteraction
 from scriptman.logs import LogHandler, LogLevel
 from scriptman.scripts import ScriptsHandler
-from scriptman.selenium import SeleniumHandler
-from scriptman.settings import SettingsHandler
+from scriptman.selenium_handler import SeleniumHandler
+from scriptman.settings import Settings
 
-Settings = SettingsHandler()
 atexit.register(CleanUpHandler)
 
 __all__ = [

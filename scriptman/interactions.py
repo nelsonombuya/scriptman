@@ -9,8 +9,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
-from scriptman import Settings
 from scriptman.directories import DirectoryHandler
+from scriptman.settings import Settings
 
 AnyDriver = Union[webdriver.Chrome, webdriver.Firefox]
 

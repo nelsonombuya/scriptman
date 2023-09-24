@@ -2,7 +2,7 @@ import sys
 from typing import List
 
 from scriptman.scripts import ScriptsHandler
-from scriptman import Settings
+from scriptman.settings import Settings
 
 
 class CLIHandler:

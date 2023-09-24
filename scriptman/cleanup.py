@@ -3,9 +3,9 @@ import shutil
 from datetime import datetime, timedelta
 from typing import Optional
 
-from scriptman import Settings
 from scriptman.directories import DirectoryHandler
 from scriptman.logs import LogHandler, LogLevel
+from scriptman.settings import Settings
 
 
 class CleanUpHandler:

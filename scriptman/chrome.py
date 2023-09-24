@@ -8,10 +8,10 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-from scriptman import Settings
 from scriptman.directories import DirectoryHandler
 from scriptman.interactions import SeleniumInteractionHandler
 from scriptman.logs import LogHandler, LogLevel
+from scriptman.settings import Settings
 
 
 class ChromeApp:

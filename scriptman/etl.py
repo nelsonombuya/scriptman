@@ -5,10 +5,10 @@ from typing import Any, Callable, Dict, List, MutableMapping, Optional, Union
 import pandas as pd
 from tqdm import tqdm
 
-from scriptman import Settings
-from scriptman.csv import CSVHandler
+from scriptman.csv_handler import CSVHandler
 from scriptman.database import DatabaseHandler
 from scriptman.logs import LogHandler, LogLevel
+from scriptman.settings import Settings
 
 
 class ETLHandler:

@@ -4,8 +4,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from scriptman import Settings
 from scriptman.directories import DirectoryHandler
+from scriptman.settings import Settings
 
 
 class LogLevel(Enum):

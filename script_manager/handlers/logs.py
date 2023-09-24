@@ -99,6 +99,16 @@ class LogHandler:
             print_to_terminal (bool): Whether to print the message to the
                 terminal.
         """
+        if level in (
+            LogLevel.ERROR,
+            LogLevel.FATAL,
+            LogLevel.WARN,
+            LogLevel.CRITICAL,
+            LogLevel.EXCEPTION,
+        ):
+            stacktrace = {"stacktrace": self.get_stacktrace()}
+            details = stacktrace if not details else details.update(stacktrace)
+
         message = f"{self.name}: {message}"
         message += (
             "\n\t" + ("\n\t".join([f"{k}: {v}" for k, v in details.items()]))

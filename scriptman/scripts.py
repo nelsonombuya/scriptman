@@ -184,7 +184,7 @@ class ScriptExecutor:
             self._handle_script_exceptions(self._configure_custom_driver)
             return self.execute(file, directory)
         except self.selenium_optimization_exceptions:
-            if Settings.selenium_optimizations_mode:
+            if not Settings.selenium_optimizations_mode:
                 raise Exception(
                     f"{self.script_log.title} failed due to a Web Page Issue."
                 )  # Prevents recursive loop

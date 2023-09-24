@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-VERSION = "0.0.0.10"
+VERSION = "0.0.0.11"
 DESCRIPTION = "Script Manager assists with managing python scripts."
 
 setup(

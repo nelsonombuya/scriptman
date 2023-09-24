@@ -192,9 +192,8 @@ class DatabaseHandler:
         Returns:
             bool: True if the table was truncated, False otherwise.
         """
-        query = f"TRUNCATE TABLE {table_name}"
         try:
-            return self.execute_write_query(query)
+            return self.execute_write_query("TRUNCATE TABLE ?", (table_name,))
         finally:
             self._log.message(f"Table [{table_name}] truncated")
 
@@ -208,9 +207,8 @@ class DatabaseHandler:
         Returns:
             bool: True if the table was dropped, False otherwise.
         """
-        query = f"DROP TABLE {table_name}"
         try:
-            return self.execute_write_query(query)
+            return self.execute_write_query("DROP TABLE ?", (table_name,))
         finally:
             self._log.message(f"Table [{table_name}] dropped")
 
@@ -256,8 +254,8 @@ class DatabaseHandler:
             return False
         cursor = self._connection.cursor()
         try:
-            query = f"SELECT COUNT(*) FROM [{table_name}];"
-            cursor.execute(query)
+            query = "SELECT COUNT(*) FROM ?;"
+            cursor.execute(query, (table_name,))
             fetched = cursor.fetchone()
             count = fetched[0] if fetched is not None else 0
             return count > 0

@@ -8,10 +8,10 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-from script_manager.handlers.directories import DirectoryHandler
-from script_manager.handlers.interactions import SeleniumInteractionHandler
-from script_manager.handlers.logs import LogHandler, LogLevel
-from script_manager.handlers.settings import settings
+from .directories import DirectoryHandler
+from .interactions import SeleniumInteractionHandler
+from .logs import LogHandler, LogLevel
+from .settings import settings
 
 
 class ChromeApp:

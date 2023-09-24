@@ -5,9 +5,9 @@ from typing import Callable, List, Optional
 
 import selenium.common.exceptions as sce
 
-from script_manager.handlers.directories import DirectoryHandler
-from script_manager.handlers.logs import LogHandler, LogLevel
-from script_manager.handlers.settings import settings
+from .directories import DirectoryHandler
+from .logs import LogHandler, LogLevel
+from .settings import settings
 
 
 class ScriptsHandler:

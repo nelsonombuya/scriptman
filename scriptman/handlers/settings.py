@@ -139,8 +139,8 @@ class SettingsHandler:
         self.debug_mode = debugging
         self.set_app_dir(app_dir)
 
-        from script_manager.handlers.directories import DirectoryHandler
-        from script_manager.handlers.logs import LogHandler
+        from .directories import DirectoryHandler
+        from .logs import LogHandler
 
         directory_handler = DirectoryHandler()
         self.add_folders_for_cleanup(
@@ -429,7 +429,7 @@ class SettingsHandler:
             name (str): The name of the setting being changed.
             value: The new value of the setting.
         """
-        from script_manager.handlers.logs import LogHandler
+        from .logs import LogHandler
 
         LogHandler("Settings Handler").message(
             print_to_terminal=self.debug_mode,

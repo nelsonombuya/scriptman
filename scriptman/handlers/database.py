@@ -3,7 +3,7 @@ from typing import List, Union
 
 import pyodbc
 
-from script_manager.handlers.logs import LogHandler, LogLevel
+from .logs import LogHandler, LogLevel
 
 
 class DatabaseHandler:

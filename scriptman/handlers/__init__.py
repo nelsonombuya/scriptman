@@ -1,15 +1,15 @@
 from typing import Callable, List
 
-from script_manager.handlers.cleanup import CleanUpHandler
-from script_manager.handlers.cli import CLIHandler
-from script_manager.handlers.database import DatabaseHandler
-from script_manager.handlers.directories import DirectoryHandler
-from script_manager.handlers.etl import ETLHandler
-from script_manager.handlers.logs import LogHandler
-from script_manager.handlers.scripts import ScriptsHandler
-from script_manager.handlers.selenium import SeleniumHandler
-from script_manager.handlers.settings import SettingsHandler
-from script_manager.handlers.settings import settings as settings_handler
+from .cleanup import CleanUpHandler
+from .cli import CLIHandler
+from .database import DatabaseHandler
+from .directories import DirectoryHandler
+from .etl import ETLHandler
+from .logs import LogHandler
+from .scripts import ScriptsHandler
+from .selenium import SeleniumHandler
+from .settings import SettingsHandler
+from .settings import settings as settings_handler
 
 
 class HandlerManager:

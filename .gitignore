@@ -1,5 +1,6 @@
 app
+dist
 .venv
 *.pyc
 __pycache__
-script_manager.egg-info
+scriptman.egg-info

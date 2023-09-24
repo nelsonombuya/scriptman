@@ -5,10 +5,10 @@ from typing import Any, Callable, Dict, List, MutableMapping, Optional, Tuple, U
 import pandas as pd
 from tqdm import tqdm
 
-from script_manager.handlers.csv import CSVHandler
-from script_manager.handlers.database import DatabaseHandler
-from script_manager.handlers.logs import LogHandler, LogLevel
-from script_manager.handlers.settings import settings
+from .csv import CSVHandler
+from .database import DatabaseHandler
+from .logs import LogHandler, LogLevel
+from .settings import settings
 
 
 class ETLHandler:

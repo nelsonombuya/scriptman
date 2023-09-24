@@ -1,22 +1,24 @@
 import atexit
 from typing import Callable, List
 
-from script_manager.handlers.cli import CLIHandler
-from script_manager.handlers.directories import DirectoryHandler
-from script_manager.handlers.interactions import Interaction
-from script_manager.handlers.logs import LogLevel as LogLevelEnum
-from script_manager.handlers.scripts import ScriptsHandler
-from script_manager.handlers.settings import SettingsHandler
+from handlers.cli import CLIHandler
+from handlers.directories import DirectoryHandler
+from handlers.interactions import Interaction
+from handlers.logs import LogLevel as LogLevelEnum
+from handlers.scripts import ScriptsHandler
+from handlers.settings import SettingsHandler
+from handlers.settings import settings as settings_handler
 
 # Exposing Enums
 LogLevel = LogLevelEnum
 SeleniumInteraction = Interaction
 
 
-class ScriptManager:
+class ScriptMan:
     """
-    ScriptManager is responsible for managing the application's scripts,
-    handlers, settings, directories, and performing cleanup tasks on exit.
+    ScriptManager aka ScriptMan is responsible for managing the application's
+    scripts, handlers, settings, directories, and performing cleanup tasks on
+    exit.
 
     Attributes:
         handlers (HandlerManager): A manager for various handlers such as logs,
@@ -37,15 +39,18 @@ class ScriptManager:
     """
 
     # Initialization
-    from script_manager.handlers import HandlerManager
+    from handlers import HandlerManager
 
     handlers = HandlerManager()
 
     # Exposed Properties and Methods
-    settings: SettingsHandler = handlers.settings
+    settings: SettingsHandler = settings_handler
     cli: Callable[[List[str]], CLIHandler] = handlers.cli
     scripts: Callable[[], ScriptsHandler] = handlers.scripts
     directories: Callable[[], DirectoryHandler] = handlers.directories
 
     # On Exit
     atexit.register(handlers.cleanup)
+
+
+ScriptMan.settings.enable_debugging()

@@ -1,8 +1,8 @@
 import sys
 from typing import List
 
-from script_manager.handlers.scripts import ScriptsHandler
-from script_manager.handlers.settings import settings
+from .scripts import ScriptsHandler
+from .settings import settings
 
 
 class CLIHandler:

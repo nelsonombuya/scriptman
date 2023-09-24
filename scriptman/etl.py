@@ -25,6 +25,8 @@ class ETLHandler:
         Initialize an ETLHandler instance.
         """
         self._log = LogHandler("ETL Handler")
+        self._data: pd.DataFrame = pd.DataFrame()
+        self._nested_data: Dict[str, List[Dict[str, Any]]] = {}
 
     def from_df(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -71,7 +73,6 @@ class ETLHandler:
 
         if extract_data_from_sublists:
             self._log.message("Extracting Tables from Nested Dictionaries...")
-            self._nested_data: Dict[str, List[Dict[str, Any]]] = {}
             data = self._extract_nested_data(data, keys)
 
         self._log.message("Data transformation complete.")

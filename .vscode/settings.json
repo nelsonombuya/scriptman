@@ -1,34 +1,13 @@
 {
     "cSpell.words": [
-        "certifi",
-        "cffi",
         "chromedriver",
-        "chromeman",
-        "cleanman",
         "crdownload",
-        "dateuti",
-        "dirman",
-        "doten",
         "dtype",
-        "exceptiongroup",
         "infobars",
         "iterrows",
-        "logman",
         "Ombuya",
-        "pycparser",
-        "pytz",
         "safebrowsing",
         "scriptman",
-        "seleniuminteractions",
-        "seleniumman",
-        "settingsman",
-        "sniffi",
-        "sniffio",
-        "sortedcontainer",
-        "sortedcontainers",
-        "tarteaucitron",
-        "tzdata",
-        "wsprot",
-        "wsproto"
+        "tarteaucitron"
     ]
 }

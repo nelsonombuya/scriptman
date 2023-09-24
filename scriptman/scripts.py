@@ -5,9 +5,9 @@ from typing import Callable, List, Optional
 
 import selenium.common.exceptions as sce
 
-from .directories import DirectoryHandler
-from .logs import LogHandler, LogLevel
-from .settings import settings
+from scriptman import Settings
+from scriptman.directories import DirectoryHandler
+from scriptman.logs import LogHandler, LogLevel
 
 
 class ScriptsHandler:
@@ -43,8 +43,8 @@ class ScriptsHandler:
                 execute. If not provided, all '.py' files in the scripts
                 directory are executed.
         """
-        settings.enable_logging()
-        settings.disable_debugging()
+        Settings.enable_logging()
+        Settings.disable_debugging()
 
         for file in scripts or self.get_scripts():
             self._execute_script(file, self.scripts_dir)
@@ -59,8 +59,8 @@ class ScriptsHandler:
                 execute. If not provided, all '.py' files in the scripts
                 directory are executed.
         """
-        settings.disable_logging()
-        settings.enable_debugging()
+        Settings.disable_logging()
+        Settings.enable_debugging()
 
         for file in scripts or self.get_scripts():
             self._execute_script(file, self.scripts_dir)
@@ -72,8 +72,8 @@ class ScriptsHandler:
         Args:
             script_paths (List[str]): A list of script file paths to execute.
         """
-        settings.enable_logging()
-        settings.disable_debugging()
+        Settings.enable_logging()
+        Settings.disable_debugging()
 
         for file_path in script_paths:
             filename = os.path.basename(file_path)
@@ -87,8 +87,8 @@ class ScriptsHandler:
         Args:
             script_paths (List[str]): A list of script file paths to execute.
         """
-        settings.disable_logging()
-        settings.enable_debugging()
+        Settings.disable_logging()
+        Settings.enable_debugging()
 
         for file_path in script_paths:
             filename = os.path.basename(file_path)
@@ -184,7 +184,7 @@ class ScriptExecutor:
             self._handle_script_exceptions(self._configure_custom_driver)
             return self.execute(file, directory)
         except self.selenium_optimization_exceptions:
-            if settings.selenium_optimizations_mode:
+            if Settings.selenium_optimizations_mode:
                 raise Exception(
                     f"{self.script_log.title} failed due to a Web Page Issue."
                 )  # Prevents recursive loop
@@ -217,7 +217,7 @@ class ScriptExecutor:
         """
         self.script_log.message("Error starting Chrome Driver Session")
         self.script_log.message("Downloading Custom Chrome App & Driver")
-        settings.enable_selenium_custom_driver_mode()
+        Settings.enable_selenium_custom_driver_mode()
 
     def _disable_optimizations(self) -> None:
         """
@@ -225,4 +225,4 @@ class ScriptExecutor:
         """
         self.script_log.message("Re-Running Selenium Script")
         self.script_log.message("Disabling Selenium Optimizations")
-        settings.disable_selenium_optimizations_mode()
+        Settings.disable_selenium_optimizations_mode()

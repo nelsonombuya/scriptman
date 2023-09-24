@@ -8,10 +8,10 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-from .directories import DirectoryHandler
-from .interactions import SeleniumInteractionHandler
-from .logs import LogHandler, LogLevel
-from .settings import settings
+from scriptman import Settings
+from scriptman.directories import DirectoryHandler
+from scriptman.interactions import SeleniumInteractionHandler
+from scriptman.logs import LogHandler, LogLevel
 
 
 class ChromeApp:
@@ -44,13 +44,13 @@ class Chrome(SeleniumInteractionHandler):
             webdriver.Chrome: A Chrome WebDriver instance.
         """
         try:
-            if settings.selenium_custom_driver_mode:
+            if Settings.selenium_custom_driver_mode:
                 raise ValueError
             options = self._get_chrome_options()
             service = Service(ChromeDriverManager().install())
         except ValueError:
             cdm = ChromeDownloadHandler()
-            chrome_version = settings.selenium_custom_driver_version
+            chrome_version = Settings.selenium_custom_driver_version
             chrome_driver = cdm.download(chrome_version)
             chrome_browser = cdm.download(chrome_version, ChromeApp.CHROME)
             options = self._get_chrome_options(chrome_browser)
@@ -76,7 +76,7 @@ class Chrome(SeleniumInteractionHandler):
         if chrome_executable_path:
             options.binary_location = chrome_executable_path
 
-        if settings.selenium_optimizations_mode and not settings.debug_mode:
+        if Settings.selenium_optimizations_mode and not Settings.debug_mode:
             optimization_args = [
                 "--headless",
                 "--no-sandbox",
@@ -168,7 +168,7 @@ class ChromeDownloadHandler:
         Returns:
             dict: JSON data containing download URLs.
         """
-        response = requests.get(settings.selenium_chrome_url)
+        response = requests.get(Settings.selenium_chrome_url)
         response.raise_for_status()
         return response.json()
 

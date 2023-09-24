@@ -1,8 +1,8 @@
 import sys
 from typing import List
 
-from .scripts import ScriptsHandler
-from .settings import settings
+from scriptman.scripts import ScriptsHandler
+from scriptman import Settings
 
 
 class CLIHandler:
@@ -19,7 +19,7 @@ class CLIHandler:
         self.script_handler = ScriptsHandler()
         self._parse_args(args[1:])
 
-        if settings.debug_mode:
+        if Settings.debug_mode:
             self.script_handler.test_scripts(self.scripts)
         else:
             self.script_handler.run_scripts(self.scripts)
@@ -41,10 +41,10 @@ class CLIHandler:
                 sys.exit(0)  # Exit after printing the list of scripts
 
             arg_function = {
-                "-dl": settings.disable_logging,
-                "--disable_logging": settings.disable_logging,
-                "-d": settings.enable_debugging,
-                "--debug": settings.enable_debugging,
+                "-dl": Settings.disable_logging,
+                "--disable_logging": Settings.disable_logging,
+                "-d": Settings.enable_debugging,
+                "--debug": Settings.enable_debugging,
             }.get(arg)
 
             if arg_function:

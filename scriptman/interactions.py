@@ -9,8 +9,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
-from .directories import DirectoryHandler
-from .settings import settings
+from scriptman import Settings
+from scriptman.directories import DirectoryHandler
 
 AnyDriver = Union[webdriver.Chrome, webdriver.Firefox]
 
@@ -111,7 +111,7 @@ class SeleniumInteractionHandler:
             )
         else:
             raise ValueError(f"Passed Invalid Mode: {mode}")
-        time.sleep(2 if settings.debug_mode else rest)
+        time.sleep(2 if Settings.debug_mode else rest)
 
     def wait_for_downloads_to_finish(self) -> None:
         """

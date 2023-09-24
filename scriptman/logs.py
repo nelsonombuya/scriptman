@@ -4,8 +4,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from .directories import DirectoryHandler
-from .settings import settings
+from scriptman import Settings
+from scriptman.directories import DirectoryHandler
 
 
 class LogLevel(Enum):
@@ -39,7 +39,7 @@ class LogHandler:
         self._configure_logging()
 
     def _get_log_file(self, filename: str) -> Optional[str]:
-        if not settings.log_mode:
+        if not Settings.log_mode:
             return None
         directory = DirectoryHandler().logs_dir
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -60,7 +60,7 @@ class LogHandler:
             LogLevel.FATAL: logging.FATAL,
             LogLevel.DEBUG: logging.DEBUG,
             LogLevel.CRITICAL: logging.CRITICAL,
-        }.get(level, logging.DEBUG if settings.debug_mode else logging.INFO)
+        }.get(level, logging.DEBUG if Settings.debug_mode else logging.INFO)
 
     def start(self) -> None:
         """
@@ -105,7 +105,7 @@ class LogHandler:
             else ""
         )
 
-        if settings.log_mode:
+        if Settings.log_mode:
             {
                 LogLevel.INFO: logging.info,
                 LogLevel.DEBUG: logging.debug,

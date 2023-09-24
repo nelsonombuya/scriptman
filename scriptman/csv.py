@@ -3,7 +3,7 @@ from typing import Optional
 
 import pandas as pd
 
-from .directories import DirectoryHandler
+from scriptman.directories import DirectoryHandler
 
 
 class CSVHandler:

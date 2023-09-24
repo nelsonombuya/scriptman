@@ -139,8 +139,8 @@ class SettingsHandler:
         self.debug_mode = debugging
         self.set_app_dir(app_dir)
 
-        from .directories import DirectoryHandler
-        from .logs import LogHandler
+        from scriptman.directories import DirectoryHandler
+        from scriptman.logs import LogHandler, LogLevel
 
         directory_handler = DirectoryHandler()
         self.add_folders_for_cleanup(
@@ -151,6 +151,7 @@ class SettingsHandler:
         )
         LogHandler("Script Manager").message(
             details=vars(self),
+            level=LogLevel.DEBUG,
             print_to_terminal=self.debug_mode,
             message="The application has been initialized as follows:",
         )
@@ -429,9 +430,10 @@ class SettingsHandler:
             name (str): The name of the setting being changed.
             value: The new value of the setting.
         """
-        from .logs import LogHandler
+        from scriptman.logs import LogHandler, LogLevel
 
         LogHandler("Settings Handler").message(
+            level=LogLevel.DEBUG,
             print_to_terminal=self.debug_mode,
             message=f"{name} updated to {value}",
         )
@@ -444,7 +446,3 @@ class SettingsHandler:
             str: A string representation of the current settings.
         """
         return json.dumps(vars(self), indent=4)
-
-
-# Create a single instance of SettingsHandler
-settings = SettingsHandler()

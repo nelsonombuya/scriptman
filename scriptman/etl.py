@@ -1,14 +1,14 @@
 import json
 import math
-from typing import Any, Callable, Dict, List, MutableMapping, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, MutableMapping, Optional, Union
 
 import pandas as pd
 from tqdm import tqdm
 
-from .csv import CSVHandler
-from .database import DatabaseHandler
-from .logs import LogHandler, LogLevel
-from .settings import settings
+from scriptman import Settings
+from scriptman.csv import CSVHandler
+from scriptman.database import DatabaseHandler
+from scriptman.logs import LogHandler, LogLevel
 
 
 class ETLHandler:
@@ -279,7 +279,7 @@ class ETLHandler:
                 except ValueError:
                     self._db.execute_write_query(ins_query, row, True)
 
-    def _prepare_data(self, keys: Optional[List[str]] = None) -> List[Tuple]:
+    def _prepare_data(self, keys: Optional[List[str]] = None) -> List[tuple]:
         """
         Prepare data for insertion into a database table.
 
@@ -567,5 +567,5 @@ class ETLHandler:
         """
         self._log.message(f"Extracted {len(self._data)} records.")
 
-        if settings.debug_mode:
+        if Settings.debug_mode:
             print(self._data)

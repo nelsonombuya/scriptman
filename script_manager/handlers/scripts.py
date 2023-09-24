@@ -1,5 +1,6 @@
 import os
 import re
+import traceback
 from typing import Callable, List, Optional
 
 import selenium.common.exceptions as sce
@@ -190,10 +191,11 @@ class ScriptExecutor:
             self._handle_script_exceptions(self._disable_optimizations)
             return self.execute(file, directory)
         except Exception as exception:
+            stacktrace = traceback.format_exc()
             self.script_log.message(
                 level=LogLevel.ERROR,
-                details={"error": str(exception)},
                 message="The script failed to run and couldn't recover.",
+                details={"error": str(exception), "stacktrace": stacktrace},
             )
             return False
 

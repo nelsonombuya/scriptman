@@ -1,8 +1,11 @@
 import atexit
-from typing import Callable
+from typing import Callable, List
 
+from script_manager.handlers.cli import CLIHandler
+from script_manager.handlers.directories import DirectoryHandler
 from script_manager.handlers.interactions import Interaction
 from script_manager.handlers.logs import LogLevel as LogLevelEnum
+from script_manager.handlers.scripts import ScriptsHandler
 from script_manager.handlers.settings import SettingsHandler
 
 # Exposing Enums
@@ -39,10 +42,10 @@ class ScriptManager:
     handlers = HandlerManager()
 
     # Exposed Properties and Methods
-    cli: Callable = handlers.cli
-    scripts: Callable = handlers.scripts
-    directories: Callable = handlers.directories
     settings: SettingsHandler = handlers.settings
+    cli: Callable[[List[str]], CLIHandler] = handlers.cli
+    scripts: Callable[[], ScriptsHandler] = handlers.scripts
+    directories: Callable[[], DirectoryHandler] = handlers.directories
 
     # On Exit
     atexit.register(handlers.cleanup)

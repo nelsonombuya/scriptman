@@ -33,4 +33,4 @@ class SeleniumHandler:
             WebDriver instances.
     """
 
-    chrome: Callable = Chrome
+    chrome: Callable[[], Chrome] = Chrome

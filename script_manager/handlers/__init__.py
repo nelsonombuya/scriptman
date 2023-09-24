@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, List
 
 from script_manager.handlers.cleanup import CleanUpHandler
 from script_manager.handlers.cli import CLIHandler
@@ -21,33 +21,36 @@ class HandlerManager:
     CleanUpHandler, SeleniumHandler, DirectoryHandler, and SettingsHandler.
 
     Attributes:
-        cli (Callable): A callable reference to the CLIHandler class, which
-            can be used to run scripts from the CLI.
-        etl (Callable): A callable reference to the ETLHandler class, which
-            can be used to run etl processes for CSV, JSON and Pandas DataFrame
+        etl (Callable): A callable reference to the ETLHandler class, which can
+            be used to run ETL processes for CSV, JSON, and Pandas DataFrame
             data when needed.
-        logs (Callable): A callable reference to the LogHandler class, which
-            can be used to manage logs.
-        db (Callable): A callable reference to the DatabaseHandler class, which
-            can be used to run CRUD processes for databases.
+        settings (SettingsHandler): An instance of the SettingsHandler class,
+            which can be used to access and modify settings.
+        logs (Callable[str]): A callable reference to the LogHandler class,
+            which can be used to manage logs. You can provide a name for the
+            log instance.
+        cli (Callable[List[str]]): A callable reference to the CLIHandler
+            class, which can be used to run scripts from the command line
+            interface.
+        db (Callable[str]): A callable reference to the DatabaseHandler class,
+            which can be used to run CRUD processes for databases. You can
+            provide a database connection string.
         cleanup (Callable): A callable reference to the CleanUpHandler class,
             which can be used to manage cleanup tasks.
-        scripts (Callable): A callable reference to the ScriptHandler class,
-            which can be used to manage and run python scripts.
+        scripts (Callable): A callable reference to the ScriptsHandler class,
+            which can be used to manage and run Python scripts.
         selenium (Callable): A callable reference to the SeleniumHandler class,
             which can be used to interact with Selenium.
         directories (Callable): A callable reference to the DirectoryHandler
             class, which can be used to manage directories.
-        settings (SettingsHandler): An instance of the SettingsHandler class,
-            which can be used to access and modify settings.
 
     Example:
         # Access the LogHandler
-        log_handler = HandlerManager.logs()
+        logs = HandlerManager.logs("MyLogger")
 
         # Access the SettingsHandler
-        settings_handler = HandlerManager.settings
-        max_retries = settings_handler.get_setting("max_retries")
+        settings = HandlerManager.settings
+        max_retries = settings.get_setting("max_retries")
 
     Note:
         This class assumes that the referenced handler classes
@@ -55,12 +58,12 @@ class HandlerManager:
         exist in the current module or package.
     """
 
-    cli: Callable = CLIHandler
-    etl: Callable = ETLHandler
-    logs: Callable = LogHandler
-    db: Callable = DatabaseHandler
-    cleanup: Callable = CleanUpHandler
-    scripts: Callable = ScriptsHandler
-    selenium: Callable = SeleniumHandler
-    directories: Callable = DirectoryHandler
+    etl: Callable[[], ETLHandler] = ETLHandler
     settings: SettingsHandler = settings_handler
+    logs: Callable[[str], LogHandler] = LogHandler
+    cli: Callable[[List[str]], CLIHandler] = CLIHandler
+    db: Callable[[str], DatabaseHandler] = DatabaseHandler
+    cleanup: Callable[[], CleanUpHandler] = CleanUpHandler
+    scripts: Callable[[], ScriptsHandler] = ScriptsHandler
+    selenium: Callable[[], SeleniumHandler] = SeleniumHandler
+    directories: Callable[[], DirectoryHandler] = DirectoryHandler

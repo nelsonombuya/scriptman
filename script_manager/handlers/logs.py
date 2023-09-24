@@ -1,6 +1,5 @@
 import logging
 import time
-import traceback
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
@@ -99,16 +98,6 @@ class LogHandler:
             print_to_terminal (bool): Whether to print the message to the
                 terminal.
         """
-        if level in (
-            LogLevel.ERROR,
-            LogLevel.FATAL,
-            LogLevel.WARN,
-            LogLevel.CRITICAL,
-            LogLevel.EXCEPTION,
-        ):
-            stacktrace = {"stacktrace": self.get_stacktrace()}
-            details = stacktrace if not details else details.update(stacktrace)
-
         message = f"{self.name}: {message}"
         message += (
             "\n\t" + ("\n\t".join([f"{k}: {v}" for k, v in details.items()]))
@@ -129,15 +118,6 @@ class LogHandler:
 
         if print_to_terminal:
             print(message)
-
-    def get_stacktrace(self) -> str:
-        """
-        Returns the stack trace as a string when an error occurs.
-
-        Returns:
-            str: The stack trace.
-        """
-        return traceback.format_exc()
 
     def format_time(self, seconds: int) -> str:
         """

@@ -4,8 +4,11 @@ from setuptools import find_packages, setup
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-VERSION = "0.0.0.11"
+VERSION = "0.0.0.12"
 DESCRIPTION = "Script Manager assists with managing python scripts."
+
+with open(os.path.join(here, "README.md"), encoding="utf-8") as f:
+    LONG_DESCRIPTION = f.read()
 
 setup(
     name="scriptman",
@@ -13,6 +16,7 @@ setup(
     author="Nelson Ombuya",
     description=DESCRIPTION,
     packages=find_packages(),
+    long_description=LONG_DESCRIPTION,
     author_email="nelson.ombuya@zohomail.com",
     long_description_content_type="text/markdown",
     keywords=["python", "scripts", "etl", "selenium"],

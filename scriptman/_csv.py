@@ -1,9 +1,45 @@
+"""
+ScriptMan - CSVHandler
+
+This module provides the CSVHandler class, responsible for handling CSV files
+and data.
+
+Usage:
+- Import the CSVHandler class from this module.
+- Use the methods provided by the CSVHandler class to perform CSV file
+operations.
+
+Example:
+```python
+from scriptman._csv import CSVHandler
+
+# Find a CSV file
+csv_file_path = CSVHandler.find_csv_file('my_data')
+
+# Extract data from a CSV file
+data = CSVHandler.extract_csv(csv_file_path)
+
+# Update a CSV entry
+CSVHandler.update_csv_entry(0, 'Status', csv_file_path, data, value='Updated')
+
+# Save data to a CSV file
+data_to_save = [{'Name': 'John', 'Age': 30}, {'Name': 'Alice', 'Age': 25}]
+CSVHandler.save_to_csv(data_to_save, 'my_data_updated')
+```
+
+Classes:
+- `CSVHandler`: A class for handling CSV files and data.
+
+For detailed documentation and examples, please refer to the package
+documentation.
+"""
+
 from glob import glob
 from typing import Optional
 
 import pandas as pd
 
-from scriptman.directories import DirectoryHandler
+from scriptman._directories import DirectoryHandler
 
 
 class CSVHandler:

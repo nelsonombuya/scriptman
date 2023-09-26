@@ -99,10 +99,7 @@ class PackagePublishHelper:
         Upload distribution packages to Twine using 'twine upload'.
         """
         subprocess.run(["python", "-m", "pip", "install", "twine"])
-
         cmd = ["twine", "upload", "dist/*"]
-
-        # Pass username and password options
         cmd.extend(["-u", self.username, "-p", self.password])
 
         subprocess.run(cmd)

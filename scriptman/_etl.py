@@ -1,3 +1,60 @@
+"""
+ScriptMan - ETLHandler
+
+This module provides the ETLHandler class, responsible for performing data
+extraction, transformation, and loading tasks.
+
+Usage:
+- Import the ETLHandler class from this module.
+- Initialize an ETLHandler instance to perform ETL operations.
+
+Example:
+```python
+from scriptman._etl import ETLHandler
+
+etl_handler = ETLHandler()
+# Use the ETLHandler instance for data extraction, transformation, and loading.
+```
+
+Classes:
+- `ETLHandler`: Handles data extraction, transformation, and loading.
+
+Attributes:
+- None
+
+Methods:
+- `__init__()`: Initializes an ETLHandler instance.
+- `from_df(df: pd.DataFrame) -> pd.DataFrame`: Extracts data from a DataFrame
+    source.
+- `from_json(
+        extraction_function: Callable[[], List[Dict[str, Any]]],
+        extract_data_from_sublists: bool = True,
+        keys: List[str] = []
+    ) -> pd.DataFrame`: Extracts data from a JSON source.
+- `from_csv(
+        filename: str,
+        directory: Optional[str] = None
+    ) -> pd.DataFrame`: Extracts data from a CSV file.
+- `from_db(
+        db_connection_string: str,
+        query: str,
+        params: tuple = ()
+    ) -> pd.DataFrame`: Extracts data from a database.
+- `to_df() -> pd.DataFrame`: Returns extracted data as a Pandas DataFrame.
+- `to_csv(
+        filename: str,
+        directory: Optional[str] = None
+    ) -> str`: Saves the loaded data to a CSV file.
+- `to_db(
+        table_name: str,
+        db_connection_string: str,
+        truncate: bool = False,
+        recreate: bool = False,
+        force_nvarchar: bool = False,
+        keys: List[str] = []
+    ) -> None`: Loads the data into a database table.
+"""
+
 import json
 import math
 from typing import Any, Callable, Dict, List, MutableMapping, Optional, Union
@@ -5,10 +62,10 @@ from typing import Any, Callable, Dict, List, MutableMapping, Optional, Union
 import pandas as pd
 from tqdm import tqdm
 
-from scriptman.csv_handler import CSVHandler
-from scriptman.database import DatabaseHandler
-from scriptman.logs import LogHandler, LogLevel
-from scriptman.settings import Settings
+from scriptman._csv import CSVHandler
+from scriptman._database import DatabaseHandler
+from scriptman._logs import LogHandler, LogLevel
+from scriptman._settings import Settings
 
 
 class ETLHandler:
@@ -24,8 +81,8 @@ class ETLHandler:
         """
         Initialize an ETLHandler instance.
         """
-        self._log = LogHandler("ETL Handler")
         self._data: pd.DataFrame = pd.DataFrame()
+        self._log: LogHandler = LogHandler("ETL Handler")
         self._nested_data: Dict[str, List[Dict[str, Any]]] = {}
 
     def from_df(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -71,7 +128,7 @@ class ETLHandler:
         self._log.message("Flattening dictionaries...")
         data = [self._flatten_dict(item) for item in data]
 
-        if extract_data_from_sublists:
+        if data and extract_data_from_sublists:
             self._log.message("Extracting Tables from Nested Dictionaries...")
             data = self._extract_nested_data(data, keys)
 
@@ -130,14 +187,26 @@ class ETLHandler:
         self._log_number_of_records()
         return self._data
 
-    def to_df(self) -> pd.DataFrame:
+    def to_df(self) -> List[Dict]:
         """
         Return extracted data as a Pandas DataFrame.
 
         Returns:
-            pd.DataFrame: The extracted DataFrame.
+            List[Dict]: The list of extracted data frames, including the nested
+                data frames.
         """
-        return self._data
+        extracted_data: List[Dict] = [{"main": self._data}]
+
+        if self._nested_data:
+            self._log.message("Creating DataFrames from Nested Data...")
+            for name, data in self._nested_data.items():
+                nested_etl = ETLHandler()
+                nested_etl.from_json(lambda: data, True)
+                nested_dfs = nested_etl.to_df()
+                extracted_data.append({name: nested_dfs})
+
+        print("The extracted data is: ", json.dumps(extracted_data))
+        return extracted_data
 
     def to_csv(self, filename: str, directory: Optional[str] = None) -> str:
         """
@@ -551,6 +620,7 @@ class ETLHandler:
             extracted_data = [
                 item
                 for sublist in extracted_data
+                if sublist
                 for item in sublist
                 if isinstance(item, dict)
             ]

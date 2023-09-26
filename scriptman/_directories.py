@@ -1,8 +1,64 @@
+"""
+ScriptMan - DirectoryHandler
+
+This module provides the DirectoryHandler class, responsible for creating and
+managing directories for a ScriptManager setup.
+
+Usage:
+- Import the DirectoryHandler class from this module.
+- Initialize a DirectoryHandler instance to manage directories for your
+  ScriptManager setup.
+
+Example:
+```python
+from scriptman._directory import DirectoryHandler
+
+directory_handler = DirectoryHandler()
+# Default directories are created upon initialization.
+# (Ensure app_dir is set in the package settings)
+```
+
+Classes:
+- `DirectoryHandler`: Manages directory creation and management for the
+  ScriptManager application.
+
+Attributes:
+- `ROOT_DIR (str)`: The key for the root directory in the directories
+  dictionary.
+- `LOGS_DIR (str)`: The key for the logs directory in the directories
+  dictionary.
+- `SCRIPTS_DIR (str)`: The key for the scripts directory in the directories
+  dictionary.
+- `HELPERS_DIR (str)`: The key for the helpers directory in the directories
+  dictionary.
+- `SELENIUM_DIR (str)`: The key for the selenium custom driver directory in
+  the directories dictionary.
+- `HANDLERS_DIR (str)`: The key for the handlers directory in the directories
+  dictionary.
+- `DOWNLOADS_DIR (str)`: The key for the downloads directory in the directories
+  dictionary.
+- `SCRIPT_MAN_DIR (str)`: The key for the ScriptManager directory in the
+  directories dictionary.
+- `DEFAULT_DIRECTORIES (List[str])`: A list of default directory names to be
+  created.
+
+Methods:
+- `__init__()`: Initializes a DirectoryHandler instance and creates the default
+  directories.
+- `create_and_set_directories()`: Creates and sets the default directories.
+- `create_directory(directory_name: str) -> str`: Creates a directory if it
+  does not exist and returns its path.
+- `create_selenium_directory() -> str`: Creates the 'selenium' directory if it
+  does not exist within the 'downloads' directory and returns its path.
+- `__str__() -> str`: Returns a JSON representation of the directories
+  dictionary.
+"""
+
 import json
 import os
 from typing import Dict
 
-from scriptman.settings import Settings
+from scriptman._settings import Settings
 
 
 class DirectoryHandler:

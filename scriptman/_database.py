@@ -1,12 +1,84 @@
+"""
+ScriptMan - DatabaseHandler
+
+This module provides the DatabaseHandler class, responsible for managing
+database connections and operations.
+
+Usage:
+- Import the DatabaseHandler class from this module.
+- Initialize a DatabaseHandler instance with the database connection string.
+- Use the methods provided by the DatabaseHandler class to interact with the
+database.
+
+Example:
+```python
+from scriptman._database import DatabaseHandler
+
+# Initialize the DatabaseHandler with the database connection string
+db_connection_string = (
+    "Driver={SQL Server};"
+    "Server=myserver;"
+    "Database=mydatabase;"
+    "Trusted_Connection=yes;"
+)
+db_handler = DatabaseHandler(db_connection_string)
+
+# Execute a read query
+query = "SELECT * FROM MyTable WHERE Age > ?"
+params = (25,)
+results = db_handler.execute_read_query(query, params)
+print(results)
+
+# Execute a write query
+insert_query = "INSERT INTO MyTable (Name, Age) VALUES (?, ?)"
+insert_params = ("Alice", 30)
+success = db_handler.execute_write_query(insert_query, insert_params)
+if success:
+    print("Data inserted successfully")
+
+# Create a new table if it doesn't exist
+create_table_query = "CREATE TABLE IF NOT EXISTS NewTable (ID INT, Name TEXT);"
+table_created = db_handler.create_table(create_table_query)
+if table_created:
+    print("New table created")
+
+# Check if a table exists
+if db_handler.table_exists("MyTable"):
+    print("MyTable exists")
+
+# Truncate a table
+table_name = "AnotherTable"
+if db_handler.truncate_table(table_name):
+    print(f"{table_name} truncated")
+
+# Drop a table
+if db_handler.drop_table("OldTable"):
+    print("OldTable dropped")
+```
+
+Classes:
+- `DatabaseHandler`: A class for managing database connections and operations.
+
+For detailed documentation and examples, please refer to the package
+documentation.
+"""
+
 import re
 from typing import List, Union
 
 import pyodbc
 
-from scriptman.logs import LogHandler, LogLevel
+from scriptman._logs import LogHandler, LogLevel
 
 
 class DatabaseHandler:
+    """
+    A class for managing database connections and operations.
+
+    Args:
+        db_connection_string (str): The connection string for the database.
+    """
+
     def __init__(self, db_connection_string: str) -> None:
         """
         Initializes the DatabaseHandler class.
@@ -294,4 +366,8 @@ class DatabaseHandler:
         return match.group(1) if match else "Database Handler"
 
     def __del__(self) -> None:
+        """
+        Destructor to disconnect from the database when the instance is
+        destroyed.
+        """
         self.disconnect()

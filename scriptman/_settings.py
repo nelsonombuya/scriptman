@@ -1,4 +1,95 @@
+"""
+ScriptMan - SettingsHandler
+
+This module provides the SettingsHandler class for managing ScriptManager
+application settings.
+
+Usage:
+- Import the SettingsHandler class from this module.
+- Initialize the SettingsHandler class to manage application settings.
+- Use the provided methods to enable or disable settings and customize the
+application behavior.
+
+Class:
+- `SettingsHandler`: Manages ScriptManager application settings.
+
+Attributes:
+- None
+
+Methods:
+- `init(
+    self,
+    app_dir: str,
+    logging: bool = True,
+    debugging: bool = False
+) -> None`: Initialize the application settings.
+- `get_setting(self, setting: str, default: Any = None) -> Any`: Retrieve the
+value of a specific setting.
+- `enable_logging(self) -> None`: Enable logging mode.
+- `disable_logging(self) -> None`: Disable logging mode.
+- `enable_printing_logs_to_terminal(self) -> None`: Enable printing logs to the
+terminal.
+- `disable_printing_logs_to_terminal(self) -> None`: Disable printing logs to
+the terminal.
+- `enable_debugging(self) -> None`: Enable debugging mode.
+- `disable_debugging(self) -> None`: Disable debugging mode.
+- `add_folders_for_cleanup(self, folders: List[str]) -> None`: Add folders to
+be cleaned up when the application is done.
+- `enable_selenium_optimizations_mode(self) -> None`: Enable Selenium
+optimizations.
+- `disable_selenium_optimizations_mode(self) -> None`: Disable Selenium
+optimizations.
+- `enable_selenium_custom_driver_mode(self) -> None`: Enable custom Selenium
+driver mode.
+- `disable_selenium_custom_driver_mode(self) -> None`: Disable custom Selenium
+driver mode.
+- `set_selenium_custom_driver_version(self, version: int) -> None`: Set the
+version of Chrome to use with custom Selenium driver.
+- `keep_selenium_custom_driver_after_use(self) -> None`: Keep the Selenium
+custom driver after it's downloaded and used.
+- `delete_selenium_custom_driver_after_use(self) -> None`: Delete the Selenium
+custom driver after it's downloaded and used.
+- `set_selenium_chrome_url(self, url: str) -> None`: Set the URL to use when
+downloading Chrome binaries/drivers.
+- `set_app_dir(self, directory: str) -> None`: Set the main app's directory.
+- `set_clean_up_logs_after_n_days(self, days: int) -> None`: Set the number of
+days after which log files should be cleaned up.
+- `add_csv_filename_to_ignore_during_cleanup(
+    self,
+    filename: str
+) -> None`: Add a CSV filename to ignore during cleanup.
+- `add_db_connection_string(
+    self,
+    connection_string: Dict[str, str]
+) -> None`: Add or update a database connection string.
+- `gen_and_add_db_connection_string(
+    self,
+    driver: str,
+    server: str,
+    database: str,
+    username: str,
+    password: str,
+    port: Optional[str] = None
+) -> None`: Generate and add or update a database connection string.
+- `view_database_connection_strings(self) -> None`: View the default database
+connection strings.
+- `remove_database_connection_string(self, key: str) -> None`: Remove a
+database connection string.
+- `upgrade_scriptman(self) -> None`: Upgrade the ScriptMan application.
+- `update_scripts(self) -> None`: Update application scripts from a Git
+repository.
+
+Private Methods:
+- `_log_change(self, name: str, value: Optional[Any]) -> None`: Log changes to
+settings.
+- `__str__(self) -> str`: Get a string representation of the current settings.
+
+Singleton Instance:
+- `Settings`: Singleton instance of the SettingsHandler class.
+"""
+
 import json
+import subprocess
 from typing import Any, Dict, List, Optional
 
 
@@ -110,9 +201,11 @@ class SettingsHandler:
         self.clean_up_folders: List[str] = []
         self.database_connection_strings = {}
         self.clean_up_logs_after_n_days: int = 7
+        self.print_logs_to_terminal: bool = True
         self.selenium_optimizations_mode: bool = True
         self.selenium_custom_driver_mode: bool = False
         self.selenium_custom_driver_version: int = 116
+        self.ignore_csv_filename_during_cleanup: set = set()
         self.selenium_keep_downloaded_custom_driver: bool = True
         self.selenium_chrome_url: str = (
             "https://googlechromelabs.github.io/chrome-for-testing/"
@@ -139,8 +232,8 @@ class SettingsHandler:
         self.debug_mode = debugging
         self.set_app_dir(app_dir)
 
-        from scriptman.directories import DirectoryHandler
-        from scriptman.logs import LogHandler, LogLevel
+        from scriptman._directories import DirectoryHandler
+        from scriptman._logs import LogHandler, LogLevel
 
         directory_handler = DirectoryHandler()
         self.add_folders_for_cleanup(
@@ -187,6 +280,20 @@ class SettingsHandler:
         """
         self.log_mode = False
         self._log_change("log_mode", False)
+
+    def enable_printing_logs_to_terminal(self) -> None:
+        """
+        Enable printing logs to terminal.
+        """
+        self.print_logs_to_terminal = True
+        self._log_change("print_logs_to_terminal", True)
+
+    def disable_printing_logs_to_terminal(self) -> None:
+        """
+        Disable printing logs to terminal.
+        """
+        self.print_logs_to_terminal = False
+        self._log_change("print_logs_to_terminal", False)
 
     def enable_debugging(self) -> None:
         """
@@ -300,6 +407,13 @@ class SettingsHandler:
         """
         self.clean_up_logs_after_n_days = days
         self._log_change("clean_up_logs_after_n_days", days)
+
+    def add_csv_filename_to_ignore_during_cleanup(self, filename: str) -> None:
+        self.ignore_csv_filename_during_cleanup.add(filename)
+        self._log_change(
+            "ignore_csv_filename_during_cleanup",
+            self.ignore_csv_filename_during_cleanup,
+        )
 
     def add_db_connection_string(
         self,
@@ -422,6 +536,24 @@ class SettingsHandler:
             removed_value,
         )
 
+    def upgrade_scriptman(self):
+        subprocess.run(
+            [
+                "python",
+                "-m",
+                "pip",
+                "install",
+                "scriptman",
+                "--upgrade",
+            ]
+        )
+        self._log_change("scriptman", "Latest Version")
+
+    def update_scripts(self):
+        subprocess.run(["cd", self.app_dir])
+        subprocess.run(["git", "pull"])
+        self._log_change("Scripts", "Latest Commit on Repository")
+
     def _log_change(self, name: str, value: Optional[Any]) -> None:
         """
         Log changes to settings.
@@ -430,12 +562,12 @@ class SettingsHandler:
             name (str): The name of the setting being changed.
             value: The new value of the setting.
         """
-        from scriptman.logs import LogHandler, LogLevel
+        from scriptman._logs import LogHandler, LogLevel
 
         LogHandler("Settings Handler").message(
             level=LogLevel.DEBUG,
             print_to_terminal=self.debug_mode,
-            message=f"{name} updated to {value}",
+            message=f"{name} updated to {json.dumps(value, indent=4)}",
         )
 
     def __str__(self) -> str:

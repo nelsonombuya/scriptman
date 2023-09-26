@@ -1,8 +1,37 @@
+"""
+ScriptMan - Command Line Interface Handler
+
+This module provides the CLIHandler class, responsible for managing and running
+scripts via the command line interface (CLI).
+
+Usage:
+- Import the CLIHandler class from this module.
+- Create an instance of CLIHandler, passing a list of command-line arguments.
+- The CLIHandler instance will parse the arguments and execute scripts
+accordingly.
+
+Example:
+```python
+import sys
+from scriptman._cli import CLIHandler
+
+cli_handler = CLIHandler(sys.argv)
+# Scripts are executed based on the provided command-line arguments.
+```
+
+Classes:
+- `CLIHandler`: Handles script execution and configuration via command-line
+arguments.
+
+For detailed documentation and examples, please refer to the package
+documentation.
+"""
+
 import sys
 from typing import List
 
-from scriptman.scripts import ScriptsHandler
-from scriptman.settings import Settings
+from scriptman._scripts import ScriptsHandler
+from scriptman._settings import Settings
 
 
 class CLIHandler:
@@ -14,15 +43,19 @@ class CLIHandler:
     """
 
     def __init__(self, args: List[str]):
+        """
+        Initialize the CLIHandler and execute scripts based on the provided
+        command-line arguments.
+
+        Args:
+            args (List[str]): List of command-line arguments.
+        """
         self.scripts = []
+        self._parse_args(args[1:])
         self.calling_file = args[0]
         self.script_handler = ScriptsHandler()
-        self._parse_args(args[1:])
-
-        if Settings.debug_mode:
-            self.script_handler.test_scripts(self.scripts)
-        else:
-            self.script_handler.run_scripts(self.scripts)
+        Settings.print_logs_to_terminal = False  # To Avoid Duplicate Logging
+        self.script_handler.run_scripts(self.scripts)
 
     def _parse_args(self, args: List[str]) -> None:
         """
@@ -45,6 +78,10 @@ class CLIHandler:
                 "--disable_logging": Settings.disable_logging,
                 "-d": Settings.enable_debugging,
                 "--debug": Settings.enable_debugging,
+                "-upg": Settings.upgrade_scriptman,
+                "--upgrade": Settings.upgrade_scriptman,
+                "-upd": Settings.update_scripts,
+                "--update": Settings.update_scripts,
             }.get(arg)
 
             if arg_function:
@@ -68,7 +105,7 @@ class CLIHandler:
 
         Returns:
             bool: True if the argument is a valid script filename,
-            False otherwise.
+                False otherwise.
         """
         return any(arg in name for name in self.script_handler.get_scripts())
 
@@ -87,6 +124,8 @@ class CLIHandler:
         -dl, --disable_logging  Disable logging.
         -d, --debug             Enable debugging mode.
         -ls, --list_scripts     List scripts contained in the scripts folder.
+        -upg, --upgrade         Upgrade ScriptMan.
+        -upd, --update          Update Scripts Repository with latest commit.
 
         script_names            Names of the scripts to execute.
         """

@@ -1,21 +1,56 @@
+"""
+ScriptMan - CleanUpHandler
+
+This module provides the CleanUpHandler class, responsible for managing
+cleaning tasks for the ScriptManager application.
+
+Usage:
+- Import the CleanUpHandler class from this module.
+- Initialize a CleanUpHandler instance to perform cleanup tasks.
+
+Example:
+```python
+from scriptman._cleanup import CleanUpHandler
+
+cleanup_handler = CleanUpHandler()
+# Cleanup tasks are executed upon initialization.
+```
+
+Classes:
+- `CleanUpHandler`: Manages cleanup tasks for the ScriptManager application.
+
+For detailed documentation and examples, please refer to the package
+documentation.
+"""
+
 import os
 import shutil
 from datetime import datetime, timedelta
-from typing import Optional
 
-from scriptman.directories import DirectoryHandler
-from scriptman.logs import LogHandler, LogLevel
-from scriptman.settings import Settings
+from scriptman._directories import DirectoryHandler
+from scriptman._logs import LogHandler, LogLevel
+from scriptman._settings import Settings
 
 
 class CleanUpHandler:
     """
     CleanUpHandler manages cleaning tasks for the ScriptManager application.
+
+    Attributes:
+        directory_handler (DirectoryHandler): An instance of DirectoryHandler
+        for managing directories.
     """
 
     def __init__(self) -> None:
         """
-        Initialize the CleanUpHandler and perform cleanup tasks.
+        Initialize CleanUpHandler and perform cleanup tasks.
+
+        Cleanup tasks include:
+        - Removing "__pycache__" folders.
+        - Removing old log files.
+        - Removing CSV files.
+
+        These tasks are executed upon initialization.
         """
         self._log = LogHandler("CleanUp Handler")
         self.directory_handler = DirectoryHandler()
@@ -52,13 +87,15 @@ class CleanUpHandler:
                             message=f"Unable to delete {path}.",
                         )
 
-    def remove_old_log_files(self, number_of_days: int = 30) -> None:
+    def remove_old_log_files(
+        self, number_of_days: int = Settings.clean_up_logs_after_n_days
+    ) -> None:
         """
         Remove log files older than the specified number of days.
 
         Args:
             number_of_days (int): The threshold for log file deletion
-                (default: 30 days).
+                (default set in SettingsHandler).
         """
         if os.path.exists(self.directory_handler.logs_dir):
             days_ago = datetime.now() - timedelta(days=number_of_days)
@@ -87,7 +124,8 @@ class CleanUpHandler:
 
     def remove_custom_driver_folder(self) -> None:
         """
-        Remove the custom driver folder.
+        Remove the custom driver folder if it exists and the setting to keep
+        downloaded custom drivers is not enabled.
         """
         if (
             os.path.exists(self.directory_handler.selenium_dir)
@@ -100,33 +138,33 @@ class CleanUpHandler:
                 message=f"Deleted {self.directory_handler.selenium_dir}",
             )
 
-    def remove_csv_files(self, ignore_filename: Optional[str] = None):
+    def remove_csv_files(self):
         """
-        Remove CSV files from the downloads directory.
-
-        Args:
-            ignore_filename (Optional[str]): Filename of csv to ignore when
-                deleting csv files (default: None).
+        Remove CSV files from the downloads directory. Also ignores csvs with
+        filenames contained in Settings.ignore_csv_filename_during_cleanup:
         """
         try:
             if self.directory_handler.downloads_dir:
                 files = os.listdir(self.directory_handler.downloads_dir)
                 for file in files:
                     if file.endswith(".csv"):
-                        filename = file.lower()
-                        if ignore_filename and ignore_filename in filename:
-                            self._log.message(f"Skipped deleting {filename}")
-                            continue
+                        skip_file = False
+                        for n in Settings.ignore_csv_filename_during_cleanup:
+                            if file.lower() in n.lower():
+                                self._log.message(f"Skipped deleting {file}")
+                                skip_file = True
+                                break
 
-                        file_path = os.path.join(
-                            self.directory_handler.downloads_dir, file
-                        )
-                        os.remove(file_path)
-                        self._log.message(
-                            level=LogLevel.DEBUG,
-                            message=f"Removed {file}",
-                            print_to_terminal=Settings.debug_mode,
-                        )
+                        if not skip_file:
+                            file_path = os.path.join(
+                                self.directory_handler.downloads_dir, file
+                            )
+                            os.remove(file_path)
+                            self._log.message(
+                                level=LogLevel.DEBUG,
+                                message=f"Removed {file}",
+                                print_to_terminal=Settings.debug_mode,
+                            )
         except Exception as e:
             self._log.message(
                 level=LogLevel.ERROR,

@@ -1,11 +1,77 @@
+"""
+ScriptMan - LogHandler
+
+This module provides the LogHandler class for handling logging operations.
+
+Usage:
+- Import the LogHandler class from this module.
+- Initialize a LogHandler instance to configure and use custom logging.
+
+Example:
+```python
+from scriptman._logs import LogHandler
+
+log = LogHandler(name="MyLog", filename="my_log", module="MyModule")
+log.message("This is an information message.", level=LogLevel.INFO)
+```
+
+Classes:
+- `LogHandler`: Handles logging operations and provides customization options.
+
+Enums:
+- `LogLevel`: Defines log levels for messages.
+
+Attributes:
+- None
+
+Methods:
+- `__init__(
+        self,
+        name: str = "LOG",
+        filename: str = "LOG",
+        module: Optional[str] = None,
+        level: LogLevel = LogLevel.INFO,
+        description: Optional[str] = None
+    ) -> None`: Initializes a LogHandler instance.
+- `_format_name(self,
+        name: str,
+        module: Optional[str] = None
+    ) -> str`: Formats the log name with optional module.
+- `_get_log_file(
+        self,
+        filename: str
+    ) -> Optional[str]`: Generates a log file path.
+- `_configure_logging(self) -> None`: Configures logging settings.
+- `_get_log_level(
+        self,
+        level: LogLevel
+    ) -> int`: Converts LogLevel enum to Python logging level.
+- `start(self) -> None`: Records the start time of an operation and logs a
+    start message.
+- `stop(self) -> None`: Stops an operation, records the end time, and logs a
+    finish message.
+- `message(
+        self,
+        message: str,
+        level: LogLevel = LogLevel.INFO,
+        details: Optional[Dict[str, Any]] = None,
+        print_to_terminal: bool = True
+    ) -> None`: Logs a message with optional details.
+- `format_time(
+        self,
+        seconds: int
+    ) -> str`: Formats seconds as an Hour, Minute, Second formatted string.
+
+"""
+
 import logging
 import time
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from scriptman.directories import DirectoryHandler
-from scriptman.settings import Settings
+from scriptman._directories import DirectoryHandler
+from scriptman._settings import Settings
 
 
 class LogLevel(Enum):
@@ -19,26 +85,61 @@ class LogLevel(Enum):
 
 
 class LogHandler:
-    """
-    LogHandler handles logging operations, providing flexibility and control
-    over logging configuration.
-    """
-
     def __init__(
         self,
         name: str = "LOG",
         filename: str = "LOG",
+        module: Optional[str] = None,
         level: LogLevel = LogLevel.INFO,
         description: Optional[str] = None,
     ) -> None:
+        """
+        Initialize a LogHandler instance.
+
+        Args:
+            name (str): The name for the log.
+            filename (str): The base filename for the log file.
+            module (str, optional): The module name for the log.
+                Defaults to None.
+            level (LogLevel, optional): The logging level.
+                Defaults to LogLevel.INFO.
+            description (str, optional): The description for the log.
+                Defaults to None.
+        """
         self.level: LogLevel = level
-        self.name: str = name.upper().replace(" ", "_")
+        self.name: str = self._format_name(name, module)
         self.title: str = name.title().replace("_", " ")
         self.description: str = description or self.title
         self.file: Optional[str] = self._get_log_file(filename)
         self._configure_logging()
 
+    def _format_name(self, name: str, module: Optional[str] = None) -> str:
+        """
+        Formats the log name with optional module.
+
+        Args:
+            name (str): The name for the log.
+            module (str, optional): The module name for the log.
+                Defaults to None.
+
+        Return:
+            (str): The formatted name of the log; which will be indicated in
+                the beginning of every log line.
+        """
+        name = name.upper().replace(" ", "_")
+        return f"[{module.upper()}] {name}" if module else name
+
     def _get_log_file(self, filename: str) -> Optional[str]:
+        """
+        Generates a log file path.
+
+        Args:
+            filename (str): The base filename for the log file.
+
+        Return:
+            (str | None): The file path of the log file, or None if the
+                Settings.log_mode flag is False.
+        """
         if not Settings.log_mode:
             return None
         directory = DirectoryHandler().logs_dir
@@ -46,6 +147,9 @@ class LogHandler:
         return rf"{directory}\{filename} - {timestamp}.log"
 
     def _configure_logging(self) -> None:
+        """
+        Configures logging to a file.
+        """
         logging.basicConfig(
             filename=self.file,
             level=self._get_log_level(self.level),
@@ -53,6 +157,17 @@ class LogHandler:
         )
 
     def _get_log_level(self, level: LogLevel) -> int:
+        """
+        Get's the logging level according to the specified LogLevel.
+
+        Args:
+            level (LogLevel): The LogLevel Enum to be set.
+
+        Return:
+            (int): The logging level to be used by the rest of the class.
+                logging.DEBUG if the Settings.debug_mode flag is True, else
+                logging.INFO if the specified level is not found.
+        """
         return {
             LogLevel.WARN: logging.WARN,
             LogLevel.INFO: logging.INFO,
@@ -67,8 +182,7 @@ class LogHandler:
         Record the start time of an operation and log a start message.
         """
         self.start_time = time.time()
-        section = self.description.replace("_", " ")
-        self.message(f"{section.title()} started.")
+        self.message(f"{self.title} started.")
 
     def stop(self) -> None:
         """
@@ -76,9 +190,8 @@ class LogHandler:
         calculate the duration.
         """
         self.end_time = time.time()
-        section = self.description.replace("_", " ")
         time_taken = self.format_time(int(self.end_time - self.start_time))
-        self.message(f"{section.title()} finished in {time_taken}")
+        self.message(f"{self.title} finished in {time_taken}")
 
     def message(
         self,
@@ -116,7 +229,7 @@ class LogHandler:
                 LogLevel.EXCEPTION: logging.exception,
             }.get(level, logging.info)(message)
 
-        if print_to_terminal:
+        if print_to_terminal and Settings.print_logs_to_terminal:
             print(message)
 
     def format_time(self, seconds: int) -> str:

@@ -1,3 +1,31 @@
+"""
+ScriptMan - ChromeApp, Chrome and Chrome Download Handling
+
+This module provides classes for managing Chrome WebDriver instances and
+handling Chrome Driver and Browser downloads.
+
+Usage:
+- Import the necessary classes from this module.
+- Initialize a Chrome instance using `Chrome()`.
+- Use the initialized Chrome instance to interact with Chrome WebDriver.
+
+Example:
+```python
+from scriptman._chrome import Chrome
+
+chrome = Chrome()
+# Your Chrome WebDriver instance is ready to use.
+```
+
+Classes:
+- `ChromeApp`: Constants/Enum for Chrome and ChromeDriver.
+- `Chrome`: Manages Chrome WebDriver instances.
+- `ChromeDownloadHandler`: Downloads and manages Chrome Driver and Browser.
+
+For detailed documentation and examples, please refer to the package
+documentation.
+"""
+
 import os
 import platform
 from typing import Optional
@@ -8,10 +36,10 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-from scriptman.directories import DirectoryHandler
-from scriptman.interactions import SeleniumInteractionHandler
-from scriptman.logs import LogHandler, LogLevel
-from scriptman.settings import Settings
+from scriptman._directories import DirectoryHandler
+from scriptman._logs import LogHandler, LogLevel
+from scriptman._selenium import SeleniumInteractionHandler
+from scriptman._settings import Settings
 
 
 class ChromeApp:
@@ -49,10 +77,10 @@ class Chrome(SeleniumInteractionHandler):
             options = self._get_chrome_options()
             service = Service(ChromeDriverManager().install())
         except ValueError:
-            cdm = ChromeDownloadHandler()
+            cdh = ChromeDownloadHandler()
             chrome_version = Settings.selenium_custom_driver_version
-            chrome_driver = cdm.download(chrome_version)
-            chrome_browser = cdm.download(chrome_version, ChromeApp.CHROME)
+            chrome_driver = cdh.download(chrome_version)
+            chrome_browser = cdh.download(chrome_version, ChromeApp.CHROME)
             options = self._get_chrome_options(chrome_browser)
             service = Service(executable_path=chrome_driver)
         return webdriver.Chrome(options, service)
@@ -120,6 +148,8 @@ class ChromeDownloadHandler:
         """
         Initialize ChromeDownloadHandler instance and set directories.
         """
+        self._tries = 0
+        self._max_retries = 3
         self._log = LogHandler("Chrome Download Manager")
         self._selenium_dir = DirectoryHandler().selenium_dir
 
@@ -141,6 +171,11 @@ class ChromeDownloadHandler:
         self._log.message(f"Downloading {str(app).title()} v{version}")
         download_urls = self._fetch_download_urls()
         url = None
+
+        if self._tries >= self._max_retries:
+            raise Exception(f"Max retries ({self._tries}) reached!")
+        else:
+            self._tries += 1
 
         try:
             for version_info in download_urls["versions"]:
@@ -204,11 +239,16 @@ class ChromeDownloadHandler:
         system = platform.system()
         machine = platform.machine()
         architecture = platform.architecture()[0]
-        return {
+        system_platform = {
             "Linux": "linux64",
             "Darwin": "mac-x64" if machine == "x86_64" else "mac-arm64",
             "Windows": "win32" if architecture == "32bit" else "win64",
-        }.get(system, "unknown")
+        }.get(system)
+
+        if system_platform:
+            return system_platform
+        else:
+            raise Exception("Invalid System Platform!")
 
     def _get_app_path(
         self,
@@ -274,6 +314,8 @@ class ChromeDownloadHandler:
 
         with ZipFile(zip_download_path, "r") as zip_ref:
             zip_ref.extractall(self._selenium_dir)
+
+        os.remove(zip_download_path)  # Remove the downloaded zip file
 
         return os.path.join(
             self._selenium_dir,

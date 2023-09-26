@@ -1,3 +1,67 @@
+"""
+ScriptMan - ScriptsHandler and ScriptExecutor
+
+This module provides the ScriptsHandler and ScriptExecutor classes for
+managing and executing Python scripts.
+
+Usage:
+- Import the ScriptsHandler and ScriptExecutor classes from this module.
+- Initialize a ScriptsHandler instance to manage script execution and provide
+custom recovery actions.
+- Use the run_scripts method to execute scripts from a specified directory or
+get a list of available scripts.
+- Use the run_custom_scripts method to execute custom scripts from their file
+paths.
+
+Example:
+```python
+from scriptman._scripts import ScriptsHandler
+
+# Initialize a ScriptsHandler instance
+script_handler = ScriptsHandler()
+
+# Run all scripts in the default scripts directory
+script_handler.run_scripts()
+
+# Run specific scripts by providing their filenames
+script_handler.run_scripts(scripts=["script1.py", "script2"])
+
+# Execute custom scripts from their file paths
+script_handler.run_custom_scripts(
+    script_paths=["/path/to/script1.py", "/path/to/script2.py"],
+)
+```
+
+Classes:
+- `ScriptsHandler`: Manages the execution and testing of scripts.
+- `ScriptExecutor`: Executes Python scripts and handles exceptions.
+
+Attributes:
+- None
+
+Methods (ScriptsHandler):
+- `__init__(
+        self,
+        scripts_dir: Optional[str] = None,
+        upon_failure: Optional[Callable] = None
+    ) -> None`: Initializes a ScriptsHandler instance.
+- `run_scripts(
+        self,
+        scripts: Optional[List[str]] = None
+    ) -> None`: Run specified scripts from the scripts directory.
+- `run_custom_scripts(
+        self,
+        script_paths: List[str]
+    ) -> None`: Run specified custom scripts.
+- `get_scripts(self) -> List[str]`: Get a list of Python script filenames in
+the scripts directory.
+
+Methods (ScriptExecutor):
+- `__init__(self, log_handler: LogHandler) -> None`: Initializes a
+ScriptExecutor instance.
+- `execute(self, file: str, directory: str) -> bool`: Execute a Python script.
+"""
+
 import os
 import re
 import traceback
@@ -5,9 +69,9 @@ from typing import Callable, List, Optional
 
 import selenium.common.exceptions as sce
 
-from scriptman.directories import DirectoryHandler
-from scriptman.logs import LogHandler, LogLevel
-from scriptman.settings import Settings
+from scriptman._directories import DirectoryHandler
+from scriptman._logs import LogHandler, LogLevel
+from scriptman._settings import Settings
 
 
 class ScriptsHandler:
@@ -43,25 +107,6 @@ class ScriptsHandler:
                 execute. If not provided, all '.py' files in the scripts
                 directory are executed.
         """
-        Settings.enable_logging()
-        Settings.disable_debugging()
-
-        for file in scripts or self.get_scripts():
-            self._execute_script(file, self.scripts_dir)
-
-    def test_scripts(self, scripts: Optional[List[str]] = None) -> None:
-        """
-        Test scripts in the scripts directory with logging disabled and
-        debugging enabled.
-
-        Args:
-            scripts (Optional[List[str]]): A list of script filenames to
-                execute. If not provided, all '.py' files in the scripts
-                directory are executed.
-        """
-        Settings.disable_logging()
-        Settings.enable_debugging()
-
         for file in scripts or self.get_scripts():
             self._execute_script(file, self.scripts_dir)
 
@@ -72,24 +117,6 @@ class ScriptsHandler:
         Args:
             script_paths (List[str]): A list of script file paths to execute.
         """
-        Settings.enable_logging()
-        Settings.disable_debugging()
-
-        for file_path in script_paths:
-            filename = os.path.basename(file_path)
-            directory = os.path.dirname(file_path)
-            self._execute_script(filename, directory)
-
-    def test_custom_scripts(self, script_paths: List[str]) -> None:
-        """
-        Test custom scripts with logging disabled and debugging enabled.
-
-        Args:
-            script_paths (List[str]): A list of script file paths to execute.
-        """
-        Settings.disable_logging()
-        Settings.enable_debugging()
-
         for file_path in script_paths:
             filename = os.path.basename(file_path)
             directory = os.path.dirname(file_path)
@@ -175,10 +202,20 @@ class ScriptExecutor:
                 flags=re.MULTILINE,
             )
 
+            # Create a lock file to prevent script from being re-run
+            lock_file = f"{file.replace('.', '_')}.lock"
+            lock_file = os.path.join(directory, lock_file)
+
+            if os.path.exists(lock_file):
+                raise FileExistsError
+            else:
+                open(lock_file, "w").close()
+
             exec(script_content, globals())
             message = f"{self.script_log.title} Script ran successfully"
             message += " after recovery." if self.recovery_mode else "!"
             self.script_log.message(message)
+            os.remove(lock_file)
             return True
         except self.selenium_session_exceptions:
             self._handle_script_exceptions(self._configure_custom_driver)
@@ -190,6 +227,12 @@ class ScriptExecutor:
                 )  # Prevents recursive loop
             self._handle_script_exceptions(self._disable_optimizations)
             return self.execute(file, directory)
+        except FileExistsError:
+            self.script_log.message(
+                level=LogLevel.WARN,
+                message="The script is currently running in another instance.",
+            )
+            return False
         except Exception as exception:
             stacktrace = traceback.format_exc()
             self.script_log.message(

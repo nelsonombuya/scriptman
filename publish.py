@@ -19,9 +19,9 @@ class PackagePublishHelper:
         dir (str): The root directory of the Script Manager application.
         package_name (str): The name of the Python package.
         version (str): The new version to set for the package.
-        use_dotenv (bool|str): Whether to use the credentials from the dotenv
-            file.
-
+        use_dotenv (str): Whether to use the credentials from the dotenv file.
+        del_app_folder (str): Whether to delete the local app folder used
+            for testing.
     Usage:
         Create an instance of PackagePublishHelper with the package name and
         new version, then call the `run` method to execute the package
@@ -32,14 +32,13 @@ class PackagePublishHelper:
         >>> helper.run()
     """
 
-    def __init__(self, package_name, version, use_dotenv):
+    def __init__(self, package_name, version, use_dotenv, del_app_folder):
+        self.del_app_folder = del_app_folder
         self.dir = os.path.dirname(__file__)
         self.package_name = package_name
         self.version = version
 
-        if (isinstance(use_dotenv, str) and use_dotenv.lower() == "true") or (
-            isinstance(use_dotenv, bool) and use_dotenv is True
-        ):
+        if use_dotenv.lower() == "true":
             load_dotenv()
             self.username = os.environ["PYPI_USERNAME"]
             self.password = os.environ["PYPI_PASSWORD"]
@@ -65,6 +64,16 @@ class PackagePublishHelper:
         if os.path.exists(egg_info_dir):
             shutil.rmtree(egg_info_dir)
             print(f"Deleted '{egg_info_dir}' folder.")
+
+    def delete_local_app_folder(self):
+        """
+        Delete the app folder in the Script Manager that's used for testing
+        if it exists.
+        """
+        app_dir = os.path.join(self.dir, "app")
+        if os.path.exists(app_dir) and self.del_app_folder.lower() == "true":
+            shutil.rmtree(app_dir)
+            print(f"Deleted '{app_dir}' folder.")
 
     def update_version(self):
         """
@@ -111,8 +120,9 @@ class PackagePublishHelper:
         updating version, building distribution packages, and uploading to
         Twine.
         """
-        self.delete_dist_folder()
+        self.delete_local_app_folder()
         self.delete_egg_info_folder()
+        self.delete_dist_folder()
         self.update_version()
         self.run_build()
         self.upload_to_twine()
@@ -120,5 +130,10 @@ class PackagePublishHelper:
 
 
 if __name__ == "__main__":
-    package_name, version, use_dotenv = sys.argv[1:]
-    PackagePublishHelper(package_name, version, use_dotenv).run()
+    package_name, version, use_dotenv, del_app_folder = sys.argv[1:]
+    PackagePublishHelper(
+        package_name,
+        version,
+        use_dotenv,
+        del_app_folder,
+    ).run()

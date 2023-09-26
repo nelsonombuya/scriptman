@@ -38,7 +38,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 from scriptman._directories import DirectoryHandler
 from scriptman._logs import LogHandler, LogLevel
-from scriptman._selenium import SeleniumInteractionHandler
+from scriptman._selenium_interactions import SeleniumInteractionHandler
 from scriptman._settings import Settings
 
 

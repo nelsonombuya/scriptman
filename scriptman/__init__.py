@@ -76,7 +76,8 @@ from scriptman._directories import DirectoryHandler
 from scriptman._etl import ETLHandler
 from scriptman._logs import LogHandler, LogLevel
 from scriptman._scripts import ScriptsHandler
-from scriptman._selenium import SeleniumHandler, SeleniumInteraction
+from scriptman._selenium import SeleniumHandler
+from scriptman._selenium_interactions import SeleniumInteraction
 from scriptman._settings import Settings
 
 atexit.register(CleanUpHandler)

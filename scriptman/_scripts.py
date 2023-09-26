@@ -190,6 +190,7 @@ class ScriptExecutor:
         Returns:
             bool: True if executed successfully, False otherwise.
         """
+        lock_file = os.path.join(directory, f"{file.replace('.', '_')}.lock")
 
         try:
             # Replace 'if __name__ == "__main__":' with the module name
@@ -203,9 +204,6 @@ class ScriptExecutor:
             )
 
             # Create a lock file to prevent script from being re-run
-            lock_file = f"{file.replace('.', '_')}.lock"
-            lock_file = os.path.join(directory, lock_file)
-
             if os.path.exists(lock_file):
                 raise FileExistsError
             else:
@@ -217,8 +215,15 @@ class ScriptExecutor:
             self.script_log.message(message)
             os.remove(lock_file)
             return True
+        except FileExistsError:
+            self.script_log.message(
+                level=LogLevel.WARN,
+                message="The script is currently running in another instance.",
+            )
+            return False
         except self.selenium_session_exceptions:
             self._handle_script_exceptions(self._configure_custom_driver)
+            os.remove(lock_file)
             return self.execute(file, directory)
         except self.selenium_optimization_exceptions:
             if not Settings.selenium_optimizations_mode:
@@ -226,13 +231,8 @@ class ScriptExecutor:
                     f"{self.script_log.title} failed due to a Web Page Issue."
                 )  # Prevents recursive loop
             self._handle_script_exceptions(self._disable_optimizations)
+            os.remove(lock_file)
             return self.execute(file, directory)
-        except FileExistsError:
-            self.script_log.message(
-                level=LogLevel.WARN,
-                message="The script is currently running in another instance.",
-            )
-            return False
         except Exception as exception:
             stacktrace = traceback.format_exc()
             self.script_log.message(
@@ -240,6 +240,7 @@ class ScriptExecutor:
                 message="The script failed to run and couldn't recover.",
                 details={"error": str(exception), "stacktrace": stacktrace},
             )
+            os.remove(lock_file)
             return False
 
     def _handle_script_exceptions(self, recovery_function: Callable) -> None:

@@ -70,9 +70,10 @@ from typing import Callable, List, Optional
 
 import selenium.common.exceptions as sce
 
+import scriptman._selenium as Selenium
 from scriptman._directories import DirectoryHandler
 from scriptman._logs import LogHandler, LogLevel
-from scriptman._settings import Settings
+from scriptman._settings import SBI, Settings
 
 
 class ScriptsHandler:
@@ -247,17 +248,22 @@ class ScriptExecutor:
             return self.execute(file, directory, True)
         except self.selenium_optimization_exceptions as e:
             self.exception = e
-            if not Settings.selenium_optimizations_mode:  # Prevents inf loop
-                self._handle_script_exceptions(self._log_selenium_failure)
-                return False
-            else:
+            if Settings.selenium_optimizations_mode:
                 self._handle_script_exceptions(self._disable_optimizations)
                 return self.execute(file, directory, True)
+            else:
+                self._handle_script_exceptions(self._change_browser)
+                return self.execute(file, directory, True)
+        except Selenium.InvalidBrowserSelectionError as e:
+            self.exception = e
+            self._handle_script_exceptions(self._log_selenium_failure)
+            return False
         except Exception as e:
             self.exception = e
             self._handle_script_exceptions(self._log_general_exception)
             return False
         finally:
+            SBI.set_index(0)
             if self._is_not_a_file_lock_exception():
                 os.remove(self.lock_file)
 
@@ -288,6 +294,13 @@ class ScriptExecutor:
         self.script_log.message("Re-Running Selenium Script")
         self.script_log.message("Disabling Selenium Optimizations")
         Settings.disable_selenium_optimizations_mode()
+
+    def _change_browser(self) -> None:
+        """
+        Changes selected Selenium Browser to use.
+        """
+        SBI.set_index(SBI.get_index() + 1)
+        self.script_log.message("Re-Running Selenium with another browser.")
 
     def _log_selenium_failure(self) -> None:
         """

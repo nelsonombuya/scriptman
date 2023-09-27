@@ -580,5 +580,27 @@ class SettingsHandler:
         return json.dumps(vars(self), indent=4)
 
 
-# Singleton Instance
+class SeleniumBrowserIndex:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SeleniumBrowserIndex, cls).__new__(cls)
+            cls._instance.index = 0
+        return cls._instance
+
+    def get_index(self) -> int:
+        return self.index
+
+    def set_index(self, index: int) -> None:
+        self.index = index
+
+    def max_index(self) -> int:
+        from scriptman._selenium import BROWSER_QUEUE
+
+        return len(BROWSER_QUEUE)
+
+
+# Singleton Instances
 Settings = SettingsHandler()
+SBI = SeleniumBrowserIndex()

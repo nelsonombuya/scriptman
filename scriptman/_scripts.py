@@ -99,7 +99,11 @@ class ScriptsHandler:
         self.upon_failure = upon_failure or (lambda: None)
         self.scripts_dir = scripts_dir or DirectoryHandler().scripts_dir
 
-    def run_scripts(self, scripts: Optional[List[str]] = None) -> None:
+    def run_scripts(
+        self,
+        scripts: Optional[List[str]] = None,
+        force: bool = False,
+    ) -> None:
         """
         Run specified scripts from the scripts directory.
 
@@ -107,16 +111,24 @@ class ScriptsHandler:
             scripts (Optional[List[str]]): A list of script filenames to
                 execute. If not provided, all '.py' files in the scripts
                 directory are executed.
+            force (bool): Whether to run the file even if there's an existing
+                instance. Defaults to False.
         """
         for file in scripts or self.get_scripts():
             self._execute_script(file, self.scripts_dir)
 
-    def run_custom_scripts(self, script_paths: List[str]) -> None:
+    def run_custom_scripts(
+        self,
+        script_paths: List[str],
+        force: bool = False,
+    ) -> None:
         """
         Run specified custom scripts.
 
         Args:
             script_paths (List[str]): A list of script file paths to execute.
+            force (bool): Whether to run the file even if there's an existing
+                instance. Defaults to False.
         """
         for file_path in script_paths:
             filename = os.path.basename(file_path)
@@ -136,13 +148,20 @@ class ScriptsHandler:
             if filename.endswith(".py")
         ]
 
-    def _execute_script(self, file: str, directory: str) -> None:
+    def _execute_script(
+        self,
+        file: str,
+        directory: str,
+        force: bool = False,
+    ) -> None:
         """
         Execute a Python script.
 
         Args:
             file (str): The script to execute.
             directory (str): The directory of the script to execute.
+            force (bool): Whether to run the file even if there's an existing
+                instance. Defaults to False.
         """
         filename = os.path.splitext(file)[0]
         extension = os.path.splitext(file)[1]
@@ -157,7 +176,7 @@ class ScriptsHandler:
         log_handler = LogHandler(filename.title().replace("_", " "))
         log_handler.start()
 
-        if not ScriptExecutor(log_handler).execute(file, directory):
+        if not ScriptExecutor(log_handler).execute(file, directory, force):
             self.upon_failure()
 
         log_handler.stop()
@@ -180,13 +199,15 @@ class ScriptExecutor:
             sce.WebDriverException,
         )
 
-    def execute(self, file: str, directory: str) -> bool:
+    def execute(self, file: str, directory: str, force: bool = False) -> bool:
         """
         Execute a Python script.
 
         Args:
             file (str): The script to execute.
             directory (str): The directory of the script to execute.
+            force (bool): Whether to run the file even if there's an existing
+                instance. Defaults to False.
 
         Returns:
             bool: True if executed successfully, False otherwise.
@@ -205,7 +226,7 @@ class ScriptExecutor:
             )
 
             # Create a lock file to prevent script from being re-run
-            if os.path.exists(lock_file):
+            if os.path.exists(lock_file) and not force:
                 raise FileExistsError
             else:
                 open(lock_file, "w").close()
@@ -223,9 +244,9 @@ class ScriptExecutor:
             lock_creation_time = time.strftime(time_format, lock_creation_time)
 
             self.script_log.message(
+                "The script is currently running in another instance. "
+                " If this is not the case, kindly delete the .lock file:",
                 level=LogLevel.WARN,
-                message=f"The script is currently running in another instance."
-                f" If this is not the case, kindly delete {lock_file}",
                 details={
                     "lock_file": lock_file,
                     "locked_time": lock_creation_time,

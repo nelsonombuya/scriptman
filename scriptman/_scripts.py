@@ -88,8 +88,6 @@ class ScriptsHandler:
         """
         Initializes the ScriptsHandler.
 
-        By default, it sets the scripts directory using DirectoryHandler.
-
         Args:
             scripts_dir (str, optional): The directory where scripts are
                 located.
@@ -212,11 +210,14 @@ class ScriptExecutor:
         Returns:
             bool: True if executed successfully, False otherwise.
         """
-        lock_file = os.path.join(directory, f"{file.replace('.', '_')}.lock")
+        self.exception = None
+        self.file = os.path.join(directory, file)
+        self.lock_file = f"{file.replace('.', '_')}.lock"
+        self.lock_file = os.path.join(directory, self.lock_file)
 
         try:
             # Replace 'if __name__ == "__main__":' with the module name
-            with open(os.path.join(directory, file), "r") as script_file:
+            with open(self.file, "r") as script_file:
                 script_content = script_file.read()
             script_content = re.sub(
                 r'^if __name__ == "__main__":',
@@ -226,55 +227,39 @@ class ScriptExecutor:
             )
 
             # Create a lock file to prevent script from being re-run
-            if os.path.exists(lock_file) and not force:
+            if os.path.exists(self.lock_file) and not force:
                 raise FileExistsError
             else:
-                open(lock_file, "w").close()
+                open(self.lock_file, "w").close()
 
             exec(script_content, globals())
             message = f"{self.script_log.title} Script ran successfully"
             message += " after recovery." if self.recovery_mode else "!"
             self.script_log.message(message)
-            os.remove(lock_file)
             return True
-        except FileExistsError:
-            time_format = "%Y-%m-%d %H:%M:%S"
-            lock_creation_time = os.path.getctime(lock_file)
-            lock_creation_time = time.localtime(lock_creation_time)
-            lock_creation_time = time.strftime(time_format, lock_creation_time)
-
-            self.script_log.message(
-                "The script is currently running in another instance. "
-                " If this is not the case, kindly delete the .lock file:",
-                level=LogLevel.WARN,
-                details={
-                    "lock_file": lock_file,
-                    "locked_time": lock_creation_time,
-                    "script_file": os.path.join(directory, file),
-                },
-            )
+        except FileExistsError as e:
+            self.exception = e
+            self._handle_script_exceptions(self._locked_script)
             return False
-        except self.selenium_session_exceptions:
+        except self.selenium_session_exceptions as e:
+            self.exception = e
             self._handle_script_exceptions(self._configure_custom_driver)
-            os.remove(lock_file)
             return self.execute(file, directory)
-        except self.selenium_optimization_exceptions:
-            if not Settings.selenium_optimizations_mode:
-                raise Exception(
-                    f"{self.script_log.title} failed due to a Web Page Issue."
-                )  # Prevents recursive loop
-            self._handle_script_exceptions(self._disable_optimizations)
-            os.remove(lock_file)
-            return self.execute(file, directory)
-        except Exception as exception:
-            stacktrace = traceback.format_exc()
-            self.script_log.message(
-                level=LogLevel.ERROR,
-                message="The script failed to run and couldn't recover.",
-                details={"error": str(exception), "stacktrace": stacktrace},
-            )
-            os.remove(lock_file)
+        except self.selenium_optimization_exceptions as e:
+            self.exception = e
+            if not Settings.selenium_optimizations_mode:  # Prevents inf loop
+                self._handle_script_exceptions(self._log_selenium_failure)
+                return False
+            else:
+                self._handle_script_exceptions(self._disable_optimizations)
+                return self.execute(file, directory)
+        except Exception as e:
+            self.exception = e
+            self._handle_script_exceptions(self._log_general_exception)
             return False
+        finally:
+            if not isinstance(self.exception, FileExistsError):
+                os.remove(self.lock_file)
 
     def _handle_script_exceptions(self, recovery_function: Callable) -> None:
         """
@@ -303,3 +288,50 @@ class ScriptExecutor:
         self.script_log.message("Re-Running Selenium Script")
         self.script_log.message("Disabling Selenium Optimizations")
         Settings.disable_selenium_optimizations_mode()
+
+    def _log_selenium_failure(self) -> None:
+        """
+        Logs a failure in a Selenium operation that cannot be recovered.
+        """
+        self.script_log.message(
+            f"{self.script_log.title} failed due to a Web Page Issue.",
+            level=LogLevel.ERROR,
+            details={
+                "error": str(self.exception),
+                "stacktrace": traceback.format_exc(),
+            },
+        )
+
+    def _locked_script(self) -> None:
+        """
+        Report to the user that the script is currently running and therefore
+        locked.
+        """
+        time_format = "%Y-%m-%d %H:%M:%S"
+        lock_creation_time = os.path.getctime(self.lock_file)
+        lock_creation_time = time.localtime(lock_creation_time)
+        lock_creation_time = time.strftime(time_format, lock_creation_time)
+
+        self.script_log.message(
+            "The script is currently running in another instance. "
+            " If this is not the case, kindly delete the .lock file:",
+            level=LogLevel.WARN,
+            details={
+                "script_file": self.file,
+                "lock_file": self.lock_file,
+                "locked_time": lock_creation_time,
+            },
+        )
+
+    def _log_general_exception(self):
+        """
+        Report to the user that the script failed due to a general exception.
+        """
+        self.script_log.message(
+            level=LogLevel.ERROR,
+            message="The script failed to run and couldn't recover.",
+            details={
+                "error": str(self.exception),
+                "stacktrace": traceback.format_exc(),
+            },
+        )

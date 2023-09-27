@@ -244,7 +244,7 @@ class ScriptExecutor:
         except self.selenium_session_exceptions as e:
             self.exception = e
             self._handle_script_exceptions(self._configure_custom_driver)
-            return self.execute(file, directory)
+            return self.execute(file, directory, True)
         except self.selenium_optimization_exceptions as e:
             self.exception = e
             if not Settings.selenium_optimizations_mode:  # Prevents inf loop
@@ -252,7 +252,7 @@ class ScriptExecutor:
                 return False
             else:
                 self._handle_script_exceptions(self._disable_optimizations)
-                return self.execute(file, directory)
+                return self.execute(file, directory, True)
         except Exception as e:
             self.exception = e
             self._handle_script_exceptions(self._log_general_exception)

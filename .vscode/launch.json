@@ -5,12 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug",
             "type": "python",
             "request": "launch",
             "justMyCode": true,
-            "name": "ScriptMan",
-            "console": "integratedTerminal",
-            "program": "scriptman\\__init__.py"
+            "program": "debug.py",
+            "console": "integratedTerminal"
         }
     ]
 }

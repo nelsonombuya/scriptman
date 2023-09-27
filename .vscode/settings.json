@@ -4,6 +4,8 @@
         "crdownload",
         "csvhandler",
         "dtype",
+        "geckodriver",
+        "GECKODRIVER",
         "infobars",
         "iterrows",
         "mydatabase",

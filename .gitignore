@@ -3,5 +3,6 @@ dist
 .env
 .venv
 *.pyc
+debug.py
 __pycache__
 scriptman.egg-info

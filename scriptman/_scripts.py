@@ -258,7 +258,7 @@ class ScriptExecutor:
             self._handle_script_exceptions(self._log_general_exception)
             return False
         finally:
-            if not isinstance(self.exception, FileExistsError):
+            if self._is_not_a_file_lock_exception():
                 os.remove(self.lock_file)
 
     def _handle_script_exceptions(self, recovery_function: Callable) -> None:
@@ -335,3 +335,12 @@ class ScriptExecutor:
                 "stacktrace": traceback.format_exc(),
             },
         )
+
+    def _is_not_a_file_lock_exception(self):
+        """
+        Check whether the exception is a FileExistsError and that the lock file
+        exists.
+        """
+        lock_file_exists = os.path.exists(self.lock_file)
+        is_FileExistsError = isinstance(self.exception, FileExistsError)
+        return (not is_FileExistsError) and lock_file_exists

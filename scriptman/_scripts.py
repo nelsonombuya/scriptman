@@ -115,7 +115,7 @@ class ScriptsHandler:
                 instance. Defaults to False.
         """
         for file in scripts or self.get_scripts():
-            self._execute_script(file, self.scripts_dir)
+            self._execute_script(file, self.scripts_dir, force)
 
     def run_custom_scripts(
         self,
@@ -133,7 +133,7 @@ class ScriptsHandler:
         for file_path in script_paths:
             filename = os.path.basename(file_path)
             directory = os.path.dirname(file_path)
-            self._execute_script(filename, directory)
+            self._execute_script(filename, directory, force)
 
     def get_scripts(self) -> List[str]:
         """

@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-VERSION = "0.0.0.17"
+VERSION = "0.0.0.18"
 DESCRIPTION = (
     "ScriptMan is a versatile Python package that simplifies script "
     " management tasks, offering a wide range of utilities for various"

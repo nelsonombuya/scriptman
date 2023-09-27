@@ -84,7 +84,7 @@ class ScriptsHandler:
     def __init__(
         self,
         scripts_dir: Optional[str] = None,
-        upon_failure: Optional[Callable] = None,
+        upon_failure: Optional[Callable[[str], None]] = None,
     ) -> None:
         """
         Initializes the ScriptsHandler.
@@ -92,10 +92,12 @@ class ScriptsHandler:
         Args:
             scripts_dir (str, optional): The directory where scripts are
                 located.
-            upon_failure (callable, optional): A function to call upon script
-                execution failure.
+            upon_failure (callable(str, None), optional): A function to call
+                upon script execution failure. It should take a string
+                argument, where it will receive the stacktrace. It should also
+                return None.
         """
-        self.upon_failure = upon_failure or (lambda: None)
+        self.upon_failure = upon_failure or (lambda stacktrace: None)
         self.scripts_dir = scripts_dir or DirectoryHandler().scripts_dir
 
     def run_scripts(
@@ -175,8 +177,10 @@ class ScriptsHandler:
         log_handler = LogHandler(filename.title().replace("_", " "))
         log_handler.start()
 
-        if not ScriptExecutor(log_handler).execute(file, directory, force):
-            self.upon_failure()
+        result = ScriptExecutor(log_handler).execute(file, directory, force)
+
+        if not result[0] and isinstance(result[1], str):
+            self.upon_failure(result[1])
 
         log_handler.stop()
 
@@ -198,7 +202,12 @@ class ScriptExecutor:
             sce.WebDriverException,
         )
 
-    def execute(self, file: str, directory: str, force: bool = False) -> bool:
+    def execute(
+        self,
+        file: str,
+        directory: str,
+        force: bool = False,
+    ) -> tuple[bool, str]:
         """
         Execute a Python script.
 
@@ -209,7 +218,8 @@ class ScriptExecutor:
                 instance. Defaults to False.
 
         Returns:
-            bool: True if executed successfully, False otherwise.
+            bool, Exception: True if executed successfully, False otherwise
+                with the Exception.
         """
         self.exception = None
         self.file = os.path.join(directory, file)
@@ -237,11 +247,11 @@ class ScriptExecutor:
             message = f"{self.script_log.title} Script ran successfully"
             message += " after recovery." if self.recovery_mode else "!"
             self.script_log.message(message)
-            return True
+            return True, message
         except FileExistsError as e:
             self.exception = e
             self._handle_script_exceptions(self._locked_script)
-            return False
+            return False, traceback.format_exc()
         except self.selenium_session_exceptions as e:
             self.exception = e
             self._handle_script_exceptions(self._configure_custom_driver)
@@ -257,11 +267,11 @@ class ScriptExecutor:
         except Selenium.InvalidBrowserSelectionError as e:
             self.exception = e
             self._handle_script_exceptions(self._log_selenium_failure)
-            return False
+            return False, traceback.format_exc()
         except Exception as e:
             self.exception = e
             self._handle_script_exceptions(self._log_general_exception)
-            return False
+            return False, traceback.format_exc()
         finally:
             SBI.set_index(0)
             if self._is_not_a_file_lock_exception():

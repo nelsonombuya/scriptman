@@ -64,6 +64,7 @@ ScriptExecutor instance.
 
 import os
 import re
+import time
 import traceback
 from typing import Callable, List, Optional
 
@@ -216,9 +217,20 @@ class ScriptExecutor:
             os.remove(lock_file)
             return True
         except FileExistsError:
+            time_format = "%Y-%m-%d %H:%M:%S"
+            lock_creation_time = os.path.getctime(lock_file)
+            lock_creation_time = time.localtime(lock_creation_time)
+            lock_creation_time = time.strftime(time_format, lock_creation_time)
+
             self.script_log.message(
                 level=LogLevel.WARN,
-                message="The script is currently running in another instance.",
+                message=f"The script is currently running in another instance."
+                f" If this is not the case, kindly delete {lock_file}",
+                details={
+                    "lock_file": lock_file,
+                    "locked_time": lock_creation_time,
+                    "script_file": os.path.join(directory, file),
+                },
             )
             return False
         except self.selenium_session_exceptions:

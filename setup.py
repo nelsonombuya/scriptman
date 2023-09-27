@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-VERSION = "0.0.0.14"
+VERSION = "0.0.0.15"
 DESCRIPTION = "Script Manager assists with managing python scripts."
 
 with open(os.path.join(here, "README.md"), encoding="utf-8") as f:

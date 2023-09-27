@@ -22,6 +22,8 @@ Methods:
 - `__init__(self) -> None`: Initialize the SeleniumHandler instance.
 - `chrome: Callable[[], Chrome] = Chrome`: Provides a callable property to
 create a Chrome WebDriver instance using the Chrome class.
+- `edge: Callable[[], Edge] = Edge`: Provides a callable property to
+create an Edge WebDriver instance using the Edge class.
 - `firefox: Callable[[], Firefox] = Firefox`: Provides a callable property to
 create a Firefox WebDriver instance using the Firefox class.
 
@@ -37,11 +39,15 @@ selenium_handler = SeleniumHandler()
 # Create a Selenium WebDriver instance using the Chrome browser
 driver = selenium_handler.chrome.get_driver()
 
+# Create a Selenium WebDriver instance using the Edge browser
+driver = selenium_handler.edge.get_driver()
+
 # Create a Selenium WebDriver instance using the Firefox browser
 driver = selenium_handler.firefox.get_driver()
 
 # You can also use the browser instance for extra functionality
 selenium_handler = SeleniumHandler.chrome()
+selenium_handler = SeleniumHandler.edge()
 selenium_handler = SeleniumHandler.firefox()
 selenium_handler.wait_for_downloads_to_finish()
 ```
@@ -49,6 +55,8 @@ selenium_handler.wait_for_downloads_to_finish()
 Properties:
 - `chrome`: Provides a callable property to create a Chrome WebDriver instance
     using the Chrome class.
+- `edge`: Provides a callable property to create an Edge WebDriver instance
+    using the Edge class.
 - `firefox`: Provides a callable property to create a Firefox WebDriver
     instance using the Chrome class.
 """
@@ -56,9 +64,10 @@ Properties:
 from typing import Callable, Union
 
 from scriptman._selenium_chrome import Chrome
+from scriptman._selenium_edge import Edge
 from scriptman._selenium_firefox import Firefox
 
-AnyBrowser = Union[Chrome, Firefox]
+AnyBrowser = Union[Chrome, Edge, Firefox]
 
 
 class SeleniumHandler:
@@ -74,6 +83,11 @@ class SeleniumHandler:
         various configurations, allowing users to automate web interactions
         using Selenium.
 
+        > Edge
+        It utilizes the `Edge` class to create WebDriver instances with
+        various configurations, allowing users to automate web interactions
+        using Selenium.
+
         > Firefox
         It utilizes the `Firefox` class to create WebDriver instances with
         various configurations, allowing users to automate web interactions
@@ -83,14 +97,17 @@ class SeleniumHandler:
             To create a Selenium WebDriver instance with default settings:
             >>> selenium_handler = SeleniumHandler()
             >>> driver = selenium_handler.chrome.get_driver()
+            >>> driver = selenium_handler.edge.get_driver()
             >>> driver = selenium_handler.firefox.get_driver()
 
             You can also use the browser instance for extra functionality:
-            >>> selenium_handler = SeleniumHandler.chrome
-            >>> selenium_handler = SeleniumHandler.firefox
+            >>> selenium_handler = SeleniumHandler.chrome()
+            >>> selenium_handler = SeleniumHandler.edge()
+            >>> selenium_handler = SeleniumHandler.firefox()
             >>> selenium_handler.wait_for_downloads_to_finish()
             > See `SeleniumInteractionsHandler` for more details.
         """
 
     chrome: Callable[[], Chrome] = Chrome
+    edge: Callable[[], Edge] = Edge
     firefox: Callable[[], Firefox] = Firefox

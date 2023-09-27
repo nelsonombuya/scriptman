@@ -11,7 +11,7 @@ Usage:
 
 Example:
 ```python
-from scriptman._chrome import Chrome
+from scriptman._selenium_chrome import Chrome
 
 chrome = Chrome()
 # Your Chrome WebDriver instance is ready to use.

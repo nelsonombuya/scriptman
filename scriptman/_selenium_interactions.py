@@ -106,7 +106,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from scriptman._directories import DirectoryHandler
 from scriptman._settings import Settings
 
-AnyDriver = Union[webdriver.Chrome, webdriver.Firefox]
+AnyDriver = Union[webdriver.Chrome, webdriver.Edge, webdriver.Firefox]
 
 
 class SeleniumInteraction(Enum):

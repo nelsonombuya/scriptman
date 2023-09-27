@@ -11,7 +11,7 @@ Usage:
 
 Example:
 ```python
-from scriptman._firefox import Firefox
+from scriptman._selenium_firefox import Firefox
 
 firefox = Firefox()
 # Your Firefox WebDriver instance is ready to use.
@@ -36,7 +36,8 @@ Methods (Firefox):
     ) -> webdriver.FirefoxOptions`: Gets Firefox WebDriver options with
     specified configurations.
 
-For detailed documentation and examples, please refer to the package documentation.
+For detailed documentation and examples, please refer to the package
+documentation.
 """
 
 from typing import Optional

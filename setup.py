@@ -4,8 +4,17 @@ from setuptools import find_packages, setup
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-VERSION = "0.0.0.16"
-DESCRIPTION = "Script Manager assists with managing python scripts."
+VERSION = "0.0.0.17"
+DESCRIPTION = (
+    "ScriptMan is a versatile Python package that simplifies script "
+    " management tasks, offering a wide range of utilities for various"
+    " scripting needs. Whether you're dealing with data, databases,"
+    " command-line interfaces, web automation, or just aiming for better"
+    " script organization, ScriptMan has you covered. With features like"
+    " cleanup handling, database interaction, file management, logging, and"
+    " more, ScriptMan is your go-to tool for efficient and well-organized"
+    " scripting in Python."
+)
 
 with open(os.path.join(here, "README.md"), encoding="utf-8") as f:
     LONG_DESCRIPTION = f.read()

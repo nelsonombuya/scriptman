@@ -115,8 +115,12 @@ class ScriptsHandler:
             force (bool): Whether to run the file even if there's an existing
                 instance. Defaults to False.
         """
-        for file in scripts or self.get_scripts():
+        scripts = scripts or self.get_scripts()
+
+        for file in scripts:
             self._execute_script(file, self.scripts_dir, force)
+
+        LogHandler("Scripts Handler").message(f"{scripts} have been executed.")
 
     def run_custom_scripts(
         self,
@@ -131,10 +135,15 @@ class ScriptsHandler:
             force (bool): Whether to run the file even if there's an existing
                 instance. Defaults to False.
         """
+        scripts = []
+
         for file_path in script_paths:
             filename = os.path.basename(file_path)
             directory = os.path.dirname(file_path)
+            scripts.append(os.path.basename(file_path))
             self._execute_script(filename, directory, force)
+
+        LogHandler("Scripts Handler").message(f"{scripts} have been executed.")
 
     def get_scripts(self) -> List[str]:
         """

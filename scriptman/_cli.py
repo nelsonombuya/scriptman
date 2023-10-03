@@ -27,6 +27,7 @@ For detailed documentation and examples, please refer to the package
 documentation.
 """
 
+import re
 import sys
 from typing import List
 
@@ -73,6 +74,11 @@ class CLIHandler:
                 [print(script) for script in self.script_handler.get_scripts()]
                 sys.exit(0)  # Exit after printing the list of scripts
 
+            if arg.startswith("-venv"):
+                env_match = re.match(r'-venv=["\']?(.*?)(?=["\']|$)', arg)
+                env_folder = env_match.group(1) if env_match else ".venv"
+                Settings.use_venv(env_folder)  # Enabling the local environment
+
             arg_function = {
                 "-dl": Settings.disable_logging,
                 "--disable_logging": Settings.disable_logging,
@@ -82,7 +88,6 @@ class CLIHandler:
                 "--upgrade": Settings.upgrade_scriptman,
                 "-upd": Settings.update_scripts,
                 "--update": Settings.update_scripts,
-                "-venv": Settings.use_venv,
             }.get(arg)
 
             if arg_function:
@@ -127,7 +132,10 @@ class CLIHandler:
         -ls, --list_scripts     List scripts contained in the scripts folder.
         -upg, --upgrade         Upgrade ScriptMan.
         -upd, --update          Update Scripts Repository with latest commit.
-        -venv                   Enable a local virtual Python environment.
+        -venv[=name]            Enable a local virtual Python environment.
+                                By default uses '.venv', but one can specify
+                                the environment name using -venv=name or
+                                -venv="name".
 
         script_names            Names of the scripts to execute.
         """

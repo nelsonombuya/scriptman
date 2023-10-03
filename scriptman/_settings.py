@@ -168,16 +168,23 @@ class SettingsHandler:
             password: str,
         ) -> None:
             Generate and add a default database connection string.
-        view_default_database_connection_strings() -> None:
+        view_database_connection_strings() -> None:
             View the default database connection strings.
-        remove_default_database_connection_string(key: str) -> None:
+        remove_database_connection_string(key: str) -> None:
             Remove a default database connection string.
-
+        def upgrade_scriptman(self) -> None:
+            Upgrade the ScriptMan application to the latest version.
+        def update_scripts(self) -> None:
+            Update application scripts from a Git repository.
+        def use_venv(self) -> None:
+            Activate the virtual environment.
         Private Methods:
         _log_change(name: str, value: Optional[Any]) -> None:
             Log changes to settings.
         __str__() -> str:
             Get a string representation of the current settings.
+        __del__() -> None:
+            Disables virtual environment once the object is deleted.
     """
 
     _instance = None
@@ -196,6 +203,7 @@ class SettingsHandler:
         Initialize default settings.
         """
         self.app_dir: str = ""
+        self.venv_name: str = ""
         self.log_mode: bool = True
         self.debug_mode: bool = False
         self.clean_up_folders: List[str] = []
@@ -510,8 +518,8 @@ class SettingsHandler:
         strings in a readable JSON format with an indentation of 4 spaces.
 
         Example:
-            settings = SettingsHandler()
-            settings.view_default_database_connection_strings()
+            settings = SettingsHandler() or Settings
+            settings.view_database_connection_strings()
         """
         print(json.dumps(self.database_connection_strings, indent=4))
 
@@ -527,8 +535,8 @@ class SettingsHandler:
                 removed.
 
         Example:
-            settings = SettingsHandler()
-            settings.remove_default_database_connection_string("Connection1")
+            settings = SettingsHandler() or Settings
+            settings.remove_database_connection_string("Connection1")
         """
         removed_value = self.database_connection_strings.pop(key)
         self._log_change(
@@ -536,7 +544,61 @@ class SettingsHandler:
             removed_value,
         )
 
-    def upgrade_scriptman(self):
+    def use_venv(self, venv_name: str = ".venv") -> None:
+        """
+        Activate the virtual environment.
+
+        This method activates the virtual environment associated with the
+        ScriptManager application. It sets the `venv_name` attribute to True
+        and runs the activation script for the virtual environment located in
+        the `Scripts` directory. This allows the application to work within the
+        isolated virtual environment, which may contain specific dependencies
+        and packages.
+
+        Args:
+            venv_name (str): The name of the virtual environment folder.
+                Defaults to '.venv'.
+
+        Example:
+            settings = SettingsHandler()
+            settings.use_venv()
+
+        Note:
+            To use this method successfully, ensure that the virtual
+            environment (venv) has been created and configured correctly for
+            the ScriptManager application.
+
+        """
+        if self.app_dir:
+            self.venv_name = venv_name
+            subprocess.run([rf"{self.app_dir}\{venv_name}\Scripts\activate"])
+            self._log_change("Virtual Environment", "Activated")
+        else:
+            self._log_change("Virtual Environment", "APP DIR is undefined.")
+
+    def upgrade_scriptman(self) -> None:
+        """
+        Upgrade the ScriptMan application to the latest version.
+
+        This method uses the Python package manager `pip` to upgrade the
+        ScriptMan application to the latest available version. It runs the
+        following command to perform the upgrade:
+
+        ```
+        python -m pip install scriptman --upgrade
+        ```
+
+        Example:
+            settings = SettingsHandler() or Settings
+            settings.upgrade_scriptman()
+
+        Note:
+            This method requires an active internet connection to fetch the
+            latest version of the ScriptMan application from the Python Package
+            Index (PyPI). Ensure that the `pip` tool is properly installed and
+            configured in your Python environment.
+
+        """
         subprocess.run(
             [
                 "python",
@@ -547,12 +609,33 @@ class SettingsHandler:
                 "--upgrade",
             ]
         )
-        self._log_change("scriptman", "Latest Version")
+        self._log_change("ScriptMan", "Latest Version")
 
-    def update_scripts(self):
-        subprocess.run(["cd", self.app_dir])
-        subprocess.run(["git", "pull"])
-        self._log_change("Scripts", "Latest Commit on Repository")
+    def update_scripts(self) -> None:
+        """
+        Update application scripts from a Git repository.
+
+        This method updates the application scripts by performing a `git pull`
+        operation within the application's root directory. It assumes that the
+        application's source code is stored in a Git repository, and this
+        method pulls the latest changes from the repository.
+
+        Example:
+            settings = SettingsHandler()
+            settings.update_scripts()
+
+        Note:
+            This method is designed for applications that use Git for version
+            control. Ensure that the Git repository is properly configured and
+            accessible as the APP DIR.
+
+        """
+        if self.app_dir:
+            subprocess.run(["cd", self.app_dir])
+            subprocess.run(["git", "pull"])
+            self._log_change("Scripts", "Latest Commit on Repository")
+        else:
+            self._log_change("Scripts", "APP DIR is undefined.")
 
     def _log_change(self, name: str, value: Optional[Any]) -> None:
         """
@@ -579,23 +662,96 @@ class SettingsHandler:
         """
         return json.dumps(vars(self), indent=4)
 
+    def __del__(self) -> None:
+        """
+        Deactivate the virtual environment upon object deletion.
+
+        This method is automatically called when an instance of the
+        `SettingsHandler` class is deleted. If the virtual environment (`venv`)
+        was activated using the `use_venv` method, this method deactivates it
+        to return to the system's default Python environment. Deactivating the
+        virtual environment is a good practice to ensure that it doesn't affect
+        other Python processes or environments after its usage.
+
+        Example:
+            settings = SettingsHandler() or Settings
+            settings.use_venv()
+            # ... perform operations within the virtual environment ...
+            del settings  # Deactivate the virtual environment upon deletion.
+
+        Note:
+            Ensure that the virtual environment was previously activated using
+            the `use_venv` method before calling this method. If the virtual
+            environment was not activated, calling this method will have no
+            effect.
+
+        """
+        if self.venv_name:
+            command = [rf"{self.app_dir}\{self.venv_name}\Scripts\deactivate"]
+            subprocess.run(command)
+
 
 class SeleniumBrowserIndex:
+    """
+    Singleton class for managing Selenium browser index.
+
+    This class provides methods for managing the index used to track Selenium
+    browser instances. It ensures that there is only one instance of the index
+    within the application.
+
+    Attributes:
+        index (int): The current index value.
+
+    Methods:
+        get_index() -> int:
+            Get the current index value.
+
+        set_index(index: int) -> None:
+            Set the index value to the specified integer.
+
+        max_index() -> int:
+            Get the maximum index value based on the length of the Selenium
+            browser queue.
+
+    """
+
     _instance = None
 
     def __new__(cls):
+        """
+        Create a single instance of SeleniumBrowserIndex if it doesn't exist.
+        """
         if cls._instance is None:
             cls._instance = super(SeleniumBrowserIndex, cls).__new__(cls)
             cls._instance.index = 0
         return cls._instance
 
     def get_index(self) -> int:
+        """
+        Get the current index value.
+
+        Returns:
+            int: The current index value.
+        """
         return self.index
 
     def set_index(self, index: int) -> None:
+        """
+        Set the index value to the specified integer.
+
+        Args:
+            index (int): The new index value to set.
+        """
         self.index = index
 
     def max_index(self) -> int:
+        """
+        Get the maximum index value based on the length of the Selenium browser
+        queue.
+
+        Returns:
+            int: The maximum index value.
+        """
         from scriptman._selenium import BROWSER_QUEUE
 
         return len(BROWSER_QUEUE)

@@ -82,6 +82,7 @@ class CLIHandler:
                 "--upgrade": Settings.upgrade_scriptman,
                 "-upd": Settings.update_scripts,
                 "--update": Settings.update_scripts,
+                "-venv": Settings.use_venv,
             }.get(arg)
 
             if arg_function:
@@ -126,6 +127,7 @@ class CLIHandler:
         -ls, --list_scripts     List scripts contained in the scripts folder.
         -upg, --upgrade         Upgrade ScriptMan.
         -upd, --update          Update Scripts Repository with latest commit.
+        -venv                   Enable a local virtual Python environment.
 
         script_names            Names of the scripts to execute.
         """

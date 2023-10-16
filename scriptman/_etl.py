@@ -336,21 +336,48 @@ class ETLHandler:
         Args:
             keys (List[str]): List of keys for updates.
         """
-        upd_query = self._generate_update_query(self._table, self._data, keys)
-        ins_query = self._convert_update_query_to_insert_query(upd_query)
-        prepared_data = self._prepare_data(keys)
 
-        for row in tqdm(
-            unit="record(s)",
-            iterable=prepared_data,
-            desc=f"Updating data on [{self._table}]",
-        ):
-            try:
-                self._db.execute_write_query(upd_query, row, True)
-            except ValueError:
-                self._db.execute_write_query(ins_query, row, True)
+        try:
+            # Bulk Execute Update Query
+            upd_query = self._generate_update_query(
+                self._table,
+                self._data,
+                keys,
+            )
+            prepared_data = self._prepare_data(keys)
+            self._log.message(f"Updating data on [{self._table}]...")
+            self._db.execute_many(upd_query, prepared_data)
 
-    def _prepare_data(self, keys: Optional[List[str]] = None) -> List[tuple]:
+            # Bulk Execute Insert Query With WHERE NOT EXISTS Clause
+            ins_query = self._convert_update_query_to_insert_query(
+                upd_query,
+                keys,
+            )
+            prepared_data = self._prepare_data(keys, True)
+            self._log.message(f"Inserting new data on [{self._table}]...")
+            self._db.execute_many(ins_query, prepared_data)
+        except MemoryError:
+            upd_query = self._generate_update_query(
+                self._table,
+                self._data,
+                keys,
+            )
+            ins_query = self._convert_update_query_to_insert_query(upd_query)
+            prepared_data = self._prepare_data(keys)
+
+            for row in tqdm(
+                unit="record(s)",
+                iterable=prepared_data,
+                desc=f"Updating data on [{self._table}]",
+            ):
+                try:
+                    self._db.execute_write_query(upd_query, row, True)
+                except ValueError:
+                    self._db.execute_write_query(ins_query, row, True)
+
+    def _prepare_data(
+        self, keys: Optional[List[str]] = None, duplicate_keys: bool = False
+    ) -> List[tuple]:
         """
         Prepare data for insertion into a database table.
 
@@ -365,6 +392,9 @@ class ETLHandler:
 
         Args:
             keys (Optional[List[str]]): List of keys for updates.
+            duplicate_keys (bool): Whether to additionally duplicate and append
+                the keys to the end of the tuple. Useful for the WHERE NOT
+                EXISTS clause.
 
         Returns:
             List[Tuple]: A list of tuples representing the processed rows ready
@@ -378,6 +408,10 @@ class ETLHandler:
             if keys is not None:
                 shifted_values = [row[c] for c in row.index if c not in keys]
                 shifted_values.extend([row[col] for col in keys])
+
+                if duplicate_keys:
+                    shifted_values.extend([row[col] for col in keys])
+
                 processed_row.extend(
                     json.dumps(val) if isinstance(val, (list, dict)) else val
                     for val in shifted_values
@@ -496,12 +530,17 @@ class ETLHandler:
             WHERE {where_conditions}
         """
 
-    def _convert_update_query_to_insert_query(self, update_query: str) -> str:
+    def _convert_update_query_to_insert_query(
+        self, update_query: str, selected_columns: Optional[List[str]] = None
+    ) -> str:
         """
-        Convert an update query into an insert query.
+        Convert an update query into an insert query with an optional WHERE NOT
+        EXISTS clause.
 
         Args:
             update_query (str): The update query to convert.
+            selected_columns (List[str], optional): List of keys for the WHERE
+                NOT EXISTS clause.
 
         Returns:
             str: The converted insert query.
@@ -522,7 +561,7 @@ class ETLHandler:
         column_names = []
         placeholders = []
 
-        for i, set_part in enumerate(set_parts):
+        for set_part in set_parts:
             column_name_end = set_part.index("=")
             column_name = set_part[:column_name_end].strip()
             column_names.append(column_name)
@@ -548,8 +587,24 @@ class ETLHandler:
 
         # Create the insert query with column names and placeholders
         insert_query = f"""
-                INSERT INTO "{table_name}"
-                ({', '.join(column_names)})
+            INSERT INTO "{table_name}"
+            ({', '.join(column_names)})
+        """
+
+        # Append the WHERE NOT EXISTS subquery or VALUES as needed
+        if selected_columns:
+            insert_query += f"""
+                SELECT {', '.join(placeholders)}
+                WHERE NOT EXISTS (
+                    SELECT * FROM "{table_name}"
+                    WHERE {" AND ".join([
+                        f'{col} = ?'
+                        for col in selected_columns
+                    ])}
+                )
+            """
+        else:
+            insert_query += f"""
                 VALUES ({', '.join(placeholders)})
             """
 

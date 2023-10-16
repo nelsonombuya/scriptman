@@ -258,7 +258,6 @@ class ETLHandler:
                 type for all columns. Defaults to False.
             keys (List[str], optional): List of keys for updates.
                 Defaults to [].
-
         """
         if self._data.empty:
             self._log.message("Dataset is empty!", LogLevel.WARN)
@@ -318,6 +317,10 @@ class ETLHandler:
         try:
             self._db.execute_many(insert_query, prepared_data)
         except MemoryError:
+            self._log.message(
+                "Bulk Query Execution Failed. Executing single queries...",
+                LogLevel.WARN,
+            )
             for row in tqdm(
                 unit="record(s)",
                 iterable=prepared_data,
@@ -327,7 +330,8 @@ class ETLHandler:
 
     def _update(self, keys: List[str]) -> None:
         """
-        Update data in a database table.
+        Update data in a database table, and if the record doesn't exist,
+        insert it.
 
         Args:
             keys (List[str]): List of keys for updates.
@@ -336,18 +340,15 @@ class ETLHandler:
         ins_query = self._convert_update_query_to_insert_query(upd_query)
         prepared_data = self._prepare_data(keys)
 
-        try:
-            self._db.execute_many(upd_query, prepared_data)
-        except MemoryError:
-            for row in tqdm(
-                unit="record(s)",
-                iterable=prepared_data,
-                desc=f"Updating data on [{self._table}]",
-            ):
-                try:
-                    self._db.execute_write_query(upd_query, row, True)
-                except ValueError:
-                    self._db.execute_write_query(ins_query, row, True)
+        for row in tqdm(
+            unit="record(s)",
+            iterable=prepared_data,
+            desc=f"Updating data on [{self._table}]",
+        ):
+            try:
+                self._db.execute_write_query(upd_query, row, True)
+            except ValueError:
+                self._db.execute_write_query(ins_query, row, True)
 
     def _prepare_data(self, keys: Optional[List[str]] = None) -> List[tuple]:
         """

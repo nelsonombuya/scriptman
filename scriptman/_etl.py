@@ -594,18 +594,18 @@ class ETLHandler:
         # Append the WHERE NOT EXISTS subquery or VALUES as needed
         if selected_columns:
             insert_query += f"""
-                SELECT {', '.join(placeholders)}
-                WHERE NOT EXISTS (
-                    SELECT * FROM "{table_name}"
-                    WHERE {" AND ".join([
-                        f'{col} = ?'
-                        for col in selected_columns
-                    ])}
-                )
+            SELECT {', '.join(placeholders)}
+            WHERE NOT EXISTS (
+                SELECT * FROM "{table_name}"
+                WHERE {" AND ".join([
+                    f'"{column}" = ?'
+                    for column in selected_columns
+                ])}
+            )
             """
         else:
             insert_query += f"""
-                VALUES ({', '.join(placeholders)})
+            VALUES ({', '.join(placeholders)})
             """
 
         return insert_query

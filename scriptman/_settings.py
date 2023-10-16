@@ -731,13 +731,16 @@ class SeleniumBrowserIndex:
         index (int): The current index value.
 
     Methods:
-        get_index() -> int:
+        initialize_defaults(self) -> None:
+            Initialize default settings for the index.
+
+        get_index(self) -> int:
             Get the current index value.
 
-        set_index(index: int) -> None:
+        set_index(self, index: int) -> None:
             Set the index value to the specified integer.
 
-        max_index() -> int:
+        max_index(self) -> int:
             Get the maximum index value based on the length of the Selenium
             browser queue.
 
@@ -751,8 +754,14 @@ class SeleniumBrowserIndex:
         """
         if cls._instance is None:
             cls._instance = super(SeleniumBrowserIndex, cls).__new__(cls)
-            cls._instance.index = 0
+            cls._instance.initialize_defaults()
         return cls._instance
+
+    def initialize_defaults(self) -> None:
+        """
+        Initialize default settings for the index.
+        """
+        self.index: int = 0
 
     def get_index(self) -> int:
         """

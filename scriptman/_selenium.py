@@ -126,6 +126,8 @@ class SeleniumHandler:
 
     @staticmethod
     def any() -> AnyBrowser:
+        # FIXME: Uses browser queue when user has selected only one browser
+        # FIXME: Might have conflicts in case of simultaneous runs
         try:
             browser_info = {
                 Browsers.EDGE: (Browsers.EDGE, Edge),

@@ -64,7 +64,7 @@ Properties:
 """
 
 from enum import Enum
-from typing import Callable, Union
+from typing import Union
 
 from scriptman._logs import LogHandler
 from scriptman._selenium_chrome import Chrome
@@ -120,14 +120,14 @@ class SeleniumHandler:
             > See `SeleniumInteractionsHandler` for more details.
         """
 
-    edge: Callable[[], Edge] = Edge
-    chrome: Callable[[], Chrome] = Chrome
-    firefox: Callable[[], Firefox] = Firefox
+    # FIXME: Uses browser queue when user has selected only one browser
+    # FIXME: Might have conflicts in case of simultaneous runs
+    # edge: Callable[[], Edge] = Edge
+    # chrome: Callable[[], Chrome] = Chrome
+    # firefox: Callable[[], Firefox] = Firefox
 
     @staticmethod
     def any() -> AnyBrowser:
-        # FIXME: Uses browser queue when user has selected only one browser
-        # FIXME: Might have conflicts in case of simultaneous runs
         try:
             browser_info = {
                 Browsers.EDGE: (Browsers.EDGE, Edge),

@@ -27,7 +27,7 @@ For detailed documentation and examples, please refer to the package
 documentation.
 """
 
-from typing import List
+from typing import Callable, List, Optional
 
 from scriptman._scripts import ScriptsHandler
 from scriptman._settings import Settings
@@ -41,15 +41,23 @@ class CLIHandler:
         args (List[str]): List of command-line arguments.
     """
 
-    def __init__(self, args: List[str]):
+    def __init__(
+        self,
+        args: List[str],
+        upon_failure: Optional[Callable[[str], None]] = None,
+    ):
         """
         Initialize the CLIHandler and execute scripts based on the provided
         command-line arguments.
 
         Args:
             args (List[str]): List of command-line arguments.
+            upon_failure (callable(str, None), optional): A function to call
+                upon script execution failure. It should take a string
+                argument, where it will receive the stacktrace. It should also
+                return None.
         """
-        self.script_handler = ScriptsHandler()
+        self.script_handler = ScriptsHandler(upon_failure=upon_failure)
         self.disable_logging = False
         self.custom = False
         self.debug = False

@@ -35,14 +35,13 @@ the terminal.
 - `disable_debugging(self) -> None`: Disable debugging mode.
 - `add_folders_for_cleanup(self, folders: List[str]) -> None`: Add folders to
 be cleaned up when the application is done.
-- `enable_selenium_optimizations_mode(self) -> None`: Enable Selenium
+- `enable_selenium_optimizations(self) -> None`: Enable Selenium optimizations.
+- `disable_selenium_optimizations(self) -> None`: Disable Selenium
 optimizations.
-- `disable_selenium_optimizations_mode(self) -> None`: Disable Selenium
-optimizations.
-- `enable_selenium_custom_driver_mode(self) -> None`: Enable custom Selenium
-driver mode.
-- `disable_selenium_custom_driver_mode(self) -> None`: Disable custom Selenium
-driver mode.
+- `enable_selenium_custom_driver(self) -> None`: Enable custom Selenium
+driver.
+- `disable_selenium_custom_driver(self) -> None`: Disable custom Selenium
+driver.
 - `set_selenium_custom_driver_version(self, version: int) -> None`: Set the
 version of Chrome to use with custom Selenium driver.
 - `keep_selenium_custom_driver_after_use(self) -> None`: Keep the Selenium
@@ -54,10 +53,10 @@ downloading Chrome binaries/drivers.
 - `set_app_dir(self, directory: str) -> None`: Set the main app's directory.
 - `set_clean_up_logs_after_n_days(self, days: int) -> None`: Set the number of
 days after which log files should be cleaned up.
-- `add_csv_filename_to_ignore_during_cleanup(
+- `add_csv_filename_to_ignore_during_maintenance(
     self,
     filename: str
-) -> None`: Add a CSV filename to ignore during cleanup.
+) -> None`: Add a CSV filename to ignore during maintenance.
 - `add_db_connection_string(
     self,
     connection_string: Dict[str, str]
@@ -71,13 +70,29 @@ days after which log files should be cleaned up.
     password: str,
     port: Optional[str] = None
 ) -> None`: Generate and add or update a database connection string.
-- `view_database_connection_strings(self) -> None`: View the default database
+- `view_database_connection_strings(self) -> None`: View the added database
 connection strings.
 - `remove_database_connection_string(self, key: str) -> None`: Remove a
 database connection string.
-- `upgrade_scriptman(self) -> None`: Upgrade the ScriptMan application.
-- `update_scripts(self) -> None`: Update application scripts from a Git
-repository.
+- `update_sagerun_code (self, int)`: Update code to use when running
+Disk Cleanup during system maintenance.
+(Check scriptman.Cleanup.run_system_maintenance for more info).
+- `enable_system_maintenance (self)`: Enable scriptman's system
+maintenance scripts to run. These include sfc, dism, disk cleanup and
+defragmentation.
+- `disable_system_maintenance (self)`: Disable scriptman's system maintenance
+scripts from running.
+- `update_system_maintenance_day (self, int)`: Update the monthly date to run
+the system maintenance scripts.
+    Note:
+        Dates 30 and 31 will automatically pick the last date of the
+        month in February (28th or 29th in leap years).
+        Date 31 will automatically pick the last date of the month for
+        months with 30 days.
+- `enable_system_restart (self)`: Enable system restart after the maintenance
+scripts are completed.
+- `disable_system_restart (self)`: Disables system restart after the
+maintenance scripts are completed.
 
 Private Methods:
 - `_log_change(self, name: str, value: Optional[Any]) -> None`: Log changes to
@@ -89,7 +104,6 @@ Singleton Instance:
 """
 
 import json
-import subprocess
 from typing import Any, Dict, List, Optional
 
 
@@ -107,17 +121,36 @@ class SettingsHandler:
         debug_mode (bool): Whether debugging is enabled.
         clean_up_logs_after_n_days (int): Number of days after which log files
             should be cleaned up.
-        selenium_optimizations_mode (bool): Whether Selenium optimizations are
+        selenium_optimizations (bool): Whether Selenium optimizations are
             enabled.
-        selenium_custom_driver_mode (bool): Whether custom Selenium driver
-            mode is enabled.
+        selenium_custom_driver (bool): Whether custom Selenium driver is
+            enabled.
         selenium_custom_driver_version (int): The major version of Chrome to
             use with custom Selenium driver.
         selenium_keep_downloaded_custom_driver (bool): Whether to keep the
             downloaded custom Selenium driver.
         selenium_chrome_url (str): The URL for downloading Chrome
             binaries/drivers.
-        clean_up_folders (List[str]): List of folders to be cleaned up.
+        maintenance_folders (List[str]): Custom list of folders to be cleaned
+            up (Remove __pycache__ folders).
+        sagerun_code (int): Code to use when running Disk Cleanup during
+            system maintenance. Defaults to 11.
+            (Check scriptman.Maintenance.run_system_maintenance for more info).
+        system_maintenance (bool): Enable scriptman's system maintenance
+            scripts to run. These include sfc, dism, disk cleanup, disk
+            defragmentation, and custom scripts to clean up downloaded files
+            and __pycache__ folders. Defaults to False.
+        system_maintenance_day (int): The monthly day to run the system
+            maintenance scripts. Defaults to 31.
+
+            Note:
+                Dates 30 and 31 will automatically pick the last date of the
+                month in February (28th or 29th in leap years).
+                Date 31 will automatically pick the last date of the month for
+                months with 30 days.
+        restart_system_after_maintenance (bool): Restart the system 5 minutes
+            after system maintenance is complete. Defaults to False.
+
 
     Methods:
         init(app_dir: str, logging: bool = True) -> None:
@@ -136,13 +169,13 @@ class SettingsHandler:
         add_folders_for_cleanup(folders: List[str]) -> None:
             Add a list of folders to be cleaned up when the ScriptManager is
             done.
-        enable_selenium_optimizations_mode() -> None:
+        enable_selenium_optimizations() -> None:
             Enable Selenium optimizations.
-        disable_selenium_optimizations_mode() -> None:
+        disable_selenium_optimizations() -> None:
             Disable Selenium optimizations.
-        enable_selenium_custom_driver_mode() -> None:
+        enable_selenium_custom_driver() -> None:
             Enable custom Selenium driver mode.
-        disable_selenium_custom_driver_mode() -> None:
+        disable_selenium_custom_driver() -> None:
             Disable custom Selenium driver mode.
         set_selenium_custom_driver_version(version: int) -> None:
             Set the version of Chrome to use with custom Selenium driver.
@@ -172,19 +205,32 @@ class SettingsHandler:
             View the default database connection strings.
         remove_database_connection_string(key: str) -> None:
             Remove a default database connection string.
-        def upgrade_scriptman(self) -> None:
-            Upgrade the ScriptMan application to the latest version.
-        def update_scripts(self) -> None:
-            Update application scripts from a Git repository.
-        def use_venv(self) -> None:
-            Activate the virtual environment.
+        def update_sagerun_code (self, int): Update code to use when running
+            Disk Cleanup during system maintenance.
+            (Check scriptman.Cleanup.run_system_maintenance for more info).
+        def enable_system_maintenance (self): Enable scriptman's system
+            maintenance scripts to run. These include sfc, dism, disk cleanup
+            and defragmentation.
+        def disable_system_maintenance (self): Disable scriptman's system
+            maintenance scripts from running.
+        def update_system_maintenance_day (self, int): Update the monthly date
+            to run the system maintenance scripts.
+
+            Note:
+                Dates 30 and 31 will automatically pick the last date of the
+                month in February (28th or 29th in leap years).
+                Date 31 will automatically pick the last date of the month for
+                months with 30 days.
+        def enable_system_restart (self): Enable system restart after the
+            maintenance scripts are completed.
+        def disable_system_restart (self): Disables system restart after the
+            maintenance scripts are completed.
+
         Private Methods:
-        _log_change(name: str, value: Optional[Any]) -> None:
-            Log changes to settings.
-        __str__() -> str:
-            Get a string representation of the current settings.
-        __del__() -> None:
-            Disables virtual environment once the object is deleted.
+            _log_change(name: str, value: Optional[Any]) -> None:
+                Log changes to settings.
+            __str__() -> str:
+                Get a string representation of the current settings.
     """
 
     _instance = None
@@ -203,17 +249,20 @@ class SettingsHandler:
         Initialize default settings.
         """
         self.app_dir: str = ""
-        self.venv_name: str = ""
         self.log_mode: bool = True
+        self.sagerun_code: int = 11
         self.debug_mode: bool = False
-        self.clean_up_folders: List[str] = []
-        self.database_connection_strings = {}
-        self.clean_up_logs_after_n_days: int = 7
+        self.system_maintenance: bool = False
+        self.system_maintenance_day: int = 31
+        self.maintenance_folders: List[str] = []
         self.print_logs_to_terminal: bool = True
-        self.selenium_optimizations_mode: bool = True
-        self.selenium_custom_driver_mode: bool = False
+        self.selenium_optimizations: bool = True
+        self.selenium_custom_driver: bool = False
+        self.clean_up_logs_after_n_days: int = 30
         self.selenium_custom_driver_version: int = 116
-        self.ignore_csv_filename_during_cleanup: set = set()
+        self.restart_system_after_maintenance: bool = False
+        self.database_connection_strings: Dict[str, str] = {}
+        self.ignore_csv_filename_during_maintenance: set = set()
         self.selenium_keep_downloaded_custom_driver: bool = True
         self.selenium_chrome_url: str = (
             "https://googlechromelabs.github.io/chrome-for-testing/"
@@ -236,13 +285,15 @@ class SettingsHandler:
             debugging (bool): Flag for enabling debugging mode for the session.
                 Default is False.
         """
+
+        from shutil import copy2
+        from os.path import join
+        from scriptman._logs import LogHandler, LogLevel
+        from scriptman._directories import DirectoryHandler
+
         self.log_mode = logging
         self.debug_mode = debugging
         self.set_app_dir(app_dir)
-
-        from scriptman._directories import DirectoryHandler
-        from scriptman._logs import LogHandler, LogLevel
-
         directory_handler = DirectoryHandler()
         self.add_folders_for_cleanup(
             [
@@ -250,6 +301,12 @@ class SettingsHandler:
                 directory_handler.script_man_dir,
             ]
         )
+
+        copy2(
+            join(directory_handler.script_man_dir, "_scriptman.bat"),
+            join(app_dir, "scriptman.bat"),
+        )
+
         LogHandler("Script Manager").message(
             details=vars(self),
             level=LogLevel.DEBUG,
@@ -321,36 +378,36 @@ class SettingsHandler:
         """
         Add a list of folders to be cleaned up when the ScriptManager is done.
         """
-        self.clean_up_folders.extend(folders)
-        self._log_change("Folders to be cleaned:", self.clean_up_folders)
+        self.maintenance_folders.extend(folders)
+        self._log_change("Folders to be cleaned:", self.maintenance_folders)
 
-    def enable_selenium_optimizations_mode(self) -> None:
+    def enable_selenium_optimizations(self) -> None:
         """
         Enable Selenium optimizations.
         """
-        self.selenium_optimizations_mode = True
-        self._log_change("selenium_optimizations_mode", True)
+        self.selenium_optimizations = True
+        self._log_change("selenium_optimizations", True)
 
-    def disable_selenium_optimizations_mode(self) -> None:
+    def disable_selenium_optimizations(self) -> None:
         """
         Disable Selenium optimizations.
         """
-        self.selenium_optimizations_mode = False
-        self._log_change("selenium_optimizations_mode", False)
+        self.selenium_optimizations = False
+        self._log_change("selenium_optimizations", False)
 
-    def enable_selenium_custom_driver_mode(self) -> None:
+    def enable_selenium_custom_driver(self) -> None:
         """
         Enable custom Selenium driver mode.
         """
-        self.selenium_custom_driver_mode = True
-        self._log_change("selenium_custom_driver_mode", True)
+        self.selenium_custom_driver = True
+        self._log_change("selenium_custom_driver", True)
 
-    def disable_selenium_custom_driver_mode(self) -> None:
+    def disable_selenium_custom_driver(self) -> None:
         """
         Disable custom Selenium driver mode.
         """
-        self.selenium_custom_driver_mode = False
-        self._log_change("selenium_custom_driver_mode", False)
+        self.selenium_custom_driver = False
+        self._log_change("selenium_custom_driver", False)
 
     def set_selenium_custom_driver_version(self, version: int) -> None:
         """
@@ -416,11 +473,21 @@ class SettingsHandler:
         self.clean_up_logs_after_n_days = days
         self._log_change("clean_up_logs_after_n_days", days)
 
-    def add_csv_filename_to_ignore_during_cleanup(self, filename: str) -> None:
-        self.ignore_csv_filename_during_cleanup.add(filename)
+    def add_csv_filename_to_ignore_during_maintenance(
+        self,
+        filename: str,
+    ) -> None:
+        """
+        Add a csv filename to ignore during system maintenance.
+        For example: "tickets", "transactions".
+
+        Args:
+            filename (str): The word included in the filename to ignore.
+        """
+        self.ignore_csv_filename_during_maintenance.add(filename)
         self._log_change(
-            "ignore_csv_filename_during_cleanup",
-            self.ignore_csv_filename_during_cleanup,
+            "ignore_csv_filename_during_maintenance",
+            self.ignore_csv_filename_during_maintenance,
         )
 
     def add_db_connection_string(
@@ -460,6 +527,7 @@ class SettingsHandler:
         username: str,
         password: str,
         port: Optional[str] = None,
+        name: Optional[str] = None,
     ) -> None:
         """
         Generate and add or update a database connection string.
@@ -475,6 +543,8 @@ class SettingsHandler:
             username (str): The username for authentication.
             password (str): The password for authentication.
             port (optional, str): The database server port.
+            name (optional, str): The identifier for the connection string.
+                If not specified, will use the database's name instead.
 
         Example:
             settings = SettingsHandler()
@@ -483,28 +553,20 @@ class SettingsHandler:
                 server="localhost",
                 database="db",
                 username="user",
-                password="password"
+                password="password",
+                port="123",
+                name="Test DB"
             )
         """
         connection_string = (
-            (
-                f"Driver={driver};"
-                f"Server={server};"
-                f"Port={port};"
-                f"Database={database};"
-                f"UID={username};"
-                f"PWD={password}"
-            )
-            if port
-            else (
-                f"Driver={driver};"
-                f"Server={server};"
-                f"Database={database};"
-                f"UID={username};"
-                f"PWD={password}"
-            )
+            f"Driver={driver};"
+            + f"Server={server};"
+            + (f"Port={port};" if port else "")
+            + f"Database={database};"
+            + f"UID={username};"
+            + f"PWD={password}"
         )
-        self.database_connection_strings[database] = connection_string
+        self.database_connection_strings[name or database] = connection_string
         self._log_change(
             "default_database_connection_strings",
             self.database_connection_strings,
@@ -544,98 +606,90 @@ class SettingsHandler:
             removed_value,
         )
 
-    def use_venv(self, venv_name: str = ".venv") -> None:
+    def update_sagerun_code(self, code: int) -> None:
         """
-        Activate the virtual environment.
+        Updates code to use when running Disk Cleanup during system
+        maintenance.
 
-        This method activates the virtual environment associated with the
-        ScriptManager application. It sets the `venv_name` attribute to True
-        and runs the activation script for the virtual environment located in
-        the `Scripts` directory. This allows the application to work within the
-        isolated virtual environment, which may contain specific dependencies
-        and packages.
+        (Check scriptman.Cleanup.run_system_maintenance for more info).
 
         Args:
-            venv_name (str): The name of the virtual environment folder.
-                Defaults to '.venv'.
-
-        Example:
-            settings = SettingsHandler()
-            settings.use_venv()
+            code (int): The code to use.
 
         Note:
-            To use this method successfully, ensure that the virtual
-            environment (venv) has been created and configured correctly for
-            the ScriptManager application.
-
+            Ensure to run your main script as Admin in order for the system
+            maintenance to run correctly.
         """
-        if self.app_dir:
-            self.venv_name = venv_name
-            subprocess.run([rf"{self.app_dir}\{venv_name}\Scripts\activate"])
-            self._log_change("Virtual Environment", "Activated")
+        self.sagerun_code = code
+        self._log_change("sagerun_code", code)
+
+    def enable_system_maintenance(
+        self,
+        sagerun_code: int = 11,
+        enable_restart: bool = False,
+        cleanup_folders: List[str] = [],
+        system_maintenance_day: int = 31,
+    ) -> None:
+        """
+        Enable scriptman's system maintenance scripts to run. These include
+        sfc, dism, disk cleanup and defragmentation.
+
+        Note:
+            The main script needs to be run as Admin in order for the scripts
+            to work effectively.
+        """
+        self.system_maintenance = True
+        self.update_sagerun_code(sagerun_code)
+        self.update_system_maintenance_day(system_maintenance_day)
+
+        if cleanup_folders:
+            self.add_folders_for_cleanup(cleanup_folders)
+
+        if enable_restart:
+            self.enable_system_restart()
+
+        self._log_change("system_maintenance", True)
+
+    def disable_system_maintenance(self) -> None:
+        """
+        Disable scriptman's system maintenance scripts to run. These include
+        sfc, dism, disk cleanup and defragmentation.
+        """
+        self.system_maintenance = False
+        self._log_change("system_maintenance", False)
+
+    def enable_system_restart(self) -> None:
+        """
+        Enable system restart after the maintenance scripts are completed.
+        """
+        self.restart_system_after_maintenance = True
+        self._log_change("restart_system_after_maintenance", True)
+
+    def disable_system_restart(self) -> None:
+        """
+        Disable system restart after the maintenance scripts are completed.
+        """
+        self.restart_system_after_maintenance = False
+        self._log_change("restart_system_after_maintenance", False)
+
+    def update_system_maintenance_day(self, day: int) -> None:
+        """
+        Update the monthly day to run the system maintenance scripts.
+
+        Args:
+            day (int): The day to run the scripts. Must be between 1 and 31.
+
+        Note:
+            Dates 30 and 31 will automatically pick the last date of the
+            month in February (28th or 29th in leap years).
+            Date 31 will automatically pick the last date of the month for
+            months with 30 days.
+        """
+        if day >= 1 and day <= 31:
+            self.system_maintenance_day = day
+            self._log_change("System Maintenance Date", day)
         else:
-            self._log_change("Virtual Environment", "APP DIR is undefined.")
-
-    def upgrade_scriptman(self) -> None:
-        """
-        Upgrade the ScriptMan application to the latest version.
-
-        This method uses the Python package manager `pip` to upgrade the
-        ScriptMan application to the latest available version. It runs the
-        following command to perform the upgrade:
-
-        ```
-        python -m pip install scriptman --upgrade
-        ```
-
-        Example:
-            settings = SettingsHandler() or Settings
-            settings.upgrade_scriptman()
-
-        Note:
-            This method requires an active internet connection to fetch the
-            latest version of the ScriptMan application from the Python Package
-            Index (PyPI). Ensure that the `pip` tool is properly installed and
-            configured in your Python environment.
-
-        """
-        subprocess.run(
-            [
-                "python",
-                "-m",
-                "pip",
-                "install",
-                "scriptman",
-                "--upgrade",
-            ]
-        )
-        self._log_change("ScriptMan", "Latest Version")
-
-    def update_scripts(self) -> None:
-        """
-        Update application scripts from a Git repository.
-
-        This method updates the application scripts by performing a `git pull`
-        operation within the application's root directory. It assumes that the
-        application's source code is stored in a Git repository, and this
-        method pulls the latest changes from the repository.
-
-        Example:
-            settings = SettingsHandler()
-            settings.update_scripts()
-
-        Note:
-            This method is designed for applications that use Git for version
-            control. Ensure that the Git repository is properly configured and
-            accessible as the APP DIR.
-
-        """
-        if self.app_dir:
-            subprocess.run(["cd", self.app_dir])
-            subprocess.run(["git", "pull"])
-            self._log_change("Scripts", "Latest Commit on Repository")
-        else:
-            self._log_change("Scripts", "APP DIR is undefined.")
+            raise ValueError(f"({day}) is not within the correct range!")
 
     def _log_change(self, name: str, value: Optional[Any]) -> None:
         """
@@ -661,34 +715,6 @@ class SettingsHandler:
             str: A string representation of the current settings.
         """
         return json.dumps(vars(self), indent=4)
-
-    def __del__(self) -> None:
-        """
-        Deactivate the virtual environment upon object deletion.
-
-        This method is automatically called when an instance of the
-        `SettingsHandler` class is deleted. If the virtual environment (`venv`)
-        was activated using the `use_venv` method, this method deactivates it
-        to return to the system's default Python environment. Deactivating the
-        virtual environment is a good practice to ensure that it doesn't affect
-        other Python processes or environments after its usage.
-
-        Example:
-            settings = SettingsHandler() or Settings
-            settings.use_venv()
-            # ... perform operations within the virtual environment ...
-            del settings  # Deactivate the virtual environment upon deletion.
-
-        Note:
-            Ensure that the virtual environment was previously activated using
-            the `use_venv` method before calling this method. If the virtual
-            environment was not activated, calling this method will have no
-            effect.
-
-        """
-        if self.venv_name:
-            command = [rf"{self.app_dir}\{self.venv_name}\Scripts\deactivate"]
-            subprocess.run(command)
 
 
 class SeleniumBrowserIndex:

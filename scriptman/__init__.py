@@ -11,18 +11,10 @@ Usage:
 To use ScriptMan, you can import it as follows:
 
 ```python
-
 import scriptman
-
 ```
 
-
-# Example: Run a script
-scriptman.ScriptsHandler().run_script('my_script.py')
-
-
 Exposed Classes and Modules:
-- `CleanUpHandler`: Provides cleanup functionalities for scripts.
 - `CLIHandler`: Handles command-line interface interactions.
 - `CSVHandler`: Offers utilities for working with CSV files.
 - `DatabaseHandler`: Provides capabilities for database interactions.
@@ -30,6 +22,7 @@ Exposed Classes and Modules:
 - `ETLHandler`: Provides tools for Extract, Transform, Load (ETL) processes.
 - `LogHandler`: Handles logging with support for different log levels.
 - `LogLevel`: An enum for different log levels.
+- `MaintenanceHandler`: Provides maintenance functionalities for scripts.
 - `ScriptsHandler`: Manages the execution of scripts.
 - `SeleniumHandler`: Provides tools for web automation using Selenium.
 - `SeleniumInteraction`: Enum for handling Selenium-based interactions.
@@ -41,49 +34,44 @@ To initialize ScriptMan and set it up for your project, follow these steps:
 1. Import the necessary modules from ScriptMan.
 
 ```python
-
-from scriptman import Settings, ScriptHandler, CLIHandler
-
+from scriptman import Settings, ScriptsHandler, CLIHandler
 ```
 
 2. Initialize the `Settings` class instance to set up the ScriptMan app files
 in your project directory. You can do this as follows:
 
 ```python
-
 Settings.init(
     app_dir='your_project_directory',
     logging=True,  # Enable logging (default is True)
     debugging=False,  # Enable debugging mode (default is False)
 )
-
 ```
 
 For detailed documentation, examples, and advanced usage, please refer to the
-
 [ScriptMan package documentation]
 (https://github.com/nelsonombuya/scriptman/blob/main/docs/README.md).
-
 """
 
 import atexit
+from typing import List
 
-from scriptman._cleanup import CleanUpHandler
 from scriptman._cli import CLIHandler
 from scriptman._csv import CSVHandler
 from scriptman._database import DatabaseHandler
 from scriptman._directories import DirectoryHandler
 from scriptman._etl import ETLHandler
 from scriptman._logs import LogHandler, LogLevel
+from scriptman._maintenance import MaintenanceHandler
 from scriptman._scripts import ScriptsHandler
 from scriptman._selenium import SeleniumHandler
 from scriptman._selenium_interactions import SeleniumInteraction
 from scriptman._settings import Settings
 
-atexit.register(CleanUpHandler)
+# Register MaintenanceHandler to run cleanup tasks at program exit
+atexit.register(MaintenanceHandler)
 
-__all__ = [
-    "CleanUpHandler",
+__all__: List[str] = [
     "CLIHandler",
     "CSVHandler",
     "DatabaseHandler",
@@ -91,6 +79,7 @@ __all__ = [
     "ETLHandler",
     "LogHandler",
     "LogLevel",
+    "MaintenanceHandler",
     "ScriptsHandler",
     "SeleniumHandler",
     "SeleniumInteraction",

@@ -285,7 +285,8 @@ class SettingsHandler:
             debugging (bool): Flag for enabling debugging mode for the session.
                 Default is False.
         """
-        from os.path import join
+        from os.path import exists, join
+
         from scriptman._batch import BATCH_FILE
         from scriptman._directories import DirectoryHandler
         from scriptman._logs import LogHandler, LogLevel
@@ -301,8 +302,12 @@ class SettingsHandler:
             ]
         )
 
-        with open(join(app_dir, "sm.bat"), "w") as batch_file:
-            batch_file.write(BATCH_FILE)
+        # Create Batch File for CLIHandler
+        sm_batch_path = join(app_dir, "sm.bat")
+
+        if not exists(sm_batch_path):
+            with open(sm_batch_path, "w") as batch_file:
+                batch_file.write(BATCH_FILE)
 
         LogHandler("Script Manager").message(
             details=vars(self),

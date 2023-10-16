@@ -119,7 +119,7 @@ class PackagePublishHelper:
         python_file_path = r"scriptman\_batch.py"
         with open(bat_file_path, "r") as bat_file:
             content = bat_file.read()
-            python_variable = f'BATCH_FILE = r"""\n{content}"""\n'
+            python_variable = f'BATCH_FILE = r"""{content}"""\n'
             with open(python_file_path, "w") as python_file:
                 python_file.write(python_variable)
         print("Updated Batch File.")

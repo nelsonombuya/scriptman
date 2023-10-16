@@ -114,6 +114,16 @@ class PackagePublishHelper:
         subprocess.run(cmd)
         print("Uploaded distribution packages to Twine.")
 
+    def create_sm_bat_file(self):
+        bat_file_path = r"scriptman\_scriptman.bat"
+        python_file_path = r"scriptman\_batch.py"
+        with open(bat_file_path, "r") as bat_file:
+            content = bat_file.read()
+            python_variable = f'BATCH_FILE = r"""\n{content}"""\n'
+            with open(python_file_path, "w") as python_file:
+                python_file.write(python_variable)
+        print("Updated Batch File.")
+
     def run(self):
         """
         Run the package publishing process, including deleting folders,
@@ -122,6 +132,7 @@ class PackagePublishHelper:
         """
         self.delete_local_app_folder()
         self.delete_egg_info_folder()
+        self.create_sm_bat_file()
         self.delete_dist_folder()
         self.update_version()
         self.run_build()

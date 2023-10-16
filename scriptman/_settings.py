@@ -285,11 +285,10 @@ class SettingsHandler:
             debugging (bool): Flag for enabling debugging mode for the session.
                 Default is False.
         """
-
-        from shutil import copy2
         from os.path import join
-        from scriptman._logs import LogHandler, LogLevel
+        from scriptman._batch import BATCH_FILE
         from scriptman._directories import DirectoryHandler
+        from scriptman._logs import LogHandler, LogLevel
 
         self.log_mode = logging
         self.debug_mode = debugging
@@ -302,10 +301,8 @@ class SettingsHandler:
             ]
         )
 
-        copy2(
-            join(directory_handler.script_man_dir, "_scriptman.bat"),
-            join(app_dir, "sm.bat"),
-        )
+        with open(join(app_dir, "sm.bat"), "w") as batch_file:
+            batch_file.write(BATCH_FILE)
 
         LogHandler("Script Manager").message(
             details=vars(self),

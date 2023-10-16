@@ -5,6 +5,7 @@
         "crdownload",
         "csvhandler",
         "dtype",
+        "enabledelayedexpansion",
         "geckodriver",
         "GECKODRIVER",
         "infobars",
@@ -17,6 +18,7 @@
         "sagerun",
         "scannow",
         "scriptman",
+        "setlocal",
         "tarteaucitron"
     ]
 }

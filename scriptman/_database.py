@@ -216,6 +216,7 @@ class DatabaseHandler:
 
         cursor = self._connection.cursor()
         try:
+            self._log.message("Executing Bulk Query...")
             cursor.fast_executemany = True
             cursor.executemany(query, rows)
             self._connection.commit()

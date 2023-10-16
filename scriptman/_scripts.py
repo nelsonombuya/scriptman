@@ -267,7 +267,7 @@ class ScriptExecutor:
             return self.execute(file, directory, True)
         except self.selenium_optimization_exceptions as e:
             self.exception = e
-            if Settings.selenium_optimizations_mode:
+            if Settings.selenium_optimizations:
                 self._handle_script_exceptions(self._disable_optimizations)
                 return self.execute(file, directory, True)
             else:
@@ -304,7 +304,7 @@ class ScriptExecutor:
         """
         self.script_log.message("Error starting Chrome Driver Session")
         self.script_log.message("Downloading Custom Chrome App & Driver")
-        Settings.enable_selenium_custom_driver_mode()
+        Settings.enable_selenium_custom_driver()
 
     def _disable_optimizations(self) -> None:
         """
@@ -312,7 +312,7 @@ class ScriptExecutor:
         """
         self.script_log.message("Re-Running Selenium Script")
         self.script_log.message("Disabling Selenium Optimizations")
-        Settings.disable_selenium_optimizations_mode()
+        Settings.disable_selenium_optimizations()
 
     def _change_browser(self) -> None:
         """

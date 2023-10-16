@@ -98,7 +98,7 @@ class Firefox(SeleniumInteractionHandler):
         if firefox_executable_path:
             options.binary_location = firefox_executable_path
 
-        if Settings.selenium_optimizations_mode and not Settings.debug_mode:
+        if Settings.selenium_optimizations and not Settings.debug_mode:
             optimization_args = [
                 "--headless",
                 "--disable-infobars",

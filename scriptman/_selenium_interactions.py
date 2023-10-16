@@ -41,6 +41,7 @@ Attributes:
     - `SEND_KEYS (str)`: Send keys (text input) to the web element.
     - `WAIT_TILL_INVISIBLE (str)`: Wait for the element to become invisible.
     - `DENY_COOKIES (str)`: Deny cookies using JavaScript interaction.
+    - `ACCEPT_COOKIES (str)`: Accept cookies using JavaScript interaction.
 
 Initialization:
 - Create an instance of `SeleniumInteractionHandler` by providing a WebDriver
@@ -90,11 +91,13 @@ Enum:
     - `SEND_KEYS (str)`: Send keys (text input) to the web element.
     - `WAIT_TILL_INVISIBLE (str)`: Wait for the element to become invisible.
     - `DENY_COOKIES (str)`: Deny cookies using JavaScript interaction.
+    - `ACCEPT_COOKIES (str)`: Accept cookies using JavaScript interaction.
 """
 
 import os
 import time
 from enum import Enum
+from random import uniform
 from typing import Optional, Union
 
 from selenium import webdriver
@@ -120,6 +123,7 @@ class SeleniumInteraction(Enum):
         SEND_KEYS (str): Send keys (text input) to the web element.
         WAIT_TILL_INVISIBLE (str): Wait for the element to become invisible.
         DENY_COOKIES (str): Deny cookies using JavaScript interaction.
+        ACCEPT_COOKIES (str): Accept cookies using JavaScript interaction.
     """
 
     CLICK = "click"
@@ -127,6 +131,7 @@ class SeleniumInteraction(Enum):
     SEND_KEYS = "send_keys"
     WAIT_TILL_INVISIBLE = "wait"
     DENY_COOKIES = "deny_cookies"
+    ACCEPT_COOKIES = "accept_cookies"
 
 
 class SeleniumInteractionHandler:
@@ -158,7 +163,7 @@ class SeleniumInteractionHandler:
         mode: SeleniumInteraction = SeleniumInteraction.CLICK,
         keys: Optional[str] = None,
         timeout: int = 30,
-        rest: float = 0.5,
+        rest: float = uniform(0.25, 0.50),
     ) -> None:
         """
         Interact with a web element on the page.
@@ -171,7 +176,8 @@ class SeleniumInteractionHandler:
         Args:
             xpath (str): The XPath expression to locate the web element.
                 You can input an empty xpath ("") if mode is
-                SeleniumInteraction.DENY_COOKIES.
+                SeleniumInteraction.DENY_COOKIES or
+                SeleniumInteraction.ACCEPT_COOKIES.
             mode (SeleniumInteraction, optional): The interaction mode, which
                 can be one of the Interaction enum values.
                 (default is SeleniumInteraction.CLICK).
@@ -181,7 +187,7 @@ class SeleniumInteractionHandler:
             timeout (int, optional): The maximum time (in seconds) to wait for
                 the element to become clickable or invisible (default is 30).
             rest (float, optional): The time (in seconds) to rest after the
-                interaction (default is 0.5).
+                interaction (default is a random time between 0.25s and 0.50s).
 
         Raises:
             ValueError: If an invalid interaction mode is provided.
@@ -190,6 +196,12 @@ class SeleniumInteractionHandler:
             return self.interact_with_element(
                 mode=SeleniumInteraction.JS_CLICK,
                 xpath=xpath or '//*[@id="tarteaucitronAllDenied2"]',
+            )
+
+        if mode == SeleniumInteraction.ACCEPT_COOKIES:
+            return self.interact_with_element(
+                mode=SeleniumInteraction.JS_CLICK,
+                xpath=xpath or '//*[@id="tarteaucitronAllAllowed2"]',
             )
 
         wait = WebDriverWait(self._driver, timeout)
@@ -208,7 +220,7 @@ class SeleniumInteractionHandler:
             element.send_keys(keys)
         else:
             raise ValueError(f"Passed Invalid Mode: {mode}")
-        time.sleep(2 if Settings.debug_mode else rest)
+        time.sleep(1 if Settings.debug_mode else rest)
 
     def wait_for_downloads_to_finish(self) -> None:
         """

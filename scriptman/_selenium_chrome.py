@@ -72,7 +72,7 @@ class Chrome(SeleniumInteractionHandler):
             webdriver.Chrome: A Chrome WebDriver instance.
         """
         try:
-            if Settings.selenium_custom_driver_mode:
+            if Settings.selenium_custom_driver:
                 raise ValueError
             options = self._get_chrome_options()
             service = Service(ChromeDriverManager().install())
@@ -104,7 +104,7 @@ class Chrome(SeleniumInteractionHandler):
         if chrome_executable_path:
             options.binary_location = chrome_executable_path
 
-        if Settings.selenium_optimizations_mode and not Settings.debug_mode:
+        if Settings.selenium_optimizations and not Settings.debug_mode:
             optimization_args = [
                 "--headless",
                 "--no-sandbox",

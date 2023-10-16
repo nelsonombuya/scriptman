@@ -304,7 +304,7 @@ class SettingsHandler:
 
         copy2(
             join(directory_handler.script_man_dir, "_scriptman.bat"),
-            join(app_dir, "scriptman.bat"),
+            join(app_dir, "sm.bat"),
         )
 
         LogHandler("Script Manager").message(

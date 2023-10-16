@@ -27,8 +27,6 @@ For detailed documentation and examples, please refer to the package
 documentation.
 """
 
-import re
-import sys
 from typing import List
 
 from scriptman._scripts import ScriptsHandler
@@ -51,12 +49,18 @@ class CLIHandler:
         Args:
             args (List[str]): List of command-line arguments.
         """
-        self.scripts = []
-        self._parse_args(args[1:])
-        self.calling_file = args[0]
         self.script_handler = ScriptsHandler()
-        Settings.print_logs_to_terminal = False  # To Avoid Duplicate Logging
-        self.script_handler.run_scripts(self.scripts)
+        self.disable_logging = False
+        self.custom = False
+        self.debug = False
+        self.force = False
+        self.scripts = []
+        self._parse_args(args)
+
+        if self.custom:
+            self.script_handler.run_custom_scripts(self.scripts, self.force)
+        else:
+            self.script_handler.run_scripts(self.scripts, self.force)
 
     def _parse_args(self, args: List[str]) -> None:
         """
@@ -65,42 +69,26 @@ class CLIHandler:
         Args:
             args (List[str]): List of command-line arguments.
         """
-        for arg in args:
-            if arg in ("-h", "--help"):
-                self._print_help()
-                sys.exit(0)  # Exit after printing help
+        self.debug, self.custom, self.disable_logging, self.force = map(
+            lambda arg: arg.lower() == "true",
+            args[1:5],
+        )
 
-            if arg in ("-ls", "--list_scripts"):
-                [print(script) for script in self.script_handler.get_scripts()]
-                sys.exit(0)  # Exit after printing the list of scripts
+        if self.debug:
+            Settings.enable_debugging()
 
-            if arg.startswith("-venv"):
-                env_match = re.match(r'-venv=["\']?(.*?)(?=["\']|$)', arg)
-                env_folder = env_match.group(1) if env_match else ".venv"
-                Settings.use_venv(env_folder)  # Enabling the local environment
+        if self.disable_logging:
+            Settings.disable_logging()
 
-            arg_function = {
-                "-dl": Settings.disable_logging,
-                "--disable_logging": Settings.disable_logging,
-                "-d": Settings.enable_debugging,
-                "--debug": Settings.enable_debugging,
-                "-upg": Settings.upgrade_scriptman,
-                "--upgrade": Settings.upgrade_scriptman,
-                "-upd": Settings.update_scripts,
-                "--update": Settings.update_scripts,
-            }.get(arg)
+        if self.custom:
+            self.scripts.extend(args[5:])
+            return
 
-            if arg_function:
-                arg_function()
-                continue
-
-            if self._is_valid_script_arg(arg):
-                self.scripts.append(arg)
-                continue
-
-            print(f"Invalid argument {arg} passed! \n\n")
-            self._print_help()
-            sys.exit(0)  # Exit after having an error.
+        for script in args[5:]:
+            if self._is_valid_script_arg(script):
+                self.scripts.extend(script)
+            else:
+                raise ValueError(f"'{script}' not found in scripts folder")
 
     def _is_valid_script_arg(self, arg: str) -> bool:
         """
@@ -114,29 +102,3 @@ class CLIHandler:
                 False otherwise.
         """
         return any(arg in name for name in self.script_handler.get_scripts())
-
-    def _print_help(self) -> None:
-        """
-        Print a manual for the various flags that can be used.
-
-        Returns:
-            None
-        """
-        help_message = f"""
-        Usage: python {self.calling_file} [options] [script_names]
-
-        Options:
-        -h, --help              Show this help message and exit.
-        -dl, --disable_logging  Disable logging.
-        -d, --debug             Enable debugging mode.
-        -ls, --list_scripts     List scripts contained in the scripts folder.
-        -upg, --upgrade         Upgrade ScriptMan.
-        -upd, --update          Update Scripts Repository with latest commit.
-        -venv[=name]            Enable a local virtual Python environment.
-                                By default uses '.venv', but one can specify
-                                the environment name using -venv=name or
-                                -venv="name".
-
-        script_names            Names of the scripts to execute.
-        """
-        print(help_message)

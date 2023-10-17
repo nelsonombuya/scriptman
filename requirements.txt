@@ -1,4 +1,6 @@
 attrs==23.1.0
+beautifulsoup4==4.12.2
+bs4==0.0.1
 build==1.0.3
 certifi==2023.7.22
 cffi==1.15.1
@@ -34,11 +36,12 @@ requests==2.31.0
 requests-toolbelt==1.0.0
 rfc3986==2.0.0
 rich==13.5.3
--e git+https://github.com/nelsonombuya/script_manager.git@6130493cc0de8ba51300e4e44d39bb58f37aacbb#egg=scriptman
+-e git+https://github.com/nelsonombuya/script_manager.git@00f6148f4c71133ad4f71a019d8ee120e2cc5a8f#egg=scriptman
 selenium==4.13.0
 six==1.16.0
 sniffio==1.3.0
 sortedcontainers==2.4.0
+soupsieve==2.5
 tqdm==4.66.1
 trio==0.22.2
 trio-websocket==0.10.4

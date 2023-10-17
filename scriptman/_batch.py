@@ -33,7 +33,7 @@ BATCH_FILE: str = r"""@echo off
 setlocal enabledelayedexpansion
 
 set "VENV_NAME=.venv"
-set "MAIN_SCRIPT=test.py"
+set "MAIN_SCRIPT=debug.py"
 set "ROOT_DIR=C:\test\dir"
 
 set "QUICK="

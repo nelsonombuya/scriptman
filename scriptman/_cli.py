@@ -94,7 +94,7 @@ class CLIHandler:
 
         for script in args[5:]:
             if self._is_valid_script_arg(script):
-                self.scripts.extend(script)
+                self.scripts.append(script)
             else:
                 raise ValueError(f"'{script}' not found in scripts folder")
 

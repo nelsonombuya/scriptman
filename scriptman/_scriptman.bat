@@ -1,6 +1,6 @@
 @echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPT MANAGER
+:: SCRIPT MANAGER [0.0.0.33]
 :: -----------------------------------------------------------------------------
 :: Runs the various scripts for managing Company Data.
 :: -----------------------------------------------------------------------------
@@ -154,13 +154,13 @@ echo Running script...
 python "!ROOT_DIR!\!MAIN_SCRIPT!" !DEBUG! !CUSTOM! !DISABLE_LOGGING! !FORCE! !SCRIPTS!
 echo.
 
-if not !VENV_NAME! == ""(
+if not !VENV_NAME! == "" (
     echo Deactivating virtual environment...
-    call %VENV_NAME%\Scripts\deactivate.bat
+    call "!ROOT_DIR!\!VENV_NAME!\Scripts\deactivate.bat"
     echo.
 )
 
-echo Scripts Manager Process Complete.
+echo ScriptMan Process Complete.
 exit /b
 
 :show_help

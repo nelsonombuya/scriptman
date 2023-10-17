@@ -1,5 +1,6 @@
 import getpass
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -32,8 +33,25 @@ class PackagePublishHelper:
         >>> helper.run()
     """
 
-    def __init__(self, package_name, version, use_dotenv, del_app_folder):
-        self.del_app_folder = del_app_folder
+    def __init__(
+        self,
+        package_name: str,
+        version: str,
+        use_dotenv: str,
+        del_app_folder: str,
+    ):
+        """
+        A utility class for automating the package publishing process.
+
+        Args:
+            package_name (str): The name of the Python package.
+            version (str): The new version to set for the package.
+            use_dotenv (str): Whether to use the credentials from the dotenv
+                file.
+            del_app_folder (str): Whether to delete the local app folder used
+                for testing.
+        """
+        self.del_app_folder = del_app_folder.lower() == "true"
         self.dir = os.path.dirname(__file__)
         self.package_name = package_name
         self.version = version
@@ -46,14 +64,23 @@ class PackagePublishHelper:
             self.username = input("Enter your PyPI username: ")
             self.password = getpass.getpass("Enter your PyPI password: ")
 
+    def _delete_folder(self, folder_path: str):
+        """
+        Utility method for deleting folders.
+
+        Args:
+            folder_path (str): Path of the folder to delete.
+        """
+        if os.path.exists(folder_path):
+            shutil.rmtree(folder_path)
+            print(f"Deleted '{folder_path}' folder.")
+
     def delete_dist_folder(self):
         """
         Delete the 'dist' folder in the Script Manager directory if it exists.
         """
         dist_folder = os.path.join(self.dir, "dist")
-        if os.path.exists(dist_folder):
-            shutil.rmtree(dist_folder)
-            print(f"Deleted '{dist_folder}' folder.")
+        self._delete_folder(dist_folder)
 
     def delete_egg_info_folder(self):
         """
@@ -61,21 +88,18 @@ class PackagePublishHelper:
         directory if it exists.
         """
         egg_info_dir = os.path.join(self.dir, f"{self.package_name}.egg-info")
-        if os.path.exists(egg_info_dir):
-            shutil.rmtree(egg_info_dir)
-            print(f"Deleted '{egg_info_dir}' folder.")
+        self._delete_folder(egg_info_dir)
 
     def delete_local_app_folder(self):
         """
-        Delete the app folder in the Script Manager that's used for testing
-        if it exists.
+        Delete the app folder in the Script Manager that's used for testing if
+        it exists.
         """
         app_dir = os.path.join(self.dir, "app")
-        if os.path.exists(app_dir) and self.del_app_folder.lower() == "true":
-            shutil.rmtree(app_dir)
-            print(f"Deleted '{app_dir}' folder.")
+        if os.path.exists(app_dir) and self.del_app_folder:
+            self._delete_folder(app_dir)
 
-    def update_version(self):
+    def update_setup_version(self):
         """
         Update the version in 'setup.py' to the specified version.
         """
@@ -94,6 +118,27 @@ class PackagePublishHelper:
             f.writelines(new_lines)
 
         print(f"Updated version in '{setup_py}' to '{self.version}'.")
+
+    def update_app_version(self):
+        """
+        Update the version in '_settings.py' to the specified version.
+        """
+        settings_py = r"scriptman\_settings.py"
+
+        with open(settings_py, "r") as file:
+            lines = file.readlines()
+
+        # Find the line containing 'self.app_version'
+        for i, line in enumerate(lines):
+            if "self.app_version" in line:
+                lines[i] = "        "  # Adding spaces for tabs
+                lines[i] += f'self.app_version: str = "{self.version}"\n'
+                break  # Stop searching once we've found and updated the line
+
+        with open(settings_py, "w") as file:
+            file.writelines(lines)
+
+        print(f"Updated version in '{settings_py}' to '{self.version}'.")
 
     def run_build(self):
         """
@@ -114,14 +159,39 @@ class PackagePublishHelper:
         subprocess.run(cmd)
         print("Uploaded distribution packages to Twine.")
 
-    def create_sm_bat_file(self):
-        bat_file_path = r"scriptman\_scriptman.bat"
+    def update_batch_file(self):
+        """
+        Add the sm.bat file contents to the _batch.py file to use during setup.
+        """
+        pattern = r"::\s+(.*?)\s*\[([\d.]+)\]"
         python_file_path = r"scriptman\_batch.py"
+        bat_file_path = r"scriptman\_scriptman.bat"
+
+        # Get Batch File Content
         with open(bat_file_path, "r") as bat_file:
-            content = bat_file.read()
-            python_variable = f'BATCH_FILE: str = r"""{content}"""\n'
-            with open(python_file_path, "w") as python_file:
-                python_file.write(python_variable)
+            content = bat_file.readlines()
+
+        # Update version number in batch file
+        for i, line in enumerate(content):
+            match = re.match(pattern, line)
+            if match:
+                script_name, old_version = match.groups()
+
+                # Replace the version number with the custom version
+                new_line = re.sub(
+                    pattern,
+                    f":: {script_name} [{self.version}]",
+                    line,
+                )
+
+                content[i] = new_line
+                break
+
+        # Writing the batch file content to the _batch.py file
+        python_variable = 'BATCH_FILE: str = r"""' + "".join(content) + '"""\n'
+        with open(python_file_path, "w") as python_file:
+            python_file.write(python_variable)
+
         print("Updated Batch File.")
 
     def run(self):
@@ -132,15 +202,26 @@ class PackagePublishHelper:
         """
         self.delete_local_app_folder()
         self.delete_egg_info_folder()
-        self.create_sm_bat_file()
+        self.update_setup_version()
+        self.update_app_version()
         self.delete_dist_folder()
-        self.update_version()
+        self.update_batch_file()
         self.run_build()
         self.upload_to_twine()
         print("Package publishing completed.")
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 5:
+        print(
+            """
+            Usage:
+            python publish.py
+                <package_name> <version> <use_dotenv> <del_app_folder>
+            """
+        )
+        sys.exit(1)
+
     package_name, version, use_dotenv, del_app_folder = sys.argv[1:]
     PackagePublishHelper(
         package_name,

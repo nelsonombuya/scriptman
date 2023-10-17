@@ -252,6 +252,7 @@ class SettingsHandler:
         self.log_mode: bool = True
         self.sagerun_code: int = 11
         self.debug_mode: bool = False
+        self.app_version: str = "0.0.0.33"
         self.system_maintenance: bool = False
         self.system_maintenance_day: int = 31
         self.maintenance_folders: List[str] = []
@@ -285,6 +286,7 @@ class SettingsHandler:
             debugging (bool): Flag for enabling debugging mode for the session.
                 Default is False.
         """
+        import re
         from os.path import exists, join
 
         from scriptman._batch import BATCH_FILE
@@ -308,6 +310,20 @@ class SettingsHandler:
         if not exists(sm_batch_path):
             with open(sm_batch_path, "w") as batch_file:
                 batch_file.write(BATCH_FILE)
+        else:
+            version = None
+            script_name = None
+            pattern = r"::\s+(.*?)\s*\[([\d.]+)\]"
+            with open(sm_batch_path, "r") as file:
+                for line in file:
+                    match = re.match(pattern, line)
+                    if match:
+                        script_name, version = match.groups()
+                        break
+
+            if version != self.app_version:
+                with open(sm_batch_path, "w") as batch_file:
+                    batch_file.write(BATCH_FILE)
 
         LogHandler("Script Manager").message(
             details=vars(self),

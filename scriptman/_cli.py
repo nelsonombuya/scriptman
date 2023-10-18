@@ -44,7 +44,7 @@ class CLIHandler:
     def __init__(
         self,
         args: List[str],
-        upon_failure: Optional[Callable[[str], None]] = None,
+        upon_failure: Optional[Callable[[str, str], None]] = None,
     ):
         """
         Initialize the CLIHandler and execute scripts based on the provided
@@ -52,10 +52,10 @@ class CLIHandler:
 
         Args:
             args (List[str]): List of command-line arguments.
-            upon_failure (callable(str, None), optional): A function to call
-                upon script execution failure. It should take a string
-                argument, where it will receive the stacktrace. It should also
-                return None.
+            upon_failure (callable([str, str], None), optional): A function to
+                call upon script execution failure. It should take 2 string
+                arguments, where it will receive the script name and stacktrace
+                respectively. It should also return None.
         """
         self.script_handler = ScriptsHandler(upon_failure=upon_failure)
         self.disable_logging = False

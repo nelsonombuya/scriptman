@@ -84,7 +84,7 @@ class ScriptsHandler:
     def __init__(
         self,
         scripts_dir: Optional[str] = None,
-        upon_failure: Optional[Callable[[str], None]] = None,
+        upon_failure: Optional[Callable[[str, str], None]] = None,
     ) -> None:
         """
         Initializes the ScriptsHandler.
@@ -92,12 +92,12 @@ class ScriptsHandler:
         Args:
             scripts_dir (str, optional): The directory where scripts are
                 located.
-            upon_failure (callable(str, None), optional): A function to call
-                upon script execution failure. It should take a string
-                argument, where it will receive the stacktrace. It should also
-                return None.
+            upon_failure (callable([str, str], None), optional): A function to
+                call upon script execution failure. It should take 2 string
+                arguments, where it will receive the script name and stacktrace
+                respectively. It should also return None.
         """
-        self.upon_failure = upon_failure or (lambda stacktrace: None)
+        self.upon_failure = upon_failure or (lambda script, stacktrace: None)
         self.scripts_dir = scripts_dir or DirectoryHandler().scripts_dir
 
     def run_scripts(
@@ -186,10 +186,12 @@ class ScriptsHandler:
         log_handler = LogHandler(filename.title().replace("_", " "))
         log_handler.start()
 
-        result = ScriptExecutor(log_handler).execute(file, directory, force)
+        success, stacktrace = ScriptExecutor(log_handler).execute(
+            file, directory, force
+        )
 
-        if not result[0] and isinstance(result[1], str):
-            self.upon_failure(result[1])
+        if not success:
+            self.upon_failure(log_handler.title, stacktrace)
 
         log_handler.stop()
 
@@ -227,8 +229,8 @@ class ScriptExecutor:
                 instance. Defaults to False.
 
         Returns:
-            bool, Exception: True if executed successfully, False otherwise
-                with the Exception.
+            bool, str: True if executed successfully, False otherwise with the
+                stacktrace.
         """
         self.exception = None
         self.file = os.path.join(directory, file)

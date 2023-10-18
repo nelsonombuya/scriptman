@@ -64,6 +64,19 @@ class PackagePublishHelper:
             self.username = input("Enter your PyPI username: ")
             self.password = getpass.getpass("Enter your PyPI password: ")
 
+    @staticmethod
+    def get_setup_version():
+        """
+        Gets the version in 'setup.py'.
+        """
+        setup_py = "setup.py"
+        with open(setup_py, "r") as f:
+            lines = f.readlines()
+
+        for line in lines:
+            if line.strip().startswith("VERSION ="):
+                return line
+
     def _delete_folder(self, folder_path: str):
         """
         Utility method for deleting folders.
@@ -214,10 +227,12 @@ class PackagePublishHelper:
 if __name__ == "__main__":
     if len(sys.argv) != 5:
         print(
-            """
+            f"""
             Usage:
             python publish.py
                 <package_name> <version> <use_dotenv> <del_app_folder>
+
+            {PackagePublishHelper.get_setup_version()}
             """
         )
         sys.exit(1)

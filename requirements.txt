@@ -47,7 +47,7 @@ trio==0.22.2
 trio-websocket==0.10.4
 twine==4.0.2
 tzdata==2023.3
-urllib3==2.0.5
+urllib3==2.0.7
 webdriver-manager==4.0.1
 wsproto==1.2.0
 zipp==3.17.0

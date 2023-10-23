@@ -75,6 +75,7 @@ class MaintenanceHandler:
             self.remove_pycache_folders(folder)
 
         self.remove_custom_driver_folder()
+        self.remove_empty_log_files()
         self.remove_old_log_files()
         self.remove_csv_files()
         self.run_system_maintenance()
@@ -103,6 +104,29 @@ class MaintenanceHandler:
                         details={"Error": error},
                         message=f"Unable to delete {path}.",
                     )
+
+    def remove_empty_log_files(self) -> None:
+        """
+        Remove all empty log files in the specified logs directory.
+        """
+        if os.path.exists(self._directory_handler.logs_dir):
+            for root, dirs, files in os.walk(self._directory_handler.logs_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    if os.path.getsize(file_path) == 0:
+                        try:
+                            os.remove(file_path)
+                            self._log.message(
+                                level=LogLevel.DEBUG,
+                                print_to_terminal=Settings.debug_mode,
+                                message=f"Deleted empty log file: {file_path}",
+                            )
+                        except OSError as error:
+                            self._log.message(
+                                level=LogLevel.ERROR,
+                                details={"Error": error},
+                                message=f"Unable to delete {file_path}.",
+                            )
 
     def remove_old_log_files(self) -> None:
         """

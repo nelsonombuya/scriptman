@@ -1,6 +1,6 @@
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPT MANAGER [0.0.0.36]
+:: SCRIPT MANAGER [0.0.0.37]
 :: -----------------------------------------------------------------------------
 :: Runs the various scripts for managing Company Data.
 :: -----------------------------------------------------------------------------
@@ -36,8 +36,8 @@ set "VENV_NAME=.venv"
 set "MAIN_SCRIPT=debug.py"
 set "ROOT_DIR=C:\test\dir"
 
-set "QUICK="
 set "SCRIPTS="
+set "QUICK=False"
 set "DEBUG=False"
 set "FORCE=False"
 set "CUSTOM=False"
@@ -144,7 +144,7 @@ if not !VENV_NAME! == "" (
     echo.
 )
 
-if !QUICK! == "" (
+if !QUICK! == "False" (
     echo Updating Files...
     git pull
     echo.

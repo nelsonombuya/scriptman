@@ -252,7 +252,7 @@ class SettingsHandler:
         self.log_mode: bool = True
         self.sagerun_code: int = 11
         self.debug_mode: bool = False
-        self.app_version: str = "0.0.0.36"
+        self.app_version: str = "0.0.0.37"
         self.system_maintenance: bool = False
         self.system_maintenance_day: int = 31
         self.maintenance_folders: List[str] = []

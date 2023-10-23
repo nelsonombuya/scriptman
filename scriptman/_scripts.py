@@ -173,8 +173,7 @@ class ScriptsHandler:
             force (bool): Whether to run the file even if there's an existing
                 instance. Defaults to False.
         """
-        filename = os.path.splitext(file)[0]
-        extension = os.path.splitext(file)[1]
+        filename, extension = os.path.splitext(file)
 
         if not extension:
             extension = ".py"
@@ -250,7 +249,7 @@ class ScriptExecutor:
 
             # Create a lock file to prevent script from being re-run
             if os.path.exists(self.lock_file) and not force:
-                raise FileExistsError
+                raise FileLockError(self.file, self.lock_file)
             else:
                 open(self.lock_file, "w").close()
 
@@ -259,7 +258,7 @@ class ScriptExecutor:
             message += " after recovery." if self.recovery_mode else "!"
             self.script_log.message(message)
             return True, message
-        except FileExistsError as e:
+        except FileLockError as e:
             self.exception = e
             self._handle_script_exceptions(self._locked_script)
             return False, traceback.format_exc()
@@ -341,21 +340,7 @@ class ScriptExecutor:
         Report to the user that the script is currently running and therefore
         locked.
         """
-        time_format = "%Y-%m-%d %H:%M:%S"
-        lock_creation_time = os.path.getctime(self.lock_file)
-        lock_creation_time = time.localtime(lock_creation_time)
-        lock_creation_time = time.strftime(time_format, lock_creation_time)
-
-        self.script_log.message(
-            "The script is currently running in another instance. "
-            " If this is not the case, kindly delete the .lock file:",
-            level=LogLevel.WARN,
-            details={
-                "script_file": self.file,
-                "lock_file": self.lock_file,
-                "locked_time": lock_creation_time,
-            },
-        )
+        self.script_log.message(str(self.exception), LogLevel.WARN)
 
     def _log_general_exception(self):
         """
@@ -376,5 +361,81 @@ class ScriptExecutor:
         exists.
         """
         lock_file_exists = os.path.exists(self.lock_file)
-        is_FileExistsError = isinstance(self.exception, FileExistsError)
-        return (not is_FileExistsError) and lock_file_exists
+        is_FileLockError = isinstance(self.exception, FileLockError)
+        return (not is_FileLockError) and lock_file_exists
+
+
+class FileLockError(Exception):
+    """
+    Custom exception raised when a script file is currently running in another
+    instance.
+    """
+
+    def __init__(self, script_file_path: str, lock_file: str):
+        """
+        Initializes the exception with the script file path and lock file.
+
+        Args:
+            script_file_path (str): The path to the script file.
+            lock_file (str): The path to the lock file.
+        """
+        self.lock_file = lock_file
+        self.script_file_path = script_file_path
+        lock_creation_time = os.path.getctime(lock_file)
+        lock_creation_time = self._format_time(lock_creation_time)
+        self.exception_str = self._build_exception_message(
+            script_file_path, lock_file, lock_creation_time
+        )
+        super().__init__(self.exception_str)
+
+    def __str__(self) -> str:
+        """
+        Returns the formatted exception message as a string.
+
+        Return:
+            str: The exception message as a string.
+        """
+        return self.exception_str
+
+    def _format_time(self, timestamp: float) -> str:
+        """
+        Formats a timestamp into a human-readable time string.
+
+        Args:
+            timestamp (float): The timestamp to format.
+
+        Return:
+            str: The formatted time string.
+        """
+        time_format = "%Y-%m-%d %H:%M:%S"
+        creation_time = time.localtime(timestamp)
+        return time.strftime(time_format, creation_time)
+
+    def _build_exception_message(
+        self, script_file_path: str, lock_file: str, lock_time: str
+    ) -> str:
+        """
+        Builds the exception message with script file path, lock file, and lock
+        time.
+
+        Args:
+            script_file_path (str): The path to the script file.
+            lock_file (str): The path to the lock file.
+            lock_time (str): The formatted lock creation time.
+
+        Return:
+            str: The constructed exception message.
+        """
+        message = f"'{os.path.basename(script_file_path)}'"
+        message += " is currently running in another instance."
+        message += " If this is not the case, kindly delete the lock file.\n"
+        details = {
+            "script_file": script_file_path,
+            "lock_file": lock_file,
+            "locked_time": lock_time,
+        }
+        message += "\n\t" + (
+            "\n\t".join([f"{key}: {value}" for key, value in details.items()])
+        )
+
+        return message + "\n"

@@ -252,7 +252,7 @@ class SettingsHandler:
         self.log_mode: bool = True
         self.sagerun_code: int = 11
         self.debug_mode: bool = False
-        self.app_version: str = "0.0.0.35"
+        self.app_version: str = "0.0.0.36"
         self.system_maintenance: bool = False
         self.system_maintenance_day: int = 31
         self.maintenance_folders: List[str] = []
@@ -533,7 +533,7 @@ class SettingsHandler:
         """
         self.database_connection_strings.update(connection_string)
         self._log_change(
-            "default_database_connection_strings",
+            "database_connection_strings",
             self.database_connection_strings,
         )
 
@@ -586,7 +586,7 @@ class SettingsHandler:
         )
         self.database_connection_strings[name or database] = connection_string
         self._log_change(
-            "default_database_connection_strings",
+            "database_connection_strings",
             self.database_connection_strings,
         )
 

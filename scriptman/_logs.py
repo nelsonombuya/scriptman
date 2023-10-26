@@ -230,7 +230,7 @@ class LogHandler:
             }.get(level, logging.info)(message)
 
         if print_to_terminal and Settings.print_logs_to_terminal:
-            print(message)
+            print(f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')} {message}")
 
     def format_time(self, seconds: int) -> str:
         """

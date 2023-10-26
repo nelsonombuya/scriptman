@@ -71,6 +71,7 @@ from scriptman._settings import Settings
 # Register MaintenanceHandler to run cleanup tasks at program exit
 atexit.register(MaintenanceHandler)
 
+# Exposes relevant classes
 __all__: List[str] = [
     "CLIHandler",
     "CSVHandler",

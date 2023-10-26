@@ -109,6 +109,7 @@ class LogHandler:
         self.level: LogLevel = level
         self.name: str = self._format_name(name, module)
         self.title: str = name.title().replace("_", " ")
+        self.logs_dir: str = DirectoryHandler().logs_dir
         self.description: str = description or self.title
         self.file: Optional[str] = self._get_log_file(filename)
         self._configure_logging()
@@ -142,9 +143,8 @@ class LogHandler:
         """
         if not Settings.log_mode:
             return None
-        directory = DirectoryHandler().logs_dir
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        return rf"{directory}\{filename} - {timestamp}.log"
+        return rf"{self.logs_dir}\{filename} - {timestamp}.log"
 
     def _configure_logging(self) -> None:
         """

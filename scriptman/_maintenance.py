@@ -43,12 +43,13 @@ class MaintenanceHandler:
 
     def __init__(self) -> None:
         """
-        Initialize MaintenanceHandler and perform cleanup tasks.
+        Initialize MaintenanceHandler and perform maintenance tasks.
 
-        Cleanup tasks include:
+        Maintenance tasks include:
         - Removing "__pycache__" folders.
-        - Removing old log files.
-        - Removing CSV files.
+        - Removing empty and old log files.
+        - Moving geckodriver.log to the logs folder.
+        - Removing downloaded CSV files from the downloads folder.
         - Running system maintenance scripts (SFC, DISM, Disk Cleanup, Defrag).
 
         These tasks are executed upon initialization.
@@ -57,18 +58,20 @@ class MaintenanceHandler:
         self._directory_handler = DirectoryHandler()
 
         if Settings.system_maintenance and self._verify_date():
-            self._perform_cleanup()
+            self._perform_maintenance_tasks()
         else:
+            self.move_geckodriver_log()
             self._log.message("System Maintenance Skipped", LogLevel.DEBUG)
 
-    def _perform_cleanup(self) -> None:
+    def _perform_maintenance_tasks(self) -> None:
         """
-        Perform cleanup tasks.
+        Perform maintenance tasks.
 
-        Cleanup tasks include:
+        Maintenance tasks include:
         - Removing "__pycache__" folders.
-        - Removing old log files.
-        - Removing CSV files.
+        - Removing empty and old log files.
+        - Moving geckodriver.log to the logs folder.
+        - Removing downloaded CSV files from the downloads folder.
         - Running system maintenance scripts (SFC, DISM, Disk Cleanup, Defrag).
         """
         for folder in Settings.maintenance_folders:
@@ -76,6 +79,7 @@ class MaintenanceHandler:
 
         self.remove_custom_driver_folder()
         self.remove_empty_log_files()
+        self.move_geckodriver_log()
         self.remove_old_log_files()
         self.remove_csv_files()
         self.run_system_maintenance()
@@ -263,6 +267,41 @@ class MaintenanceHandler:
                 level=LogLevel.ERROR,
                 details={"error": error},
                 message="An error occurred while running system maintenance",
+            )
+
+    def move_geckodriver_log(self) -> None:
+        """
+        Move the geckodriver.log file from app_dir to the logs_dir.
+        """
+        app_dir = self._directory_handler.root_dir
+        logs_dir = self._directory_handler.logs_dir
+        geckodriver_log_path = os.path.join(app_dir, "geckodriver.log")
+
+        try:
+            if os.path.exists(geckodriver_log_path):
+                timestamp = os.path.getctime(geckodriver_log_path)
+                timestamp = datetime.fromtimestamp(timestamp)
+                timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
+                filename = f"{timestamp} - geckodriver.log"
+                destination_path = os.path.join(logs_dir, filename)
+
+                shutil.move(geckodriver_log_path, destination_path)
+                self._log.message(
+                    level=LogLevel.DEBUG,
+                    print_to_terminal=Settings.debug_mode,
+                    message=f"Moved geckodriver.log to {destination_path}",
+                )
+            else:
+                self._log.message(
+                    level=LogLevel.DEBUG,
+                    print_to_terminal=Settings.debug_mode,
+                    message=f"geckodriver.log not found in {app_dir}.",
+                )
+        except OSError as error:
+            self._log.message(
+                level=LogLevel.ERROR,
+                details={"Error": error},
+                message=f"Error moving geckodriver.log to {logs_dir}",
             )
 
     def _verify_date(self) -> bool:

@@ -33,9 +33,9 @@
 :: -----------------------------------------------------------------------------
 setlocal enabledelayedexpansion
 
-set "VENV_NAME=.venv"
-set "MAIN_SCRIPT=debug.py"
-set "ROOT_DIR=C:\test\dir"
+set "ROOT_DIR="
+set "VENV_NAME="
+set "MAIN_SCRIPT="
 
 set "SCRIPTS="
 set "QUICK=False"

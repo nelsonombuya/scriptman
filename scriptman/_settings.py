@@ -19,7 +19,7 @@ Attributes:
 Methods:
 - `init(
     self,
-    app_dir: str,
+    root_dir: str,
     logging: bool = True,
     debugging: bool = False
 ) -> None`: Initialize the application settings.
@@ -50,7 +50,8 @@ custom driver after it's downloaded and used.
 custom driver after it's downloaded and used.
 - `set_selenium_chrome_url(self, url: str) -> None`: Set the URL to use when
 downloading Chrome binaries/drivers.
-- `set_app_dir(self, directory: str) -> None`: Set the main app's directory.
+- `set_root_dir(self, directory: str) -> None`: Set the main app's root
+directory.
 - `set_clean_up_logs_after_n_days(self, days: int) -> None`: Set the number of
 days after which log files should be cleaned up.
 - `add_csv_filename_to_ignore_during_maintenance(
@@ -116,7 +117,7 @@ class SettingsHandler:
     optimizations, custom driver settings, and more.
 
     Attributes:
-        app_dir (str): The root directory of the application.
+        root_dir (str): The root directory of the application.
         log_mode (bool): Whether logging is enabled.
         debug_mode (bool): Whether debugging is enabled.
         clean_up_logs_after_n_days (int): Number of days after which log files
@@ -153,7 +154,7 @@ class SettingsHandler:
 
 
     Methods:
-        init(app_dir: str, logging: bool = True) -> None:
+        init(root_dir: str, logging: bool = True) -> None:
             Initialize the application settings.
         get_setting(setting: str, default: Any = None) -> Any:
             Get the value of a specific setting and return the default value if
@@ -187,8 +188,8 @@ class SettingsHandler:
             used.
         set_selenium_chrome_url(url: str) -> None:
             Set the URL to use when downloading Chrome binaries/drivers.
-        set_app_dir(directory: str) -> None:
-            Set the main app's directory.
+        set_root_dir(directory: str) -> None:
+            Set the main app's root directory.
         set_clean_up_logs_after_n_days(days: int) -> None:
             Set the number of days after which log files should be cleaned up.
         add_db_connection_string(connection_string: Dict[str, str]) -> None:
@@ -248,11 +249,11 @@ class SettingsHandler:
         """
         Initialize default settings.
         """
-        self.app_dir: str = ""
+        self.root_dir: str = ""
         self.log_mode: bool = False
         self.sagerun_code: int = 11
         self.debug_mode: bool = False
-        self.app_version: str = "0.0.0.42"
+        self.app_version: str = "0.0.0.43"
         self.system_maintenance: bool = False
         self.system_maintenance_day: int = 31
         self.maintenance_folders: List[str] = []
@@ -272,7 +273,7 @@ class SettingsHandler:
 
     def init(
         self,
-        app_dir: str,
+        root_dir: str,
         logging: bool = True,
         debugging: bool = False,
     ) -> None:
@@ -280,7 +281,7 @@ class SettingsHandler:
         Initialize the application settings.
 
         Args:
-            app_dir (str): The root directory of the application.
+            root_dir (str): The root directory of the application.
             logging (bool): Flag for enabling logging for the session.
                 Default is True.
             debugging (bool): Flag for enabling debugging mode for the session.
@@ -292,11 +293,17 @@ class SettingsHandler:
         self.log_mode = logging
         self.debug_mode = debugging
 
-        self.set_app_dir(app_dir)
+        self.set_root_dir(root_dir)
         dirs = DirectoryHandler()
 
         self.upgrade_batch_file()
-        self.add_folders_for_cleanup([dirs.root_dir, dirs.script_man_dir])
+        self.add_folders_for_cleanup(
+            [
+                dirs.root_dir,
+                dirs.app_dir,
+                dirs.script_man_dir,
+            ]
+        )
 
         LogHandler("Script Manager").message(
             details=vars(self),
@@ -434,15 +441,15 @@ class SettingsHandler:
         self.selenium_chrome_url = url
         self._log_change("selenium_chrome_url", self.selenium_chrome_url)
 
-    def set_app_dir(self, directory: str) -> None:
+    def set_root_dir(self, directory: str) -> None:
         """
         Set the main app's directory.
 
         Args:
             directory (str): The directory path to set as the app's root dir.
         """
-        self.app_dir = directory
-        self._log_change("app_dir", directory)
+        self.root_dir = directory
+        self._log_change("root_dir", directory)
 
     def set_clean_up_logs_after_n_days(self, days: int) -> None:
         """
@@ -696,7 +703,7 @@ class SettingsHandler:
         existing_root_dir = ""
         existing_venv_name = ""
         existing_main_script = ""
-        sm_batch_path = join(self.app_dir, "sm.bat")
+        sm_batch_path = join(self.root_dir, "sm.bat")
         version_regex_pattern = r"::\s+(.*?)\s*\[([\d.]+)\]"
 
         # Read existing sm.bat file
@@ -722,7 +729,7 @@ class SettingsHandler:
         if not existing_venv_name:
             existing_venv_name = ".venv"
         if not existing_root_dir:
-            existing_root_dir = self.app_dir
+            existing_root_dir = self.root_dir
         if not existing_main_script:
             existing_main_script = "__main__.py"
 

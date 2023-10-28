@@ -273,9 +273,9 @@ class MaintenanceHandler:
         """
         Move the geckodriver.log file from app_dir to the logs_dir.
         """
-        app_dir = self._directory_handler.root_dir
         logs_dir = self._directory_handler.logs_dir
-        geckodriver_log_path = os.path.join(app_dir, "geckodriver.log")
+        root_dir = self._directory_handler.root_dir
+        geckodriver_log_path = os.path.join(root_dir, "geckodriver.log")
 
         try:
             if os.path.exists(geckodriver_log_path):
@@ -295,7 +295,7 @@ class MaintenanceHandler:
                 self._log.message(
                     level=LogLevel.DEBUG,
                     print_to_terminal=Settings.debug_mode,
-                    message=f"geckodriver.log not found in {app_dir}.",
+                    message=f"geckodriver.log not found in {root_dir}.",
                 )
         except OSError as error:
             self._log.message(

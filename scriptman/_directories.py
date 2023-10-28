@@ -15,7 +15,7 @@ from scriptman._directory import DirectoryHandler
 
 directory_handler = DirectoryHandler()
 # Default directories are created upon initialization.
-# (Ensure app_dir is set in the package settings)
+# (Ensure root_dir is set in the package settings)
 ```
 
 Classes:
@@ -67,6 +67,8 @@ class DirectoryHandler:
     ScriptManager setup.
 
     Attributes:
+        APP_DIR (str): The key for the app directory in the directories
+            dictionary.
         ROOT_DIR (str): The key for the root directory in the directories
             dictionary.
         LOGS_DIR (str): The key for the logs directory in the directories
@@ -99,6 +101,7 @@ class DirectoryHandler:
             dictionary.
     """
 
+    APP_DIR = "app"
     ROOT_DIR = "root"
     LOGS_DIR = "logs"
     SCRIPTS_DIR = "scripts"
@@ -107,7 +110,7 @@ class DirectoryHandler:
     HANDLERS_DIR = "handlers"
     DOWNLOADS_DIR = "downloads"
     SCRIPT_MAN_DIR = "scriptman"
-    DEFAULT_DIRECTORIES = [DOWNLOADS_DIR, LOGS_DIR, SCRIPTS_DIR, HELPERS_DIR]
+    DEFAULT_DIRECTORIES = [DOWNLOADS_DIR, HELPERS_DIR, LOGS_DIR, SCRIPTS_DIR]
 
     def __init__(self) -> None:
         """
@@ -120,20 +123,38 @@ class DirectoryHandler:
     @property
     def root_dir(self) -> str:
         """
-        Get the root directory for the setup, based on the location of this
-        script.
+        Get the root (project) directory for the setup, based on the location
+        of this script.
 
         Returns:
             str: The path to the root directory.
 
         Raises:
-            RuntimeError: If APP DIR has not been set in the settings.
+            RuntimeError: If ROOT_DIR has not been set in the settings.
         """
-        if Settings.app_dir:
-            return os.path.abspath(os.path.join(Settings.app_dir, "app"))
-        elif Settings.debug_mode:
+        if Settings.root_dir:
+            return os.path.abspath(Settings.root_dir)
+        if Settings.debug_mode:
+            return os.path.join(os.path.dirname(__file__), "..")
+        raise RuntimeError("ROOT_DIR has not been set! Run settings.init()")
+
+    @property
+    def app_dir(self) -> str:
+        """
+        Get the "app" directory for the setup, based on the location of this
+        script.
+
+        Returns:
+            str: The path to the app directory.
+
+        Raises:
+            RuntimeError: If ROOT_DIR has not been set in the settings.
+        """
+        if Settings.root_dir:
+            return os.path.abspath(os.path.join(Settings.root_dir, "app"))
+        if Settings.debug_mode:
             return os.path.join(os.path.dirname(__file__), "..", "app")
-        raise RuntimeError("APP DIR has not been set! Run settings.init()")
+        raise RuntimeError("ROOT_DIR has not been set! Run settings.init()")
 
     @property
     def logs_dir(self) -> str:
@@ -227,6 +248,7 @@ class DirectoryHandler:
         """
         Create and set the default directories.
         """
+        self.directories[self.APP_DIR] = self.app_dir
         self.directories[self.ROOT_DIR] = self.root_dir
         self.directories[self.SCRIPT_MAN_DIR] = self.script_man_dir
         for directory_name in self.DEFAULT_DIRECTORIES:
@@ -242,7 +264,7 @@ class DirectoryHandler:
         Returns:
             str: The path of the created or existing directory.
         """
-        directory_path = os.path.join(self.root_dir, directory_name)
+        directory_path = os.path.join(self.app_dir, directory_name)
         self.directories[directory_name] = directory_path
         if not os.path.exists(directory_path):
             os.makedirs(directory_path, exist_ok=True)

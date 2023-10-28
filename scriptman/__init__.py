@@ -42,7 +42,7 @@ in your project directory. You can do this as follows:
 
 ```python
 Settings.init(
-    app_dir='your_project_directory',
+    root_dir='your_project_directory',
     logging=True,  # Enable logging (default is True)
     debugging=False,  # Enable debugging mode (default is False)
 )

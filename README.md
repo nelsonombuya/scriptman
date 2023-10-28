@@ -77,7 +77,7 @@ To set up ScriptMan for your project, you should call the following method from 
 from scriptman import Settings
 
 Settings.init(
-    app_dir='your_project_directory',
+    root_dir='your_project_directory',
     logging=True,  # Enable logging (default is True)
     debugging=False,  # Enable debugging mode (default is False)
 )

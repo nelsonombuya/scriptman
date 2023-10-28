@@ -36,7 +36,7 @@ requests==2.31.0
 requests-toolbelt==1.0.0
 rfc3986==2.0.0
 rich==13.5.3
--e git+https://github.com/nelsonombuya/script_manager.git@00f6148f4c71133ad4f71a019d8ee120e2cc5a8f#egg=scriptman
+-e git+https://github.com/nelsonombuya/script_manager.git@6711e6ba995bb63a5574dbcf94f93cde38f24859#egg=scriptman
 selenium==4.13.0
 six==1.16.0
 sniffio==1.3.0
@@ -47,7 +47,7 @@ trio==0.22.2
 trio-websocket==0.10.4
 twine==4.0.2
 tzdata==2023.3
-urllib3==2.0.7
+urllib3==2.0.5
 webdriver-manager==4.0.1
 wsproto==1.2.0
 zipp==3.17.0

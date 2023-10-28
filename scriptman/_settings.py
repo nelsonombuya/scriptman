@@ -252,7 +252,7 @@ class SettingsHandler:
         self.log_mode: bool = False
         self.sagerun_code: int = 11
         self.debug_mode: bool = False
-        self.app_version: str = "0.0.0.41"
+        self.app_version: str = "0.0.0.42"
         self.system_maintenance: bool = False
         self.system_maintenance_day: int = 31
         self.maintenance_folders: List[str] = []
@@ -286,44 +286,17 @@ class SettingsHandler:
             debugging (bool): Flag for enabling debugging mode for the session.
                 Default is False.
         """
-        import re
-        from os.path import exists, join
-
-        from scriptman._batch import BATCH_FILE
         from scriptman._directories import DirectoryHandler
         from scriptman._logs import LogHandler, LogLevel
 
         self.log_mode = logging
         self.debug_mode = debugging
+
         self.set_app_dir(app_dir)
-        directory_handler = DirectoryHandler()
-        self.add_folders_for_cleanup(
-            [
-                directory_handler.root_dir,
-                directory_handler.script_man_dir,
-            ]
-        )
+        dirs = DirectoryHandler()
 
-        # Create Batch File for CLIHandler
-        sm_batch_path = join(app_dir, "sm.bat")
-
-        if not exists(sm_batch_path):
-            with open(sm_batch_path, "w") as batch_file:
-                batch_file.write(BATCH_FILE)
-        else:
-            version = None
-            script_name = None
-            pattern = r"::\s+(.*?)\s*\[([\d.]+)\]"
-            with open(sm_batch_path, "r") as file:
-                for line in file:
-                    match = re.match(pattern, line)
-                    if match:
-                        script_name, version = match.groups()
-                        break
-
-            if version != self.app_version:
-                with open(sm_batch_path, "w") as batch_file:
-                    batch_file.write(BATCH_FILE)
+        self.upgrade_batch_file()
+        self.add_folders_for_cleanup([dirs.root_dir, dirs.script_man_dir])
 
         LogHandler("Script Manager").message(
             details=vars(self),
@@ -708,6 +681,63 @@ class SettingsHandler:
             self._log_change("System Maintenance Date", day)
         else:
             raise ValueError(f"({day}) is not within the correct range!")
+
+    def upgrade_batch_file(self) -> None:
+        """
+        Upgrade the batch file (sm.bat) while maintaining existing variable
+        values.
+        """
+        import re
+        from os.path import exists, join
+
+        from scriptman._batch import BATCH_FILE
+
+        existing_version = ""
+        existing_root_dir = ""
+        existing_venv_name = ""
+        existing_main_script = ""
+        sm_batch_path = join(self.app_dir, "sm.bat")
+        version_regex_pattern = r"::\s+(.*?)\s*\[([\d.]+)\]"
+
+        # Read existing sm.bat file
+        if exists(sm_batch_path):
+            with open(sm_batch_path, "r") as batch_file:
+                for line in batch_file:
+                    match = re.match(version_regex_pattern, line)
+
+                    if match:
+                        existing_version = match.groups()[1]
+                        continue
+                    if line.startswith('set "VENV_NAME='):
+                        existing_venv_name = line.split("=")[1].strip()
+                        continue
+                    if line.startswith('set "MAIN_SCRIPT='):
+                        existing_main_script = line.split("=")[1].strip()
+                        continue
+                    if line.startswith('set "ROOT_DIR='):
+                        existing_root_dir = line.split("=")[1].strip()
+                        continue
+
+        # Update values with defaults if not already set
+        if not existing_venv_name:
+            existing_venv_name = ".venv"
+        if not existing_root_dir:
+            existing_root_dir = self.app_dir
+        if not existing_main_script:
+            existing_main_script = "__main__.py"
+
+        # Create Batch File for CLIHandler with extracted values
+        if existing_version != self.app_version:
+            with open(sm_batch_path, "w") as batch_file:
+                batch_file.write(
+                    BATCH_FILE.format(
+                        ROOT_DIR=existing_root_dir.replace('"', ""),
+                        VENV_NAME=existing_venv_name.replace('"', ""),
+                        MAIN_SCRIPT=existing_main_script.replace('"', ""),
+                    )
+                )
+
+        self._log_change("Batch File", f"Version {self.app_version}")
 
     def _log_change(self, name: str, value: Optional[Any]) -> None:
         """

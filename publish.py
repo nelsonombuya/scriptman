@@ -186,6 +186,7 @@ class PackagePublishHelper:
 
         # Update version number in batch file
         for i, line in enumerate(content):
+            # Update the Batch File's Version
             match = re.match(pattern, line)
             if match:
                 script_name, old_version = match.groups()
@@ -196,9 +197,19 @@ class PackagePublishHelper:
                     f":: {script_name} [{self.version}]",
                     line,
                 )
-
                 content[i] = new_line
-                break
+                continue
+
+            # Add placeholders for the relevant data
+            if line.startswith('set "VENV_NAME='):
+                content[i] = 'set "VENV_NAME={VENV_NAME}"\n'
+                continue
+            if line.startswith('set "MAIN_SCRIPT='):
+                content[i] = 'set "MAIN_SCRIPT={MAIN_SCRIPT}"\n'
+                continue
+            if line.startswith('set "ROOT_DIR='):
+                content[i] = 'set "ROOT_DIR={ROOT_DIR}"\n'
+                continue
 
         # Writing the batch file content to the _batch.py file
         python_variable = 'BATCH_FILE: str = r"""' + "".join(content) + '"""\n'

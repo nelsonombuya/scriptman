@@ -1,8 +1,9 @@
 @echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPT MANAGER [0.0.0.37]
+:: SCRIPTMAN [0.0.0.41]
 :: -----------------------------------------------------------------------------
-:: Runs the various scripts for managing Company Data.
+:: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
+:: more.
 :: -----------------------------------------------------------------------------
 :: Usage:
 ::   sm.bat         [-h | --help]

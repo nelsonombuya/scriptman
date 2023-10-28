@@ -1,8 +1,9 @@
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPT MANAGER [0.0.0.41]
+:: SCRIPTMAN [0.0.0.42]
 :: -----------------------------------------------------------------------------
-:: Runs the various scripts for managing Company Data.
+:: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
+:: more.
 :: -----------------------------------------------------------------------------
 :: Usage:
 ::   sm.bat         [-h | --help]
@@ -32,9 +33,9 @@ BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
 setlocal enabledelayedexpansion
 
-set "VENV_NAME=.venv"
-set "MAIN_SCRIPT=debug.py"
-set "ROOT_DIR=C:\test\dir"
+set "VENV_NAME={VENV_NAME}"
+set "MAIN_SCRIPT={MAIN_SCRIPT}"
+set "ROOT_DIR={ROOT_DIR}"
 
 set "SCRIPTS="
 set "QUICK=False"

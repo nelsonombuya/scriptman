@@ -297,13 +297,7 @@ class SettingsHandler:
         dirs = DirectoryHandler()
 
         self.upgrade_batch_file()
-        self.add_folders_for_cleanup(
-            [
-                dirs.root_dir,
-                dirs.app_dir,
-                dirs.script_man_dir,
-            ]
-        )
+        self.add_folders_for_cleanup([dirs.root_dir])
 
         LogHandler("Script Manager").message(
             details=vars(self),

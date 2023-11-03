@@ -61,6 +61,7 @@ class MaintenanceHandler:
             self._perform_maintenance_tasks()
         else:
             self.move_geckodriver_log()
+            self.remove_empty_log_files()
             self._log.message("System Maintenance Skipped", LogLevel.DEBUG)
 
     def _perform_maintenance_tasks(self) -> None:

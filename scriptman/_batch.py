@@ -1,6 +1,6 @@
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPTMAN [0.0.0.43]
+:: SCRIPTMAN [0.0.0.44]
 :: -----------------------------------------------------------------------------
 :: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
 :: more.
@@ -33,9 +33,9 @@ BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
 setlocal enabledelayedexpansion
 
+set "ROOT_DIR={ROOT_DIR}"
 set "VENV_NAME={VENV_NAME}"
 set "MAIN_SCRIPT={MAIN_SCRIPT}"
-set "ROOT_DIR={ROOT_DIR}"
 
 set "SCRIPTS="
 set "QUICK=False"

@@ -1,6 +1,6 @@
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPTMAN [0.0.0.44]
+:: SCRIPTMAN [0.0.0.45]
 :: -----------------------------------------------------------------------------
 :: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
 :: more.

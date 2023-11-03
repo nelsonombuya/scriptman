@@ -283,7 +283,7 @@ class MaintenanceHandler:
                 timestamp = os.path.getctime(geckodriver_log_path)
                 timestamp = datetime.fromtimestamp(timestamp)
                 timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
-                filename = f"{timestamp} - geckodriver.log"
+                filename = f"GECKODRIVER - {timestamp}.log"
                 destination_path = os.path.join(logs_dir, filename)
 
                 shutil.move(geckodriver_log_path, destination_path)

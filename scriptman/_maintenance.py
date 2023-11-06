@@ -60,6 +60,7 @@ class MaintenanceHandler:
         if Settings.system_maintenance and self._verify_date():
             self._perform_maintenance_tasks()
         else:
+            self.remove_csv_files()
             self.move_geckodriver_log()
             self.remove_empty_log_files()
             self._log.message("System Maintenance Skipped", LogLevel.DEBUG)

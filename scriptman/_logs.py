@@ -211,7 +211,7 @@ class LogHandler:
             print_to_terminal (bool): Whether to print the message to the
                 terminal.
         """
-        message = f"{self.name}: {message}"
+        message = f"[{self.name}] {message}"
         message += (
             "\n\t" + ("\n\t".join([f"{k}: {v}" for k, v in details.items()]))
             if details
@@ -231,7 +231,7 @@ class LogHandler:
 
         if print_to_terminal and Settings.print_logs_to_terminal:
             timestamp = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-            print(f"[{timestamp}] {message}")
+            print(f"{timestamp} [{level.value}] {message}")
 
     def format_time(self, seconds: int) -> str:
         """

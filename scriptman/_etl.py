@@ -243,6 +243,7 @@ class ETLHandler:
         recreate: bool = False,
         force_nvarchar: bool = False,
         keys: List[str] = [],
+        bulk_execute: bool = True,
     ) -> None:
         """
         Load the data into a database table.
@@ -258,6 +259,8 @@ class ETLHandler:
                 type for all columns. Defaults to False.
             keys (List[str], optional): List of keys for updates.
                 Defaults to [].
+            bulk_execute (bool, optional): Whether to use bulk execute for
+                queries. Defaults to True.
         """
         if self._data.empty:
             self._log.message("Dataset is empty!", LogLevel.WARN)
@@ -290,17 +293,23 @@ class ETLHandler:
             or truncate
             or recreate
         ):
-            return self._insert(truncate, recreate)
+            return self._insert(truncate, recreate, bulk_execute)
         else:
-            return self._update(keys)
+            return self._update(keys, bulk_execute)
 
-    def _insert(self, truncate: bool = False, recreate: bool = False) -> None:
+    def _insert(
+        self,
+        truncate: bool = False,
+        recreate: bool = False,
+        bulk_execute: bool = True,
+    ) -> None:
         """
         Insert data into a database table.
 
         Args:
             truncate (bool): Whether to truncate the table.
             recreate (bool): Whether to recreate the table.
+            bulk_execute (bool): Whether to use bulk execute for queries.
         """
         tbl_query = self._generate_create_table_query(self._table, self._data)
         insert_query = self._generate_insert_query(self._table, self._data)
@@ -315,7 +324,10 @@ class ETLHandler:
             self._db.truncate_table(self._table)
 
         try:
-            self._db.execute_many(insert_query, prepared_data)
+            if bulk_execute:
+                self._db.execute_many(insert_query, prepared_data)
+            else:
+                raise MemoryError
         except MemoryError:
             self._log.message(
                 "Bulk Query Execution Failed. Executing single queries...",
@@ -328,34 +340,38 @@ class ETLHandler:
             ):
                 self._db.execute_write_query(insert_query, row)
 
-    def _update(self, keys: List[str]) -> None:
+    def _update(self, keys: List[str], bulk_execute: bool = True) -> None:
         """
         Update data in a database table, and if the record doesn't exist,
         insert it.
 
         Args:
             keys (List[str]): List of keys for updates.
+            bulk_execute (bool): Whether to use bulk execute for queries.
         """
 
         try:
-            # Bulk Execute Update Query
-            upd_query = self._generate_update_query(
-                self._table,
-                self._data,
-                keys,
-            )
-            prepared_data = self._prepare_data(keys)
-            self._log.message(f"Updating data on [{self._table}]...")
-            self._db.execute_many(upd_query, prepared_data)
+            if bulk_execute:
+                # Bulk Execute Update Query
+                upd_query = self._generate_update_query(
+                    self._table,
+                    self._data,
+                    keys,
+                )
+                prepared_data = self._prepare_data(keys)
+                self._log.message(f"Updating data on [{self._table}]...")
+                self._db.execute_many(upd_query, prepared_data)
 
-            # Bulk Execute Insert Query With WHERE NOT EXISTS Clause
-            ins_query = self._convert_update_query_to_insert_query(
-                upd_query,
-                keys,
-            )
-            prepared_data = self._prepare_data(keys, True)
-            self._log.message(f"Inserting new data on [{self._table}]...")
-            self._db.execute_many(ins_query, prepared_data)
+                # Bulk Execute Insert Query With WHERE NOT EXISTS Clause
+                ins_query = self._convert_update_query_to_insert_query(
+                    upd_query,
+                    keys,
+                )
+                prepared_data = self._prepare_data(keys, True)
+                self._log.message(f"Inserting new data on [{self._table}]...")
+                self._db.execute_many(ins_query, prepared_data)
+            else:
+                raise MemoryError
         except MemoryError:
             upd_query = self._generate_update_query(
                 self._table,

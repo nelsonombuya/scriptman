@@ -244,6 +244,7 @@ class ETLHandler:
         force_nvarchar: bool = False,
         keys: List[str] = [],
         bulk_execute: bool = True,
+        nested_keys: Optional[list[str]] = None,
     ) -> None:
         """
         Load the data into a database table.
@@ -261,6 +262,8 @@ class ETLHandler:
                 Defaults to [].
             bulk_execute (bool, optional): Whether to use bulk execute for
                 queries. Defaults to True.
+            nested_keys (Optional[list[str]], optional): List of keys for
+                updates in nested tables. Defaults to None.
         """
         if self._data.empty:
             self._log.message("Dataset is empty!", LogLevel.WARN)
@@ -272,9 +275,10 @@ class ETLHandler:
                 nested_etl = ETLHandler()
                 nested_etl.from_json(lambda: data, True, keys)
                 nested_etl.to_db(
-                    keys=keys,
                     truncate=truncate,
                     recreate=recreate,
+                    keys=nested_keys or keys,
+                    bulk_execute=bulk_execute,
                     force_nvarchar=force_nvarchar,
                     table_name=f"{table_name}_{tbl}",
                     db_connection_string=db_connection_string,

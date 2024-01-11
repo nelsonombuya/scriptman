@@ -139,13 +139,13 @@ echo Setting current directory
 cd /d "%~dp0"
 echo.
 
-if not !VENV_NAME! == "" (
+if not "!VENV_NAME!" == "" (
     echo Activating virtual environment...
     call "!ROOT_DIR!\!VENV_NAME!\Scripts\activate.bat"
     echo.
 )
 
-if !QUICK! == "False" (
+if "!QUICK!" == "" (
     echo Updating Files...
     git pull
     echo.
@@ -155,7 +155,7 @@ echo Running script...
 python "!ROOT_DIR!\!MAIN_SCRIPT!" !DEBUG! !CUSTOM! !DISABLE_LOGGING! !FORCE! !SCRIPTS!
 echo.
 
-if not !VENV_NAME! == "" (
+if not "!VENV_NAME!" == "" (
     echo Deactivating virtual environment...
     call "!ROOT_DIR!\!VENV_NAME!\Scripts\deactivate.bat"
     echo.

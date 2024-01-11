@@ -722,10 +722,11 @@ class SettingsHandler:
         # Update values with defaults if not already set
         if not existing_venv_name:
             existing_venv_name = ".venv"
-        if not existing_root_dir:
-            existing_root_dir = self.root_dir
         if not existing_main_script:
             existing_main_script = "__main__.py"
+        # NOTE: Leave the root dir as is, let the batch file handle it
+        # if not existing_root_dir:
+        #     existing_root_dir = self.root_dir
 
         # Create Batch File for CLIHandler with extracted values
         if existing_version != self.app_version:

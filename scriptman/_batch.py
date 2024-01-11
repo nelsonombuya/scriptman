@@ -1,6 +1,6 @@
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPTMAN [0.0.0.50]
+:: SCRIPTMAN [0.0.0.51]
 :: -----------------------------------------------------------------------------
 :: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
 :: more.
@@ -43,7 +43,7 @@ set "DEBUG=False"
 set "FORCE=False"
 set "CUSTOM=False"
 set "DISABLE_LOGGING=False"
-if !ROOT_DIR! == "" set "ROOT_DIR=%~dp0"
+if "!ROOT_DIR!" == "" set "ROOT_DIR=%~dp0"
 
 :process_args
 for %%A in (%*) do (

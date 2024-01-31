@@ -1,6 +1,6 @@
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPTMAN [0.0.0.51]
+:: SCRIPTMAN [0.0.0.53]
 :: -----------------------------------------------------------------------------
 :: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
 :: more.
@@ -145,9 +145,13 @@ if not "!VENV_NAME!" == "" (
     echo.
 )
 
-if "!QUICK!" == "" (
+if "!QUICK!" == "False" (
     echo Updating Files...
     git pull
+    echo.
+
+    echo Installing Dependencies...
+    pip install -r requirements.txt
     echo.
 )
 

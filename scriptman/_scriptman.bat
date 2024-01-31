@@ -145,9 +145,13 @@ if not "!VENV_NAME!" == "" (
     echo.
 )
 
-if "!QUICK!" == "" (
+if "!QUICK!" == "False" (
     echo Updating Files...
     git pull
+    echo.
+
+    echo Installing Dependencies...
+    pip install -r requirements.txt
     echo.
 )
 

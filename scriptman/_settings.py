@@ -253,7 +253,7 @@ class SettingsHandler:
         self.log_mode: bool = False
         self.sagerun_code: int = 11
         self.debug_mode: bool = False
-        self.app_version: str = "0.0.0.53"
+        self.app_version: str = "0.0.0.54"
         self.system_maintenance: bool = False
         self.system_maintenance_day: int = 31
         self.maintenance_folders: List[str] = []
@@ -261,7 +261,7 @@ class SettingsHandler:
         self.selenium_optimizations: bool = True
         self.selenium_custom_driver: bool = False
         self.clean_up_logs_after_n_days: int = 30
-        self.selenium_custom_driver_version: int = 116
+        self.selenium_custom_driver_version: int = 121
         self.restart_system_after_maintenance: bool = False
         self.database_connection_strings: Dict[str, str] = {}
         self.ignore_csv_filename_during_maintenance: set = set()

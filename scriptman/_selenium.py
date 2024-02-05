@@ -80,7 +80,7 @@ class Browsers(Enum):
 
 
 AnyBrowser = Union[Chrome, Edge, Firefox]
-BROWSER_QUEUE = [Browsers.CHROME, Browsers.FIREFOX, Browsers.EDGE]
+BROWSER_QUEUE = [Browsers.CHROME, Browsers.EDGE, Browsers.FIREFOX]
 
 
 class InvalidBrowserSelectionError(Exception):

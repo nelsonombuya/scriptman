@@ -135,8 +135,8 @@ if defined SCRIPTS (
 exit /b
 
 :run_script
-echo Setting current directory
-cd /d "%~dp0"
+echo Setting root directory
+cd /d "!ROOT_DIR!"
 echo.
 
 if not "!VENV_NAME!" == "" (

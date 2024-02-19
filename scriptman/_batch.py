@@ -1,6 +1,6 @@
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPTMAN [0.0.0.54]
+:: SCRIPTMAN [0.0.0.55]
 :: -----------------------------------------------------------------------------
 :: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
 :: more.
@@ -135,8 +135,8 @@ if defined SCRIPTS (
 exit /b
 
 :run_script
-echo Setting current directory
-cd /d "%~dp0"
+echo Setting root directory
+cd /d "!ROOT_DIR!"
 echo.
 
 if not "!VENV_NAME!" == "" (

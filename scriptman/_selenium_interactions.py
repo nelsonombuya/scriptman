@@ -240,3 +240,10 @@ class SeleniumInteractionHandler:
             return len(new_files) > 0
 
         WebDriverWait(self._driver, 300, 1).until(is_new_file_added)
+
+    def __del__(self) -> None:
+        """
+        Close the WebDriver instance when the SeleniumInteractionHandler
+        instance is deleted.
+        """
+        self._driver.quit()

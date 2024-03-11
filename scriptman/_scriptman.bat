@@ -1,6 +1,6 @@
 @echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPTMAN [0.0.0.41]
+:: SCRIPTMAN [0.0.0.55]
 :: -----------------------------------------------------------------------------
 :: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
 :: more.

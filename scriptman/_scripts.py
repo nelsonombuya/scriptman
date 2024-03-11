@@ -272,8 +272,12 @@ class ScriptExecutor:
                 self._handle_script_exceptions(self._disable_optimizations)
                 return self.execute(file, directory, True)
             else:
-                self._handle_script_exceptions(self._change_browser)
-                return self.execute(file, directory, True)
+                if SBI.use_queue:
+                    self._handle_script_exceptions(self._change_browser)
+                    return self.execute(file, directory, True)
+                else:
+                    self._handle_script_exceptions(self._log_selenium_failure)
+                    return False, traceback.format_exc()
         except Selenium.InvalidBrowserSelectionError as e:
             self.exception = e
             self._handle_script_exceptions(self._log_selenium_failure)

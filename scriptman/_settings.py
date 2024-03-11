@@ -253,7 +253,7 @@ class SettingsHandler:
         self.log_mode: bool = False
         self.sagerun_code: int = 11
         self.debug_mode: bool = False
-        self.app_version: str = "0.0.0.55"
+        self.app_version: str = "0.0.0.56"
         self.system_maintenance: bool = False
         self.system_maintenance_day: int = 31
         self.maintenance_folders: List[str] = []
@@ -810,6 +810,7 @@ class SeleniumBrowserIndex:
         Initialize default settings for the index.
         """
         self.index: int = 0
+        self.use_queue: bool = False
 
     def get_index(self) -> int:
         """
@@ -840,6 +841,18 @@ class SeleniumBrowserIndex:
         from scriptman._selenium import BROWSER_QUEUE
 
         return len(BROWSER_QUEUE)
+
+    def enable_queue(self) -> None:
+        """
+        Enable the use of the browser queue.
+        """
+        self.use_queue = True
+
+    def disable_queue(self) -> None:
+        """
+        Disable the use of the browser queue.
+        """
+        self.use_queue = False
 
 
 # Singleton Instances

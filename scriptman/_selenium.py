@@ -64,7 +64,7 @@ Properties:
 """
 
 from enum import Enum
-from typing import Union
+from typing import Callable, Union
 
 from scriptman._logs import LogHandler
 from scriptman._selenium_chrome import Chrome
@@ -119,16 +119,18 @@ class SeleniumHandler:
             >>> selenium_handler.wait_for_downloads_to_finish()
             > See `SeleniumInteractionsHandler` for more details.
         """
+        pass
 
-    # FIXME: Uses browser queue when user has selected only one browser
-    # FIXME: Might have conflicts in case of simultaneous runs
-    # edge: Callable[[], Edge] = Edge
-    # chrome: Callable[[], Chrome] = Chrome
-    # firefox: Callable[[], Firefox] = Firefox
+    edge: Callable[[], Edge] = Edge
+    chrome: Callable[[], Chrome] = Chrome
+    firefox: Callable[[], Firefox] = Firefox
 
     @staticmethod
     def any() -> AnyBrowser:
         try:
+            if not SBI.use_queue:
+                SBI.enable_queue()
+
             browser_info = {
                 Browsers.EDGE: (Browsers.EDGE, Edge),
                 Browsers.CHROME: (Browsers.CHROME, Chrome),

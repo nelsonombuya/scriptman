@@ -37,6 +37,7 @@ documentation.
 from glob import glob
 from typing import Optional
 
+import chardet
 import pandas as pd
 
 from scriptman._directories import DirectoryHandler
@@ -64,24 +65,30 @@ class CSVHandler:
         Returns:
             str: The path to the CSV file.
         """
-        csv_file = ""
         csv_directory = csv_directory or DirectoryHandler().downloads_dir
-        for file in glob(f"{csv_directory}/*{csv_file_name}*.csv"):
-            csv_file = file
-        return csv_file
+        files = glob(f"{csv_directory}/*{csv_file_name}*.csv")
+        return files[0] if files else ""
 
     @staticmethod
-    def extract_csv(csv_file_path: str) -> pd.DataFrame:
+    def extract_csv(
+        csv_file_path: str,
+        encoding: Optional[str] = None,
+    ) -> pd.DataFrame:
         """
         Extract data from the CSV file.
 
         Args:
             csv_file_path (str): The path to the CSV file.
+            encoding (str, optional): Encoding of the CSV file.
 
         Returns:
             pd.DataFrame: The extracted data as a pandas.DataFrame.
         """
-        return pd.read_csv(csv_file_path)
+        if not encoding:
+            with open(csv_file_path, "rb") as csv_file:
+                encoding = chardet.detect(csv_file.read())["encoding"]
+
+        return pd.read_csv(csv_file_path, encoding=encoding)
 
     @staticmethod
     def update_csv_entry(

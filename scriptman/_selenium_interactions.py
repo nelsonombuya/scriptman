@@ -192,17 +192,16 @@ class SeleniumInteractionHandler:
         Raises:
             ValueError: If an invalid interaction mode is provided.
         """
-        if mode == SeleniumInteraction.DENY_COOKIES:
-            return self.interact_with_element(
-                mode=SeleniumInteraction.JS_CLICK,
-                xpath=xpath or '//*[@id="tarteaucitronAllDenied2"]',
+        if mode in [
+            SeleniumInteraction.DENY_COOKIES,
+            SeleniumInteraction.ACCEPT_COOKIES,
+        ]:
+            xpath = xpath or (
+                '//*[@id="tarteaucitronAllDenied2"]'
+                if mode == SeleniumInteraction.DENY_COOKIES
+                else '//*[@id="tarteaucitronAllAllowed2"]'
             )
-
-        if mode == SeleniumInteraction.ACCEPT_COOKIES:
-            return self.interact_with_element(
-                mode=SeleniumInteraction.JS_CLICK,
-                xpath=xpath or '//*[@id="tarteaucitronAllAllowed2"]',
-            )
+            mode = SeleniumInteraction.JS_CLICK
 
         wait = WebDriverWait(self._driver, timeout)
         if mode == SeleniumInteraction.WAIT_TILL_INVISIBLE:
@@ -219,27 +218,40 @@ class SeleniumInteractionHandler:
         elif mode == SeleniumInteraction.SEND_KEYS:
             element.send_keys(keys)
         else:
-            raise ValueError(f"Passed Invalid Mode: {mode}")
+            raise ValueError(f"Invalid mode: {mode}")
         time.sleep(1 if Settings.debug_mode else rest)
 
-    def wait_for_downloads_to_finish(self) -> None:
+    def wait_for_downloads_to_finish(
+        self,
+        file_name: Optional[str] = None,
+    ) -> None:
         """
         Wait for all downloads to finish before continuing.
+
+        Args:
+            file_name (optional(str)): The name of the file you want to wait
+                for its download to complete. Defaults to None.
         """
+        download_extensions = (".tmp", ".crdownload")
         directory = self._downloads_directory
         files = os.listdir(directory)
 
         def is_new_file_added(self) -> bool:
             current_files = os.listdir(directory)
             new_files = [
-                file_name
-                for file_name in current_files
-                if file_name not in files
-                and not file_name.endswith((".tmp", ".crdownload"))
+                file
+                for file in current_files
+                if file not in files and not file.endswith(download_extensions)
             ]
             return len(new_files) > 0
 
-        WebDriverWait(self._driver, 300, 1).until(is_new_file_added)
+        def does_file_exist(self) -> bool:
+            return file_name in os.listdir(directory)
+
+        if file_name:
+            WebDriverWait(self._driver, 300, 1).until(does_file_exist)
+        else:
+            WebDriverWait(self._driver, 300, 1).until(is_new_file_added)
 
     def __del__(self) -> None:
         """

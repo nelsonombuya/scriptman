@@ -683,6 +683,39 @@ class SettingsHandler:
         else:
             raise ValueError(f"({day}) is not within the correct range!")
 
+    def clear_lock_files(self, script_name: Optional[str] = None) -> None:
+        """
+        Clear lock files created by the application.
+
+        Args:
+            script_name (Optional[str]): The name of the script to clear the
+                lock file for. If not provided, all lock files will be cleared.
+        """
+        from os import remove
+        from pathlib import Path
+        from os.path import exists
+
+        from scriptman._directories import DirectoryHandler
+
+        # Get Scripts Directory
+        dirs = Path(DirectoryHandler().scripts_dir)
+
+        # Remove the file extension from script_name if it is included
+        if script_name:
+            script_name = script_name.split(".")[0]
+
+        # Remove files ending with .lock extension in the scripts directory
+        for file in dirs.iterdir():
+            if script_name and file.name.startswith(script_name):
+                lock_file = "_".join(list((file.name).split("."))) + ".lock"
+                lock_file = dirs / lock_file
+
+                if lock_file.exists():
+                    remove(lock_file)
+
+            if file.name.endswith(".lock") and exists(file):
+                remove(file)
+
     def upgrade_batch_file(self) -> None:
         """
         Upgrade the batch file (sm.bat) while maintaining existing variable

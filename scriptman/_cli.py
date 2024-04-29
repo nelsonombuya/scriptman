@@ -100,11 +100,9 @@ class CLIHandler:
                 for script in args[self._last_arg :]:
                     if self._is_valid_script_arg(script):
                         Settings.clear_lock_files(script)
-            return
 
         if self.custom:
             self.scripts.extend(args[self._last_arg :])
-            return
 
         for script in args[self._last_arg :]:
             if self._is_valid_script_arg(script):

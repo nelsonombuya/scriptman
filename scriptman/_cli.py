@@ -58,7 +58,9 @@ class CLIHandler:
                 respectively. It should also return None.
         """
         self.script_handler = ScriptsHandler(upon_failure=upon_failure)
+        self.clear_lock_files = False
         self.disable_logging = False
+        self._last_arg: int = 6
         self.custom = False
         self.debug = False
         self.force = False
@@ -77,10 +79,13 @@ class CLIHandler:
         Args:
             args (List[str]): List of command-line arguments.
         """
-        self.debug, self.custom, self.disable_logging, self.force = map(
-            lambda arg: arg.lower() == "true",
-            args[1:5],
-        )
+        (
+            self.debug,
+            self.custom,
+            self.disable_logging,
+            self.force,
+            self.clear_lock_files,
+        ) = map(lambda arg: arg.lower() == "true", args[1 : self._last_arg])
 
         if self.debug:
             Settings.enable_debugging()
@@ -88,11 +93,20 @@ class CLIHandler:
         if self.disable_logging:
             Settings.disable_logging()
 
-        if self.custom:
-            self.scripts.extend(args[5:])
+        if self.clear_lock_files:
+            if not args[self._last_arg :]:
+                Settings.clear_lock_files()
+            else:
+                for script in args[self._last_arg :]:
+                    if self._is_valid_script_arg(script):
+                        Settings.clear_lock_files(script)
             return
 
-        for script in args[5:]:
+        if self.custom:
+            self.scripts.extend(args[self._last_arg :])
+            return
+
+        for script in args[self._last_arg :]:
             if self._is_valid_script_arg(script):
                 self.scripts.append(script)
             else:

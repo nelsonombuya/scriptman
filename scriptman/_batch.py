@@ -1,6 +1,6 @@
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPTMAN [0.0.0.58]
+:: SCRIPTMAN [0.0.0.59]
 :: -----------------------------------------------------------------------------
 :: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
 :: more.
@@ -11,6 +11,7 @@ BATCH_FILE: str = r"""@echo off
 ::                  [-d | --debug]
 ::                  [-f | --force]
 ::                  [-c | --custom]
+::                  [-cl | --clearlock]
 ::                  [-dl | --disable_logging]
 ::
 ::                  [script_file [script_file ...]]
@@ -21,6 +22,7 @@ BATCH_FILE: str = r"""@echo off
 ::   -d, --debug            Enable debugging mode.
 ::   -f, --force            Force the scripts to run even if there's another running instance.
 ::   -c, --custom           Enable custom mode (specify custom script files).
+::   -cl, --clearlock       Clear a specific, or all the lock files.
 ::   -dl, --disable_logging Disable logging.
 ::
 ::   script_file            One or more script files to run.
@@ -42,6 +44,7 @@ set "QUICK=False"
 set "DEBUG=False"
 set "FORCE=False"
 set "CUSTOM=False"
+set "CLEARLOCK=False"
 set "DISABLE_LOGGING=False"
 if "!ROOT_DIR!" == "" set "ROOT_DIR=%~dp0"
 
@@ -103,6 +106,16 @@ if /I "!flag!" == "--debug" (
     exit /b
 )
 
+if /I "!flag!" == "-cl" (
+    set "CLEARLOCK=True"
+    exit /b
+)
+
+if /I "!flag!" == "--clearlock" (
+    set "CLEARLOCK=True"
+    exit /b
+)
+
 if /I "!flag!" == "-dl" (
     set "DISABLE_LOGGING=True"
     exit /b
@@ -156,7 +169,7 @@ if "!QUICK!" == "False" (
 )
 
 echo Running script...
-python "!ROOT_DIR!\!MAIN_SCRIPT!" !DEBUG! !CUSTOM! !DISABLE_LOGGING! !FORCE! !SCRIPTS!
+python "!ROOT_DIR!\!MAIN_SCRIPT!" !DEBUG! !CUSTOM! !DISABLE_LOGGING! !FORCE! !CLEARLOCK! !SCRIPTS!
 echo.
 
 if not "!VENV_NAME!" == "" (
@@ -175,6 +188,7 @@ echo                [-q   ^| --quick]
 echo                [-d   ^| --debug]
 echo                [-f   ^| --force]
 echo                [-c   ^| --custom]
+echo                [-cl  ^| --clearlock]
 echo                [-dl  ^| --disable_logging]
 echo.
 echo                [script_file [script_file ...]]
@@ -185,6 +199,7 @@ echo    -q, --quick             Enable quick mode (skips updates and installatio
 echo    -d, --debug             Enable debugging mode.
 echo    -f, --force             Force the scripts to run even if there's another running instance.
 echo    -c, --custom            Enable custom mode (specify custom script files).
+echo    -cl, --clearlock        Clear a specific, or all the lock files.
 echo    -dl, --disable_logging  Disable logging.
 echo.
 echo    script_file              One or more script files to run.

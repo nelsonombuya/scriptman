@@ -35,7 +35,7 @@ documentation.
 """
 
 from glob import glob
-from typing import Optional
+from typing import List, Optional, Union
 
 import chardet
 import pandas as pd
@@ -103,7 +103,7 @@ class CSVHandler:
         Update a CSV entry.
 
         Args:
-            index: Index of the CSV entry.
+            index (any): Index of the CSV entry.
             prop (str): Property to update (e.g., "Status").
             csv_file_path (str): Path to the CSV file.
             csv_data (pd.DataFrame): DataFrame containing CSV data.
@@ -119,7 +119,7 @@ class CSVHandler:
 
     @staticmethod
     def save_to_csv(
-        data: list | pd.DataFrame,
+        data: Union[List[dict], pd.DataFrame],
         csv_file_name: str,
         csv_directory: Optional[str] = None,
     ) -> str:
@@ -127,16 +127,20 @@ class CSVHandler:
         Save data to a CSV file.
 
         Args:
-            data (list | pandas.DataFrame): Data to save to the CSV.
+            data (Union[List[dict], pd.DataFrame]): Data to save to the CSV.
             csv_file_name (str): Name of the CSV file.
-            csv_directory (str (optional)): The location to save the csv to.
-                Defaults to the environment variable [DOWNLOADS_DIRECTORY]
+            csv_directory (str, optional): The location to save the CSV file.
+                Defaults to the environment variable DOWNLOADS_DIRECTORY.
 
         Returns:
-            str: The created csv file's path.
+            str: The path to the created CSV file.
         """
         csv_directory = csv_directory or DirectoryHandler().downloads_dir
         data = pd.DataFrame(data) if isinstance(data, list) else data
         csv_file_path = rf"{csv_directory}\{csv_file_name}.csv"
         data.to_csv(csv_file_path, index=False)
         return csv_file_path
+
+
+# Exports
+__all__ = ["CSVHandler"]

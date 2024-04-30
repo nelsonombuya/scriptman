@@ -66,7 +66,7 @@ import os
 import re
 import time
 import traceback
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 import selenium.common.exceptions as sce
 
@@ -190,7 +190,7 @@ class ScriptsHandler:
         )
 
         if not success:
-            self.upon_failure(log_handler.title, stacktrace)
+            self.upon_failure(log_handler._title, stacktrace)
 
         log_handler.stop()
 
@@ -217,7 +217,7 @@ class ScriptExecutor:
         file: str,
         directory: str,
         force: bool = False,
-    ) -> tuple[bool, str]:
+    ) -> Tuple[bool, str]:
         """
         Execute a Python script.
 
@@ -228,8 +228,8 @@ class ScriptExecutor:
                 instance. Defaults to False.
 
         Returns:
-            bool, str: True if executed successfully, False otherwise with the
-                stacktrace.
+            Tuple[bool, str]: True if executed successfully, False otherwise
+                with the stacktrace.
         """
         self.exception = None
         self.file = os.path.join(directory, file)
@@ -254,7 +254,7 @@ class ScriptExecutor:
                 open(self.lock_file, "w").close()
 
             exec(script_content, globals())
-            message = f"{self.script_log.title} Script ran successfully"
+            message = f"{self.script_log._title} Script ran successfully"
             message += " after recovery." if self.recovery_mode else "!"
             self.script_log.message(message)
             return True, message
@@ -331,7 +331,7 @@ class ScriptExecutor:
         Logs a failure in a Selenium operation that cannot be recovered.
         """
         self.script_log.message(
-            f"{self.script_log.title} failed due to a Web Page Issue.",
+            f"{self.script_log._title} failed due to a Web Page Issue.",
             level=LogLevel.ERROR,
             details={
                 "error": str(self.exception),

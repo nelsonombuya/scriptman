@@ -54,35 +54,36 @@ For detailed documentation, examples, and advanced usage, please refer to the
 """
 
 import atexit
-from typing import List
 
-from scriptman._cli import CLIHandler
-from scriptman._csv import CSVHandler
-from scriptman._database import DatabaseHandler
-from scriptman._directories import DirectoryHandler
-from scriptman._etl import ETLHandler
-from scriptman._logs import LogHandler, LogLevel
-from scriptman._maintenance import MaintenanceHandler
-from scriptman._scripts import ScriptsHandler
-from scriptman._selenium import SeleniumHandler
-from scriptman._selenium_interactions import SeleniumInteraction
-from scriptman._settings import Settings
+# Import all relevant modules
+from . import (
+    _cli,
+    _csv,
+    _database,
+    _directories,
+    _etl,
+    _logs,
+    _maintenance,
+    _scripts,
+    _selenium,
+    _selenium_interactions,
+    _settings,
+)
+
+# Define __all__ for the package
+__all__: list[str] = [
+    *_cli.__all__,
+    *_csv.__all__,
+    *_database.__all__,
+    *_directories.__all__,
+    *_etl.__all__,
+    *_logs.__all__,
+    *_maintenance.__all__,
+    *_scripts.__all__,
+    *_selenium.__all__,
+    *_selenium_interactions.__all__,
+    *_settings.__all__,
+]  # type: ignore # Ignores list concatenation error for __all__
 
 # Register MaintenanceHandler to run cleanup tasks at program exit
-atexit.register(MaintenanceHandler)
-
-# Exposes relevant classes
-__all__: List[str] = [
-    "CLIHandler",
-    "CSVHandler",
-    "DatabaseHandler",
-    "DirectoryHandler",
-    "ETLHandler",
-    "LogHandler",
-    "LogLevel",
-    "MaintenanceHandler",
-    "ScriptsHandler",
-    "SeleniumHandler",
-    "SeleniumInteraction",
-    "Settings",
-]
+atexit.register(_maintenance.MaintenanceHandler)

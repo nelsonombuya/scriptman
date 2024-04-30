@@ -1,3 +1,40 @@
+"""
+ScriptMan - A Python Package for Script Management
+
+ScriptMan is a comprehensive Python package that offers a wide range of tools
+and utilities for efficiently managing Python scripts. Whether you're dealing
+with data processing, databases, command-line interfaces, web automation, or
+simply need better organization for your scripts, ScriptMan provides the
+solutions you need.
+
+This module contains the batch file content for ScriptMan.
+
+"""
+
+
+def get_batch_file_content() -> str:
+    """
+    Function to return the content of the batch file as a string.
+
+    Returns:
+        str: Content of the batch file.
+    """
+    import os
+
+    # Get the directory of the current script (_batch.py)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Construct the path to the _scriptman.bat file
+    bat_file_path = os.path.join(current_dir, "_scriptman.bat")
+
+    # Read the content of the batch file
+    with open(bat_file_path, "r") as file:
+        batch_content = file.read()
+
+    return batch_content
+
+
+# flake8: noqa: E501 # NOTE: Ignore Line Length for this file
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
 :: SCRIPTMAN [0.0.0.59]
@@ -212,3 +249,6 @@ echo      3. ROOT_DIR [Optional]: The root dir of your project. If left blank, w
 echo.
 exit /b
 """
+
+# Exports
+__all__ = ["get_batch_file_content"]

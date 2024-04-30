@@ -57,6 +57,7 @@ import atexit
 
 # Import all relevant modules
 from . import (
+    _batch,
     _cli,
     _csv,
     _database,
@@ -73,6 +74,7 @@ from . import (
 # Define __all__ for the package
 __all__: list[str] = [
     *_cli.__all__,
+    *_batch.__all__,
     *_csv.__all__,
     *_database.__all__,
     *_directories.__all__,

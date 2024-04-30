@@ -36,11 +36,6 @@ from scriptman._settings import Settings
 
 
 class MaintenanceHandler:
-    """
-    MaintenanceHandler manages cleaning and maintenance tasks for the
-    ScriptManager application.
-    """
-
     def __init__(self) -> None:
         """
         Initialize MaintenanceHandler and perform maintenance tasks.
@@ -61,62 +56,59 @@ class MaintenanceHandler:
             self._perform_maintenance_tasks()
         else:
             # NOTE: ScriptMan will clean up logs and CSV files on every run.
-            self.remove_csv_files()
-            self.move_geckodriver_log()
-            self.remove_empty_log_files()
+            self._clean_up()
+
+    def _clean_up(self) -> None:
+        """
+        Clean up logs and CSV files.
+        """
+        self._remove_empty_log_files()
+        self._remove_old_log_files()
+        self._remove_csv_files()
 
     def _perform_maintenance_tasks(self) -> None:
         """
         Perform maintenance tasks.
-
-        Maintenance tasks include:
-        - Removing "__pycache__" folders.
-        - Removing empty and old log files.
-        - Moving geckodriver.log to the logs folder.
-        - Removing downloaded CSV files from the downloads folder.
-        - Running system maintenance scripts (SFC, DISM, Disk Cleanup, Defrag).
         """
-        for folder in Settings.maintenance_folders:
-            self.remove_pycache_folders(folder)
+        folders_to_clean = Settings.maintenance_folders
+        for folder in folders_to_clean:
+            self._remove_pycache_folders(folder)
 
-        self.remove_custom_driver_folder()
-        self.remove_empty_log_files()
-        self.move_geckodriver_log()
-        self.remove_old_log_files()
-        self.remove_csv_files()
-        self.run_system_maintenance()
+        self._remove_custom_driver_folder()
+        self._remove_empty_log_files()
+        self._move_geckodriver_log()
+        self._remove_old_log_files()
+        self._remove_csv_files()
+        self._run_system_maintenance()
 
-    def remove_pycache_folders(self, directory: str) -> None:
+    def _remove_pycache_folders(self, directory: str) -> None:
         """
         Remove "__pycache__" folders from the given directory.
-
-        Args:
-            directory (str): The directory to search for "__pycache__" folders.
         """
-        for dirpath, dirnames, filenames in os.walk(directory):
-            if "__pycache__" in dirnames:
-                dirnames.remove("__pycache__")
-                path = os.path.join(dirpath, "__pycache__")
+        for root, dirs, filenames in os.walk(directory):
+            if "__pycache__" in dirs:
+                dir_path = os.path.join(root, "__pycache__")
                 try:
-                    shutil.rmtree(path)
+                    shutil.rmtree(dir_path)
                     self._log.message(
                         level=LogLevel.DEBUG,
-                        message=f"Deleted {path}",
+                        message=f"Deleted {dir_path}",
                         print_to_terminal=Settings.debug_mode,
                     )
                 except OSError as error:
                     self._log.message(
                         level=LogLevel.ERROR,
                         details={"Error": error},
-                        message=f"Unable to delete {path}.",
+                        message=f"Unable to delete {dir_path}.",
                     )
 
-    def remove_empty_log_files(self) -> None:
+    def _remove_empty_log_files(self) -> None:
         """
         Remove all empty log files in the specified logs directory.
         """
-        if os.path.exists(self._directory_handler.logs_dir):
-            for root, dirs, files in os.walk(self._directory_handler.logs_dir):
+        logs_dir = self._directory_handler.logs_dir
+        if os.path.exists(logs_dir):
+            for root, _, files in os.walk(logs_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
                     if os.path.getsize(file_path) == 0:
@@ -134,23 +126,21 @@ class MaintenanceHandler:
                                 message=f"Unable to delete {file_path}.",
                             )
 
-    def remove_old_log_files(self) -> None:
+    def _remove_old_log_files(self) -> None:
         """
-        Remove log files older than the number of days specified in
-        Settings.clean_up_logs_after_n_days.
+        Remove log files older than the specified number of days.
         """
-        if os.path.exists(self._directory_handler.logs_dir):
+        logs_dir = self._directory_handler.logs_dir
+        if os.path.exists(logs_dir):
             days_ago = datetime.now() - timedelta(
                 days=Settings.clean_up_logs_after_n_days
             )
-
-            for root, dirs, files in os.walk(self._directory_handler.logs_dir):
+            for root, _, files in os.walk(logs_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
                     file_creation_time = datetime.fromtimestamp(
                         os.path.getctime(file_path)
                     )
-
                     if file_creation_time < days_ago:
                         try:
                             os.remove(file_path)
@@ -166,56 +156,52 @@ class MaintenanceHandler:
                                 message=f"Unable to delete {file_path}.",
                             )
 
-    def remove_custom_driver_folder(self) -> None:
+    def _remove_custom_driver_folder(self) -> None:
         """
         Remove the custom driver folder if it exists and the setting to keep
         downloaded custom drivers is not enabled.
         """
+        selenium_dir = self._directory_handler.selenium_dir
         if (
-            os.path.exists(self._directory_handler.selenium_dir)
+            os.path.exists(selenium_dir)
             and not Settings.selenium_keep_downloaded_custom_driver
         ):
-            shutil.rmtree(self._directory_handler.selenium_dir)
-            self._log.message(
-                level=LogLevel.DEBUG,
-                print_to_terminal=Settings.debug_mode,
-                message=f"Deleted {self._directory_handler.selenium_dir}",
-            )
+            try:
+                shutil.rmtree(selenium_dir)
+                self._log.message(
+                    level=LogLevel.DEBUG,
+                    print_to_terminal=Settings.debug_mode,
+                    message=f"Deleted {selenium_dir}",
+                )
+            except OSError as error:
+                self._log.message(
+                    level=LogLevel.ERROR,
+                    details={"Error": error},
+                    message=f"Unable to delete {selenium_dir}.",
+                )
 
-    def remove_csv_files(self):
+    def _remove_csv_files(self) -> None:
         """
-        Remove CSV files from the downloads directory. Also, ignore csvs with
-        filenames contained in Settings.ignore_csv_filename_during_maintenance.
+        Remove CSV files from the downloads directory.
         """
+        downloads_dir = self._directory_handler.downloads_dir
         try:
-            files = os.listdir(self._directory_handler.downloads_dir)
-            for file in files:
+            for file in os.listdir(downloads_dir):
                 if file.endswith(".csv"):
-                    skip_file = False
-
-                    for n in Settings.ignore_csv_filename_during_maintenance:
-                        if n.lower() in file.lower():
-                            self._log.message(f"Skipped deleting {file}")
-                            skip_file = True
-                            break
-
-                    if not skip_file:
-                        file_path = os.path.join(
-                            self._directory_handler.downloads_dir, file
-                        )
-                        os.remove(file_path)
-                        self._log.message(
-                            level=LogLevel.DEBUG,
-                            message=f"Removed {file}",
-                            print_to_terminal=Settings.debug_mode,
-                        )
-        except Exception as e:
+                    file_path = os.path.join(downloads_dir, file)
+                    os.remove(file_path)
+                    self._log.message(
+                        level=LogLevel.DEBUG,
+                        message=f"Removed {file}",
+                        print_to_terminal=Settings.debug_mode,
+                    )
+        except Exception as error:
             self._log.message(
                 level=LogLevel.ERROR,
-                message=f"An error occurred when deleting csv files: {e}",
+                message=f"An error occurred when deleting CSV files: {error}",
             )
 
-    def run_system_maintenance(self):
+    def _run_system_maintenance(self) -> None:
         """
         Run system maintenance tasks including SFC System Scan & Repair, DISM
         System Scan & Repair, Disk Cleanup, Disk Defragmentation, and
@@ -242,38 +228,38 @@ class MaintenanceHandler:
             system's PATH.
         """
         try:
-            # SFC System Scan & Repair
-            subprocess.run(["sfc", "/scannow"])
-
-            # DISM System Scan & Repair
-            subprocess.run(
+            commands = [
+                # SFC System Scan & Repair
+                ["sfc", "/scannow"],
+                # DISM System Scan & Repair
                 [
                     "dism",
                     "/cleanup-image",
                     "/online",
                     "/restorehealth",
-                ]
-            )
-
-            # Disk Cleanup
-            subprocess.run(["cleanmgr", f"/sagerun:{Settings.sagerun_code}"])
-
-            # Disc Defrag
-            subprocess.run(["defrag", "/C"])
-
-            # Restart System upon completion (if enabled)
+                ],
+                # Disk Cleanup
+                [
+                    "cleanmgr",
+                    f"/sagerun:{Settings.sagerun_code}",
+                ],
+                # Disc Defragmentation
+                ["defrag", "/C"],
+            ]
+            for command in commands:
+                subprocess.run(command)
             if Settings.restart_system_after_maintenance:
                 subprocess.run(["shutdown", "/r", "/t", "300"])
         except OSError as error:
             self._log.message(
                 level=LogLevel.ERROR,
-                details={"error": error},
-                message="An error occurred while running system maintenance",
+                details={"Error": error},
+                message="An error occurred while running system maintenance.",
             )
 
-    def move_geckodriver_log(self) -> None:
+    def _move_geckodriver_log(self) -> None:
         """
-        Move the geckodriver.log file from app_dir to the logs_dir.
+        Move the geckodriver.log file to the logs directory.
         """
         logs_dir = self._directory_handler.logs_dir
         root_dir = self._directory_handler.root_dir
@@ -286,7 +272,6 @@ class MaintenanceHandler:
                 timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
                 filename = f"GECKODRIVER - {timestamp}.log"
                 destination_path = os.path.join(logs_dir, filename)
-
                 shutil.move(geckodriver_log_path, destination_path)
                 self._log.message(
                     level=LogLevel.DEBUG,
@@ -310,34 +295,29 @@ class MaintenanceHandler:
         """
         Verifies if the system maintenance date is today or within the valid
         range.
-
-        This method calculates the maximum day for the target month, accounting
-        for leap years, and determines if the system maintenance date is today
-        or within the valid range.
-
-        Returns:
-            bool: True if the system maintenance date is today or within the
-            valid range, False otherwise.
         """
         current_date = datetime.today()
-
-        if current_date.month == 2:  # February
-            if current_date.year % 4 == 0 and (
-                current_date.year % 100 != 0 or current_date.year % 400 == 0
-            ):
-                max_day = 29  # Leap year
-            else:
-                max_day = 28  # Non-leap year
-        elif current_date.month in [4, 6, 9, 11]:  # Months with 30 days
-            max_day = 30
-        else:
-            max_day = 31  # All other months
-
-        # Check if the set system maintenance date is within the valid range
+        max_day = self._get_max_day(current_date.month, current_date.year)
         run_date = (
             Settings.system_maintenance_day
             if Settings.system_maintenance_day <= max_day
             else max_day
         )
-
         return run_date == current_date.day
+
+    @staticmethod
+    def _get_max_day(month: int, year: int) -> int:
+        """
+        Returns the maximum number of days in the given month and year.
+        """
+        if month == 2:  # February
+            if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0):
+                return 29  # Leap year
+            return 28  # Non-leap year
+        if month in [4, 6, 9, 11]:  # Months with 30 days
+            return 30
+        return 31  # All other months
+
+
+# Exports
+__all__ = ["MaintenanceHandler"]

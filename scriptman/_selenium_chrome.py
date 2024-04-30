@@ -50,10 +50,6 @@ class ChromeApp:
 class Chrome(SeleniumInteractionHandler):
     """
     Chrome manages the creation of Chrome Selenium WebDriver instances.
-
-    Attributes:
-        driver (webdriver.Chrome): The Chrome WebDriver instance.
-        _downloads_directory (str): The directory path for downloads.
     """
 
     def __init__(self) -> None:
@@ -138,10 +134,6 @@ class ChromeDownloadHandler:
     """
     ChromeDownloadHandler is responsible for downloading and managing the
     Chrome Browser and Driver.
-
-    Attributes:
-        _log (LogHandler): The log handler instance for logging.
-        _downloads_dir (str): The directory path for downloads.
     """
 
     def __init__(self) -> None:
@@ -269,11 +261,15 @@ class ChromeDownloadHandler:
         filename = (
             "chromedriver.exe"
             if os.name == "nt" and app == "chromedriver"
-            else "chromedriver"
-            if app == "chromedriver"
-            else "chrome"
-            if not os.name == "nt" and app == "chrome"
-            else "chrome.exe"
+            else (
+                "chromedriver"
+                if app == "chromedriver"
+                else (
+                    "chrome"
+                    if not os.name == "nt" and app == "chrome"
+                    else "chrome.exe"
+                )
+            )
         )
         path = os.path.join(
             self._selenium_dir,

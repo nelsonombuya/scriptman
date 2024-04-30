@@ -27,6 +27,7 @@ For detailed documentation and examples, please refer to the package
 documentation.
 """
 
+import sys
 from typing import Callable, List, Optional
 
 from scriptman._scripts import ScriptsHandler
@@ -37,88 +38,90 @@ class CLIHandler:
     """
     Command Line Interface Handler for managing and running scripts.
 
+    This class parses command-line arguments and executes scripts accordingly.
+
     Args:
         args (List[str]): List of command-line arguments.
+        upon_failure (Optional[Callable[[str, str], None]]): A function to
+            call upon script execution failure. It should take 2 string
+            arguments, where it will receive the script name and stacktrace
+            respectively. It should also return None.
     """
 
     def __init__(
         self,
-        args: List[str],
+        args: List[str] = sys.argv,
         upon_failure: Optional[Callable[[str, str], None]] = None,
-    ):
+    ) -> None:
         """
-        Initialize the CLIHandler and execute scripts based on the provided
-        command-line arguments.
+        Initialize the CLIHandler.
 
         Args:
             args (List[str]): List of command-line arguments.
-            upon_failure (callable([str, str], None), optional): A function to
+            upon_failure (Optional[Callable[[str, str], None]]): A function to
                 call upon script execution failure. It should take 2 string
                 arguments, where it will receive the script name and stacktrace
                 respectively. It should also return None.
         """
         self.script_handler = ScriptsHandler(upon_failure=upon_failure)
-        self.clear_lock_files = False
-        self.disable_logging = False
-        self._last_arg: int = 6
-        self.custom = False
-        self.debug = False
-        self.force = False
-        self.scripts = []
         self._parse_args(args)
 
-        if self.custom:
-            self.script_handler.run_custom_scripts(self.scripts, self.force)
+    def _get_last_arg(self) -> int:
+        """
+        Get the index of the last argument in the command-line arguments.
+
+        Returns:
+            int: Index of the last argument.
+        """
+        for i, arg in enumerate(sys.argv):
+            if arg.lower() not in ("true", "false"):
+                return i
         else:
-            self.script_handler.run_scripts(self.scripts, self.force)
+            return -1
 
     def _parse_args(self, args: List[str]) -> None:
         """
-        Parse command-line arguments and configure script execution settings.
+        Parse command-line arguments and execute scripts accordingly.
 
         Args:
             args (List[str]): List of command-line arguments.
         """
+        debug = False
+        custom = False
+        disable_logging = False
+        force = False
+        clear_lock_files = False
+        last_arg = self._get_last_arg()
+
         (
             self.debug,
             self.custom,
             self.disable_logging,
             self.force,
             self.clear_lock_files,
-        ) = map(lambda arg: arg.lower() == "true", args[1 : self._last_arg])
+        ) = map(lambda arg: arg.lower() == "true", args[1:last_arg])
 
-        if self.debug:
+        if debug:
             Settings.enable_debugging()
 
-        if self.disable_logging:
+        if disable_logging:
             Settings.disable_logging()
 
-        if self.clear_lock_files:
-            if not args[self._last_arg :]:
-                Settings.clear_lock_files()
-            else:
-                for script in args[self._last_arg :]:
-                    if self._is_valid_script_arg(script):
+        if clear_lock_files:
+            if args[last_arg:]:
+                for script in args[last_arg:]:
+                    if script in self.script_handler.get_scripts():
                         Settings.clear_lock_files(script)
-
-        if self.custom:
-            self.scripts.extend(args[self._last_arg :])
-
-        for script in args[self._last_arg :]:
-            if self._is_valid_script_arg(script):
-                self.scripts.append(script)
+                    else:
+                        raise ValueError(f"Script '{script}' not found.")
             else:
-                raise ValueError(f"'{script}' not found in scripts folder")
+                Settings.clear_lock_files()
 
-    def _is_valid_script_arg(self, arg: str) -> bool:
-        """
-        Check if the argument corresponds to a valid script filename.
+        if custom:
+            self.script_handler.run_custom_scripts(args[last_arg:], force)
+        else:
+            self.script_handler.run_scripts(args[last_arg:], force)
 
-        Args:
-            arg (str): Argument to be checked.
 
-        Returns:
-            bool: True if the argument is a valid script filename,
-                False otherwise.
-        """
-        return any(arg in name for name in self.script_handler.get_scripts())
+# Exports
+__all__ = ["CLIHandler"]

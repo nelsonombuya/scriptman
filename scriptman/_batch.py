@@ -251,4 +251,4 @@ exit /b
 """
 
 # Exports
-__all__ = ["get_batch_file_content"]
+__all__ = ["get_batch_file_content", "BATCH_FILE"]

@@ -64,7 +64,7 @@ documentation.
 """
 
 import re
-from typing import List, Union
+from typing import List, Optional, Tuple, Union
 
 import pyodbc
 
@@ -87,11 +87,11 @@ class DatabaseHandler:
             db_connection_string (str): The connection string for the database.
         """
         self._log = LogHandler(self._extract_db_name(db_connection_string))
+        self._connection: Optional[pyodbc.Connection] = None
         self._db_connection_string = db_connection_string
-        self._connection = None
         self.connect()
 
-    def connect(self):
+    def connect(self) -> None:
         """
         Connects to the database using the connection string provided.
         """
@@ -108,7 +108,7 @@ class DatabaseHandler:
                 },
             )
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """
         Closes the database connection if there was a connection.
         """
@@ -119,19 +119,20 @@ class DatabaseHandler:
     def execute_read_query(
         self,
         query: str,
-        params: tuple = (),
-    ) -> Union[List[pyodbc.Row], List[tuple]]:
+        params: Tuple = (),
+    ) -> Union[List[pyodbc.Row], List[Tuple]]:
         """
         Executes the given SQL query with optional parameters and returns the
         results as a list of tuples.
 
         Args:
             query (str): The SQL query to execute.
-            params (tuple, optional): The parameters for the query.
+            params (Tuple, optional): The parameters for the query.
                 Defaults to ().
 
         Returns:
-            List[pyodbc.Row]: The results of the query as a list of tuples.
+            Union[List[pyodbc.Row], List[Tuple]]: The results of the query as
+                a list of tuples.
         """
         if self._connection is None:
             return []
@@ -337,6 +338,14 @@ class DatabaseHandler:
         finally:
             cursor.close()
 
+    def __del__(self) -> None:
+        """
+        Destructor to disconnect from the database when the instance is
+        destroyed.
+        """
+        self.disconnect()
+
+    # Helper methods
     def _extract_table_name(self, query: str) -> str:
         """
         Extracts the name of the table from the given SQL query.
@@ -366,9 +375,6 @@ class DatabaseHandler:
         match = re.search(r"Database=([^;]+)", connection_string)
         return match.group(1) if match else "Database Handler"
 
-    def __del__(self) -> None:
-        """
-        Destructor to disconnect from the database when the instance is
-        destroyed.
-        """
-        self.disconnect()
+
+# Exports
+__all__ = ["DatabaseHandler"]

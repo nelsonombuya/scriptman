@@ -53,39 +53,29 @@ For detailed documentation, examples, and advanced usage, please refer to the
 (https://github.com/nelsonombuya/scriptman/blob/main/docs/README.md).
 """
 
+# Import Supporting Modules
 import atexit
 
 # Import all relevant modules
-from . import (
-    _batch,
-    _cli,
-    _csv,
-    _database,
-    _directories,
-    _etl,
-    _logs,
-    _maintenance,
-    _scripts,
-    _selenium,
-    _selenium_interactions,
-    _settings,
-)
+from scriptman._cli import CLIHandler
+from scriptman._csv import CSVHandler
+from scriptman._database import DatabaseHandler
+from scriptman._directories import DirectoryHandler
+from scriptman._etl import ETLHandler
+from scriptman._logs import LogHandler, LogLevel
+from scriptman._maintenance import MaintenanceHandler
 
-# Define __all__ for the package
+# Define the available objects for the package
 __all__: list[str] = [
-    *_cli.__all__,
-    *_batch.__all__,
-    *_csv.__all__,
-    *_database.__all__,
-    *_directories.__all__,
-    *_etl.__all__,
-    *_logs.__all__,
-    *_maintenance.__all__,
-    *_scripts.__all__,
-    *_selenium.__all__,
-    *_selenium_interactions.__all__,
-    *_settings.__all__,
-]  # type: ignore # Ignores list concatenation error for __all__
+    "CLIHandler",
+    "CSVHandler",
+    "DatabaseHandler",
+    "DirectoryHandler",
+    "ETLHandler",
+    "LogHandler",
+    "LogLevel",
+    "MaintenanceHandler",
+]
 
 # Register MaintenanceHandler to run cleanup tasks at program exit
-atexit.register(_maintenance.MaintenanceHandler)
+atexit.register(MaintenanceHandler)

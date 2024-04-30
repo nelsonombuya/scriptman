@@ -140,7 +140,3 @@ class CSVHandler:
         csv_file_path = rf"{csv_directory}\{csv_file_name}.csv"
         data.to_csv(csv_file_path, index=False)
         return csv_file_path
-
-
-# Exports
-__all__ = ["CSVHandler"]

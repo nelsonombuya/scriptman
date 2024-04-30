@@ -70,8 +70,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from ._directories import DirectoryHandler
-from ._settings import Settings
+from scriptman._directories import DirectoryHandler
+from scriptman._settings import Settings
 
 
 class LogLevel(Enum):
@@ -248,7 +248,3 @@ class LogHandler:
             formatted_time += string
 
         return f"{formatted_time}."
-
-
-# Exports
-__all__ = ["LogHandler", "LogLevel"]

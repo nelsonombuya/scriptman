@@ -65,7 +65,6 @@ from tqdm import tqdm
 from scriptman._csv import CSVHandler
 from scriptman._database import DatabaseHandler
 from scriptman._logs import LogHandler, LogLevel
-from scriptman._settings import Settings
 
 
 class ETLHandler:
@@ -724,7 +723,3 @@ class ETLHandler:
                 self._log.message(str(self._data), LogLevel.INFO)
         else:
             self._log.message("No records were extracted.", LogLevel.WARN)
-
-
-# Exports
-__all__ = ["ETLHandler"]

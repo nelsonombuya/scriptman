@@ -317,7 +317,3 @@ class MaintenanceHandler:
         if month in [4, 6, 9, 11]:  # Months with 30 days
             return 30
         return 31  # All other months
-
-
-# Exports
-__all__ = ["MaintenanceHandler"]

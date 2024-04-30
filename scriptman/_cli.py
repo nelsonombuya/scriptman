@@ -121,7 +121,3 @@ class CLIHandler:
             self.script_handler.run_custom_scripts(args[last_arg:], force)
         else:
             self.script_handler.run_scripts(args[last_arg:], force)
-
-
-# Exports
-__all__ = ["CLIHandler"]

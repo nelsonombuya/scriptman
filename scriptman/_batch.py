@@ -249,6 +249,3 @@ echo      3. ROOT_DIR [Optional]: The root dir of your project. If left blank, w
 echo.
 exit /b
 """
-
-# Exports
-__all__ = ["get_batch_file_content", "BATCH_FILE"]

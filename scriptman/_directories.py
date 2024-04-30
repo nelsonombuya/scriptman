@@ -283,7 +283,3 @@ class DirectoryHandler:
             str: JSON representation of the directories.
         """
         return json.dumps(self.directories, indent=4)
-
-
-# Exports
-__all__ = ["DirectoryHandler"]

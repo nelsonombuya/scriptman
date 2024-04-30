@@ -374,7 +374,3 @@ class DatabaseHandler:
         """
         match = re.search(r"Database=([^;]+)", connection_string)
         return match.group(1) if match else "Database Handler"
-
-
-# Exports
-__all__ = ["DatabaseHandler"]

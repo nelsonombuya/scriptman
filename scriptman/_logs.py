@@ -70,8 +70,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from scriptman._directories import DirectoryHandler
-from scriptman._settings import Settings
+from ._directories import DirectoryHandler
+from ._settings import Settings
 
 
 class LogLevel(Enum):
@@ -94,7 +94,7 @@ class LogHandler:
         description: Optional[str] = None,
     ) -> None:
         """
-        Initialize a LogHandler instance.
+        Initializes a LogHandler instance.
 
         Args:
             name (str): The name for the log.
@@ -106,29 +106,22 @@ class LogHandler:
             description (str, optional): The description for the log.
                 Defaults to None.
         """
-        self.level: LogLevel = level
-        self.name: str = self._format_name(name, module)
-        self.title: str = name.title().replace("_", " ")
-        self.logs_dir: str = DirectoryHandler().logs_dir
-        self.description: str = description or self.title
-        self.file: Optional[str] = self._get_log_file(filename)
-        self._configure_logging()
+        self._level_map = {
+            LogLevel.WARN: logging.WARN,
+            LogLevel.INFO: logging.INFO,
+            LogLevel.ERROR: logging.ERROR,
+            LogLevel.FATAL: logging.FATAL,
+            LogLevel.DEBUG: logging.DEBUG,
+            LogLevel.CRITICAL: logging.CRITICAL,
+        }
 
-    def _format_name(self, name: str, module: Optional[str] = None) -> str:
-        """
-        Formats the log name with optional module.
-
-        Args:
-            name (str): The name for the log.
-            module (str, optional): The module name for the log.
-                Defaults to None.
-
-        Return:
-            (str): The formatted name of the log; which will be indicated in
-                the beginning of every log line.
-        """
-        name = name.upper().replace(" ", "_")
-        return f"[{module.upper()}] {name}" if module else name
+        self._name = name.upper().replace(" ", "_")
+        self._module = module.upper() if module else None
+        self._title = name.title().replace("_", " ")
+        self._logs_dir = DirectoryHandler().logs_dir
+        self._description = description or self._title
+        self._file = self._get_log_file(filename)
+        self._configure_logging(level)
 
     def _get_log_file(self, filename: str) -> Optional[str]:
         """
@@ -144,15 +137,15 @@ class LogHandler:
         if not Settings.log_mode:
             return None
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        return rf"{self.logs_dir}\{filename} - {timestamp}.log"
+        return rf"{self._logs_dir}\{filename} - {timestamp}.log"
 
-    def _configure_logging(self) -> None:
+    def _configure_logging(self, level: LogLevel) -> None:
         """
         Configures logging to a file.
         """
         logging.basicConfig(
-            filename=self.file,
-            level=self._get_log_level(self.level),
+            filename=self._file,
+            level=self._get_log_level(level),
             format="%(asctime)s %(levelname)s:%(message)s",
         )
 
@@ -168,30 +161,25 @@ class LogHandler:
                 logging.DEBUG if the Settings.debug_mode flag is True, else
                 logging.INFO if the specified level is not found.
         """
-        return {
-            LogLevel.WARN: logging.WARN,
-            LogLevel.INFO: logging.INFO,
-            LogLevel.ERROR: logging.ERROR,
-            LogLevel.FATAL: logging.FATAL,
-            LogLevel.DEBUG: logging.DEBUG,
-            LogLevel.CRITICAL: logging.CRITICAL,
-        }.get(level, logging.DEBUG if Settings.debug_mode else logging.INFO)
+        return self._level_map.get(
+            level, logging.DEBUG if Settings.debug_mode else logging.INFO
+        )
 
     def start(self) -> None:
         """
         Record the start time of an operation and log a start message.
         """
-        self.start_time = time.time()
-        self.message(f"{self.title} started.")
+        self._start_time = time.time()
+        self.message(f"{self._title} started.")
 
     def stop(self) -> None:
         """
         Stop and record the end time of an operation, log an end message, and
         calculate the duration.
         """
-        self.end_time = time.time()
-        time_taken = self.format_time(int(self.end_time - self.start_time))
-        self.message(f"{self.title} finished in {time_taken}")
+        self._end_time = time.time()
+        time_taken = self.format_time(int(self._end_time - self._start_time))
+        self.message(f"{self._title} finished in {time_taken}")
 
     def message(
         self,
@@ -211,29 +199,22 @@ class LogHandler:
             print_to_terminal (bool): Whether to print the message to the
                 terminal.
         """
-        message = f"[{self.name}] {message}"
-        message += (
+        formatted_message = f"[{self._name}] {message}"
+        formatted_message += (
             "\n\t" + ("\n\t".join([f"{k}: {v}" for k, v in details.items()]))
             if details
             else ""
         )
 
         if Settings.log_mode:
-            {
-                LogLevel.INFO: logging.info,
-                LogLevel.DEBUG: logging.debug,
-                LogLevel.ERROR: logging.error,
-                LogLevel.FATAL: logging.fatal,
-                LogLevel.WARN: logging.warning,
-                LogLevel.CRITICAL: logging.critical,
-                LogLevel.EXCEPTION: logging.exception,
-            }.get(level, logging.info)(message)
+            logging.log(self._get_log_level(level), formatted_message)
 
         if print_to_terminal and Settings.print_logs_to_terminal:
             timestamp = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-            print(f"{timestamp} [{level.value}] {message}")
+            print(f"{timestamp} [{level.value}] {formatted_message}")
 
-    def format_time(self, seconds: int) -> str:
+    @staticmethod
+    def format_time(seconds: int) -> str:
         """
         Returns the seconds as an Hour, Minute, Second formatted string.
 
@@ -267,3 +248,7 @@ class LogHandler:
             formatted_time += string
 
         return f"{formatted_time}."
+
+
+# Exports
+__all__ = ["LogHandler", "LogLevel"]

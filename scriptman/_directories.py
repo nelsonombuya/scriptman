@@ -63,8 +63,8 @@ from scriptman._settings import Settings
 
 class DirectoryHandler:
     """
-    DirectoryHandler handles the creation and management of directories for a
-    ScriptManager setup.
+    Manages directory creation and management for the ScriptManager
+    application.
 
     Attributes:
         APP_DIR (str): The key for the app directory in the directories
@@ -87,18 +87,6 @@ class DirectoryHandler:
             directories dictionary.
         DEFAULT_DIRECTORIES (List[str]): A list of default directory names to
             be created.
-
-    Methods:
-        __init__(): Initializes a DirectoryHandler instance and creates the
-            default directories.
-        create_and_set_directories(): Creates and sets the default directories.
-        create_directory(directory_name: str) -> str: Creates a directory if it
-            does not exist and returns its path.
-        create_selenium_directory() -> str: Creates the 'selenium' directory if
-            it does not exist within the 'downloads' directory and returns its
-            path.
-        __str__() -> str: Returns a JSON representation of the directories
-            dictionary.
     """
 
     APP_DIR = "app"
@@ -159,8 +147,7 @@ class DirectoryHandler:
     @property
     def logs_dir(self) -> str:
         """
-        Get the logs directory for the ScriptManager Package
-        Files.
+        Get the logs directory for the ScriptManager Package Files.
 
         Returns:
             str: The path to the ScriptManager logs directory.
@@ -296,3 +283,7 @@ class DirectoryHandler:
             str: JSON representation of the directories.
         """
         return json.dumps(self.directories, indent=4)
+
+
+# Exports
+__all__ = ["DirectoryHandler"]

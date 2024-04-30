@@ -117,6 +117,7 @@ class ETLHandler:
                 data from nested dictionaries. Defaults to True.
             keys (List[str]): A list of key columns in the main dataset to use
                 as a reference key when extracting any sublist.
+
         Returns:
             pd.DataFrame: The extracted and transformed data as a DataFrame.
         """
@@ -149,6 +150,7 @@ class ETLHandler:
             filename (str): The name of the CSV file.
             directory (optional, str): The directory where the CSV file is
                 located. Defaults to the downloads directory.
+
         Returns:
             pd.DataFrame: The extracted data as a DataFrame.
         """
@@ -244,7 +246,7 @@ class ETLHandler:
         force_nvarchar: bool = False,
         keys: List[str] = [],
         bulk_execute: bool = True,
-        nested_keys: Optional[list[str]] = None,
+        nested_keys: Optional[List[str]] = None,
     ) -> None:
         """
         Load the data into a database table.
@@ -612,6 +614,7 @@ class ETLHandler:
         """
 
         # Append the WHERE NOT EXISTS subquery or VALUES as needed
+        # flake8: noqa: E126 # NOTE: Indentation problems for this section
         if selected_columns:
             insert_query += f"""
             SELECT {', '.join(placeholders)}
@@ -710,9 +713,18 @@ class ETLHandler:
         """
         Logs the number of records after data extraction.
 
-        Also prints the DataFrame if debugging mode is on.
+        Also prints the DataFrame if it's less than 5 rows for easier
+        inspection.
         """
-        self._log.message(f"Extracted {len(self._data)} records.")
+        num_records = len(self._data)
+        if num_records > 0:
+            self._log.message(f"Number of records extracted: {num_records}")
+            if num_records <= 5:
+                self._log.message("Extracted data:", LogLevel.INFO)
+                self._log.message(str(self._data), LogLevel.INFO)
+        else:
+            self._log.message("No records were extracted.", LogLevel.WARN)
 
-        if Settings.debug_mode:
-            print(self._data)
+
+# Exports
+__all__ = ["ETLHandler"]

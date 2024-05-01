@@ -17,7 +17,6 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 pytz==2024.1
 requests==2.31.0
--e git+https://github.com/nelsonombuya/script_manager.git@8c5aa2527da6496f4c2a590cc6acea7c033a125b#egg=scriptman
 selenium==4.20.0
 setuptools==69.5.1
 six==1.16.0

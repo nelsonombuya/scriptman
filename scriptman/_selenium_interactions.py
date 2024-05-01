@@ -216,7 +216,10 @@ class SeleniumInteractionHandler:
         elif mode == SeleniumInteraction.JS_CLICK:
             self._driver.execute_script("arguments[0].click();", element)
         elif mode == SeleniumInteraction.SEND_KEYS:
-            element.send_keys(keys)
+            if keys:
+                element.send_keys(keys)
+            else:
+                raise ValueError("Keys must be provided for SEND_KEYS mode")
         else:
             raise ValueError(f"Invalid mode: {mode}")
         time.sleep(1 if Settings.debug_mode else rest)

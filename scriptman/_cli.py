@@ -73,9 +73,9 @@ class CLIHandler:
         Returns:
             int: Index of the last argument.
         """
-        for i, arg in enumerate(sys.argv):
+        for i, arg in enumerate(sys.argv[1:]):  # sys.argv[0] is the script.
             if arg.lower() not in ("true", "false"):
-                return i
+                return i + 1  # Accounting for how Python indexes lists.
         else:
             return -1
 

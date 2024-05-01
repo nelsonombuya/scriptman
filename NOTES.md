@@ -11,3 +11,4 @@
 - [ ] Todo 3: Implement Method to track start and end times for a call.
 - [ ] Todo 4: Resolve file/folder deletion errors during clean-up.
 - [ ] Todo 5: Command to perform system maintenance without running scripts.
+- [ ] Todo 6: Fix Batch File Update during Publishing.

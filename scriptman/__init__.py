@@ -64,6 +64,10 @@ from scriptman._directories import DirectoryHandler
 from scriptman._etl import ETLHandler
 from scriptman._logs import LogHandler, LogLevel
 from scriptman._maintenance import MaintenanceHandler
+from scriptman._scripts import ScriptsHandler
+from scriptman._selenium import SeleniumHandler
+from scriptman._selenium_interactions import SeleniumInteraction
+from scriptman._settings import SBI, Settings
 
 # Define the available objects for the package
 __all__: list[str] = [
@@ -75,6 +79,11 @@ __all__: list[str] = [
     "LogHandler",
     "LogLevel",
     "MaintenanceHandler",
+    "ScriptsHandler",
+    "SeleniumHandler",
+    "SeleniumInteraction",
+    "Settings",
+    "SBI",
 ]
 
 # Register MaintenanceHandler to run cleanup tasks at program exit

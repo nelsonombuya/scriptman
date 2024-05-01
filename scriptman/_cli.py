@@ -76,8 +76,7 @@ class CLIHandler:
         for i, arg in enumerate(sys.argv[1:]):  # sys.argv[0] is the script.
             if arg.lower() not in ("true", "false"):
                 return i + 1  # Accounting for how Python indexes lists.
-        else:
-            return -1
+        return len(sys.argv)
 
     def _parse_args(self, args: List[str]) -> None:
         """

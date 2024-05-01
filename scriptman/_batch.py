@@ -37,7 +37,7 @@ def get_batch_file_content() -> str:
 # flake8: noqa: E501 # NOTE: Ignore Line Length for this file
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPTMAN [0.0.0.60]
+:: SCRIPTMAN [0.0.0.61]
 :: -----------------------------------------------------------------------------
 :: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
 :: more.

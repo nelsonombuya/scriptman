@@ -213,6 +213,70 @@ class LogHandler:
             timestamp = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
             print(f"{timestamp} [{level.value}] {formatted_message}")
 
+    def info(self, message: str) -> None:
+        """
+        Log an information message.
+
+        Args:
+            message (str): The main message to log.
+        """
+        self.message(message, LogLevel.INFO)
+
+    def warn(self, message: str) -> None:
+        """
+        Log a warning message.
+
+        Args:
+            message (str): The main message to log.
+        """
+        self.message(message, LogLevel.WARN)
+
+    def debug(self, message: str) -> None:
+        """
+        Log a debug message.
+
+        Args:
+            message (str): The main message to log.
+        """
+        self.message(message, LogLevel.DEBUG)
+
+    def error(self, message: str) -> None:
+        """
+        Log an error message.
+
+        Args:
+            message (str): The main message to log.
+        """
+        self.message(message, LogLevel.ERROR)
+
+    def fatal(self, message: str) -> None:
+        """
+        Log a fatal message.
+
+        Args:
+            message (str): The main message to log.
+        """
+        self.message(message, LogLevel.FATAL)
+
+    def critical(self, message: str) -> None:
+        """
+        Log a critical message.
+
+        Args:
+            message (str): The main message to log.
+        """
+        self.message(message, LogLevel.CRITICAL)
+
+    def exception(self, message: str, exception: Exception) -> None:
+        """
+        Log an exception message with the exception details.
+
+        Args:
+            message (str): The main message to log.
+            exception (Exception): The exception to log.
+        """
+        self.message(message, LogLevel.EXCEPTION, {"Exception": exception})
+
     @staticmethod
     def format_time(seconds: int) -> str:
         """
@@ -248,3 +312,6 @@ class LogHandler:
             formatted_time += string
 
         return f"{formatted_time}."
+
+    def __str__(self) -> str:
+        return f"{self._name} - {self._description}"

@@ -85,19 +85,14 @@ class CLIHandler:
         Args:
             args (List[str]): List of command-line arguments.
         """
-        debug = False
-        custom = False
-        disable_logging = False
-        force = False
-        clear_lock_files = False
         last_arg = self._get_last_arg()
 
         (
-            self.debug,
-            self.custom,
-            self.disable_logging,
-            self.force,
-            self.clear_lock_files,
+            debug,
+            custom,
+            disable_logging,
+            force,
+            clear_lock_files,
         ) = map(lambda arg: arg.lower() == "true", args[1:last_arg])
 
         if debug:

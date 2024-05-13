@@ -250,7 +250,7 @@ class ScriptExecutor:
             # Create a lock file to prevent script from being re-run
             if os.path.exists(self.lock_file) and not force:
                 raise FileLockError(self.file, self.lock_file)
-            else:
+            elif not force or Settings.file_lock:
                 open(self.lock_file, "w").close()
 
             exec(script_content, globals())

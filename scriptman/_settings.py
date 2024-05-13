@@ -251,9 +251,10 @@ class SettingsHandler:
         """
         self.root_dir: str = ""
         self.log_mode: bool = False
+        self.file_lock: bool = True
         self.sagerun_code: int = 11
         self.debug_mode: bool = False
-        self.app_version: str = "0.0.0.64"
+        self.app_version: str = "0.0.0.65"
         self.system_maintenance: bool = False
         self.system_maintenance_day: int = 31
         self.maintenance_folders: List[str] = []
@@ -773,6 +774,20 @@ class SettingsHandler:
                 )
 
         self._log_change("Batch File", f"Version {self.app_version}")
+
+    def enable_file_locking(self):
+        """
+        Enable file locking for the application.
+        """
+        self.file_lock = True
+        self._log_change("file_lock", True)
+
+    def disable_file_locking(self):
+        """
+        Disable file locking for the application.
+        """
+        self.file_lock = False
+        self._log_change("file_lock", False)
 
     def _log_change(self, name: str, value: Optional[Any]) -> None:
         """

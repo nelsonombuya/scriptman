@@ -253,7 +253,9 @@ class SeleniumInteractionHandler:
             return len(new_files) > 0
 
         def does_file_exist(self) -> bool:
-            return file_name in os.listdir(directory)
+            from glob import glob
+
+            return bool(glob(f"{directory}/{file_name}"))
 
         if file_name:
             WebDriverWait(self.driver, 300, 1).until(does_file_exist)

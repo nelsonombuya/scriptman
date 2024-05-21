@@ -65,8 +65,8 @@ class Firefox(SeleniumInteractionHandler):
         Initialize Firefox instance and set the downloads directory.
         """
         self._downloads_directory = DirectoryHandler().downloads_dir
-        self._driver = self._get_driver()
-        super().__init__(self._driver)
+        self.driver = self._get_driver()
+        super().__init__(self.driver)
 
     def _get_driver(self) -> webdriver.Firefox:
         """

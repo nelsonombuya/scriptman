@@ -156,7 +156,7 @@ class SeleniumInteractionHandler:
             driver (AnyDriver): The Selenium WebDriver instance
                 (Chrome or Firefox).
         """
-        self._driver = driver
+        self.driver = driver
         self._downloads_directory = DirectoryHandler().downloads_dir
 
     def interact_with_element(
@@ -205,18 +205,18 @@ class SeleniumInteractionHandler:
             )
             mode = SeleniumInteraction.JS_CLICK
 
-        wait = WebDriverWait(self._driver, timeout)
+        wait = WebDriverWait(self.driver, timeout)
         if mode == SeleniumInteraction.WAIT_TILL_INVISIBLE:
             wait.until(EC.invisibility_of_element_located((By.XPATH, xpath)))
             return
 
         element = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
-        ActionChains(self._driver).move_to_element(element).perform()
+        ActionChains(self.driver).move_to_element(element).perform()
 
         if mode == SeleniumInteraction.CLICK:
             element.click()
         elif mode == SeleniumInteraction.JS_CLICK:
-            self._driver.execute_script("arguments[0].click();", element)
+            self.driver.execute_script("arguments[0].click();", element)
         elif mode == SeleniumInteraction.SEND_KEYS:
             if keys:
                 element.send_keys(keys)
@@ -256,13 +256,13 @@ class SeleniumInteractionHandler:
             return file_name in os.listdir(directory)
 
         if file_name:
-            WebDriverWait(self._driver, 300, 1).until(does_file_exist)
+            WebDriverWait(self.driver, 300, 1).until(does_file_exist)
         else:
-            WebDriverWait(self._driver, 300, 1).until(is_new_file_added)
+            WebDriverWait(self.driver, 300, 1).until(is_new_file_added)
 
     def __del__(self) -> None:
         """
         Close the WebDriver instance when the SeleniumInteractionHandler
         instance is deleted.
         """
-        self._driver.quit()
+        self.driver.quit()

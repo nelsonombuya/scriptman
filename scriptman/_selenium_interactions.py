@@ -103,6 +103,7 @@ from typing import Optional, Union
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
@@ -132,6 +133,7 @@ class SeleniumInteraction(Enum):
     WAIT_TILL_INVISIBLE = "wait"
     DENY_COOKIES = "deny_cookies"
     ACCEPT_COOKIES = "accept_cookies"
+    SEND_RETURN = "send_return"
 
 
 class SeleniumInteractionHandler:
@@ -220,6 +222,8 @@ class SeleniumInteractionHandler:
                 element.send_keys(keys)
             else:
                 raise ValueError("Keys must be provided for SEND_KEYS mode")
+        elif mode == SeleniumInteraction.SEND_RETURN:
+            element.send_keys(Keys.RETURN)
         else:
             raise ValueError(f"Invalid mode: {mode}")
         time.sleep(1 if Settings.debug_mode else rest)

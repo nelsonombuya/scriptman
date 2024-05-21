@@ -57,8 +57,8 @@ class Chrome(SeleniumInteractionHandler):
         Initialize Chrome instance and set the downloads directory.
         """
         self._downloads_directory = DirectoryHandler().downloads_dir
-        self.driver = self._get_driver()
-        super().__init__(self.driver)
+        self._driver = self._get_driver()
+        super().__init__(self._driver)
 
     def _get_driver(self) -> webdriver.Chrome:
         """

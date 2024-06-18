@@ -140,3 +140,18 @@ class CSVHandler:
         csv_file_path = rf"{csv_directory}\{csv_file_name}.csv"
         data.to_csv(csv_file_path, index=False)
         return csv_file_path
+
+    @staticmethod
+    def delete_csv_file(csv_file_path: str) -> None:
+        """
+        Delete the CSV file.
+
+        Args:
+            csv_file_path (str): The path to the CSV file.
+
+        Returns:
+            None
+        """
+        import os
+
+        os.remove(csv_file_path)

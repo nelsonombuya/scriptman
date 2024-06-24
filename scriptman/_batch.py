@@ -37,7 +37,7 @@ def get_batch_file_content() -> str:
 # flake8: noqa: E501 # NOTE: Ignore Line Length for this file
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPTMAN [0.0.0.70]
+:: SCRIPTMAN [0.0.0.71]
 :: -----------------------------------------------------------------------------
 :: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
 :: more.
@@ -198,6 +198,10 @@ if not "!VENV_NAME!" == "" (
 if "!QUICK!" == "False" (
     echo Updating Files...
     git pull
+    echo.
+
+    echo Upgrading PIP...
+    python.exe -m pip install --upgrade pip
     echo.
 
     echo Installing Dependencies...

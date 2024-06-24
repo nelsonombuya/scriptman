@@ -163,6 +163,10 @@ if "!QUICK!" == "False" (
     git pull
     echo.
 
+    echo Upgrading PIP...
+    python.exe -m pip install --upgrade pip
+    echo.
+
     echo Installing Dependencies...
     pip install -r requirements.txt
     echo.

@@ -37,7 +37,7 @@ def get_batch_file_content() -> str:
 # flake8: noqa: E501 # NOTE: Ignore Line Length for this file
 BATCH_FILE: str = r"""@echo off
 :: -----------------------------------------------------------------------------
-:: SCRIPTMAN [0.0.0.71]
+:: SCRIPTMAN [0.0.0.72]
 :: -----------------------------------------------------------------------------
 :: Companion Batch File for the ScriptMan Package. See scriptman.CLIHandler for
 :: more.
@@ -50,6 +50,7 @@ BATCH_FILE: str = r"""@echo off
 ::                  [-c | --custom]
 ::                  [-cl | --clearlock]
 ::                  [-dl | --disable_logging]
+::                  [-i=script1 | --ignore=script1] [-i=script2 | --ignore=script2] ...
 ::
 ::                  [script_file [script_file ...]]
 ::
@@ -61,8 +62,12 @@ BATCH_FILE: str = r"""@echo off
 ::   -c, --custom           Enable custom mode (specify custom script files).
 ::   -cl, --clearlock       Clear a specific, or all the lock files.
 ::   -dl, --disable_logging Disable logging.
+::   -i, --ignore           Specify a script to ignore. Can be used multiple times.
 ::
 ::   script_file            One or more script files to run.
+::
+:: Example:
+::   .\sm.bat -q -d -dl -i=script1 -i="script2.py" script3 "script4.py"
 ::
 :: Note:
 :: Ensure to define the following in the scriptman batch file:
@@ -83,6 +88,7 @@ set "FORCE=False"
 set "CUSTOM=False"
 set "CLEARLOCK=False"
 set "DISABLE_LOGGING=False"
+set "IGNORE_SCRIPTS="
 if "!ROOT_DIR!" == "" set "ROOT_DIR=%~dp0"
 
 :process_args
@@ -102,7 +108,22 @@ if "%~1" == "" goto run_script
 
 set "arg=%~1"
 if "%arg:~0,1%" == "-" (
-    call :handle_flag "%arg%"
+    if "%arg%" == "-i" (
+        if defined IGNORE_SCRIPTS (
+            set "IGNORE_SCRIPTS=!IGNORE_SCRIPTS!,"%~2""
+        ) else (
+            set "IGNORE_SCRIPTS="%~2""
+        )
+        shift
+    ) else if "%arg%" == "--ignore" (
+        if defined IGNORE_SCRIPTS (
+            set "IGNORE_SCRIPTS=!IGNORE_SCRIPTS!,"%~2""
+        ) else (
+            set "IGNORE_SCRIPTS="%~2""
+        )
+    ) else (
+        call :handle_flag "%arg%"
+    )
 ) else (
     call :handle_file "%arg%"
 )
@@ -210,7 +231,7 @@ if "!QUICK!" == "False" (
 )
 
 echo Running script...
-python "!ROOT_DIR!\!MAIN_SCRIPT!" !DEBUG! !CUSTOM! !DISABLE_LOGGING! !FORCE! !CLEARLOCK! !SCRIPTS!
+python "!ROOT_DIR!\!MAIN_SCRIPT!" !DEBUG! !CUSTOM! !DISABLE_LOGGING! !FORCE! !CLEARLOCK! "--ignore=!IGNORE_SCRIPTS!" !SCRIPTS!
 echo.
 
 if not "!VENV_NAME!" == "" (
@@ -231,6 +252,7 @@ echo                [-f   ^| --force]
 echo                [-c   ^| --custom]
 echo                [-cl  ^| --clearlock]
 echo                [-dl  ^| --disable_logging]
+echo                [-i=script1 ^| --ignore=script1] [-i=script2 ^| --ignore=script2] ...
 echo.
 echo                [script_file [script_file ...]]
 echo.
@@ -242,8 +264,12 @@ echo    -f, --force             Force the scripts to run even if there's another
 echo    -c, --custom            Enable custom mode (specify custom script files).
 echo    -cl, --clearlock        Clear a specific, or all the lock files.
 echo    -dl, --disable_logging  Disable logging.
+echo    -i, --ignore            Specify a script to ignore. Can be used multiple times.
 echo.
-echo    script_file              One or more script files to run.
+echo    script_file             One or more script files to run.
+echo.
+echo Example:
+echo    .\sm.bat -q -d -dl -i=script1 -i="script2.py" script3 "script4.py"
 echo.
 echo Note:
 echo Ensure to define the following in the scriptman batch file:

@@ -102,8 +102,8 @@ class CLIHandler:
             Settings.disable_logging()
 
         if clear_lock_files:
-            if args[last_arg:]:
-                for script in args[last_arg:]:
+            if args[last_arg + 1 :]:
+                for script in args[last_arg + 1 :]:
                     if script in self.script_handler.get_scripts():
                         Settings.clear_lock_files(script)
                     else:
@@ -112,6 +112,15 @@ class CLIHandler:
                 Settings.clear_lock_files()
 
         if custom:
-            self.script_handler.run_custom_scripts(args[last_arg:], force)
+            self.script_handler.run_custom_scripts(args[last_arg + 1 :], force)
         else:
-            self.script_handler.run_scripts(args[last_arg:], force)
+            scripts = [
+                script.replace(".py", "")
+                for script in (args[last_arg + 1 :] or self.script_handler.get_scripts())
+            ]
+            ignore = [
+                script.replace(".py", "")
+                for script in args[last_arg].replace("--ignore=", "").split(",")
+            ]
+            scripts = [script for script in scripts if script not in ignore]
+            self.script_handler.run_scripts(scripts, force)

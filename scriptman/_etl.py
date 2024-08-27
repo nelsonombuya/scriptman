@@ -246,6 +246,7 @@ class ETLHandler:
         keys: List[str] = [],
         bulk_execute: bool = True,
         nested_keys: Optional[List[str]] = None,
+        batch_size: Optional[int] = None,
     ) -> None:
         """
         Load the data into a database table.
@@ -265,6 +266,8 @@ class ETLHandler:
                 queries. Defaults to True.
             nested_keys (Optional[list[str]], optional): List of keys for
                 updates in nested tables. Defaults to None.
+            batch_size (Optional[int], optional): The batch size for bulk
+                execute. Defaults to None.
         """
         if self._data.empty:
             self._log.message("Dataset is empty!", LogLevel.WARN)
@@ -278,6 +281,7 @@ class ETLHandler:
                 nested_etl.to_db(
                     truncate=truncate,
                     recreate=recreate,
+                    batch_size=batch_size,
                     keys=nested_keys or keys,
                     bulk_execute=bulk_execute,
                     force_nvarchar=force_nvarchar,
@@ -298,15 +302,16 @@ class ETLHandler:
             or truncate
             or recreate
         ):
-            return self._insert(truncate, recreate, bulk_execute)
+            return self._insert(truncate, recreate, bulk_execute, batch_size)
         else:
-            return self._update(keys, bulk_execute)
+            return self._update(keys, bulk_execute, batch_size)
 
     def _insert(
         self,
         truncate: bool = False,
         recreate: bool = False,
         bulk_execute: bool = True,
+        batch_size: Optional[int] = None,
     ) -> None:
         """
         Insert data into a database table.
@@ -315,6 +320,7 @@ class ETLHandler:
             truncate (bool): Whether to truncate the table.
             recreate (bool): Whether to recreate the table.
             bulk_execute (bool): Whether to use bulk execute for queries.
+            batch_size (Optional[int]): The batch size for bulk execute.
         """
         tbl_query = self._generate_create_table_query(self._table, self._data)
         insert_query = self._generate_insert_query(self._table, self._data)
@@ -330,7 +336,7 @@ class ETLHandler:
 
         try:
             if bulk_execute:
-                self._db.execute_many(insert_query, prepared_data)
+                self._db.execute_many(insert_query, prepared_data, batch_size)
             else:
                 raise MemoryError
         except MemoryError:
@@ -345,7 +351,9 @@ class ETLHandler:
             ):
                 self._db.execute_write_query(insert_query, row)
 
-    def _update(self, keys: List[str], bulk_execute: bool = True) -> None:
+    def _update(
+        self, keys: List[str], bulk_execute: bool = True, batch_size: Optional[int] = None
+    ) -> None:
         """
         Update data in a database table, and if the record doesn't exist,
         insert it.
@@ -353,6 +361,7 @@ class ETLHandler:
         Args:
             keys (List[str]): List of keys for updates.
             bulk_execute (bool): Whether to use bulk execute for queries.
+            batch_size (Optional[int]): The batch size for bulk execute.
         """
 
         try:
@@ -374,7 +383,7 @@ class ETLHandler:
                 )
                 prepared_data = self._prepare_data(keys, True)
                 self._log.message(f"Inserting new data on [{self._table}]...")
-                self._db.execute_many(ins_query, prepared_data)
+                self._db.execute_many(ins_query, prepared_data, batch_size)
             else:
                 raise MemoryError
         except MemoryError:

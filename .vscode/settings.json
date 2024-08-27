@@ -9,6 +9,7 @@
         "dotenv",
         "dtype",
         "enabledelayedexpansion",
+        "executemany",
         "geckodriver",
         "GECKODRIVER",
         "infobars",
@@ -17,6 +18,7 @@
         "myserver",
         "mysql",
         "Ombuya",
+        "pyodbc",
         "restorehealth",
         "safebrowsing",
         "sagerun",
@@ -24,6 +26,7 @@
         "scriptman",
         "setlocal",
         "tarteaucitron",
-        "Todos"
+        "Todos",
+        "tqdm"
     ]
 }

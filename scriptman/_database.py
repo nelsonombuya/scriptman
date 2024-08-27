@@ -200,13 +200,17 @@ class DatabaseHandler:
         finally:
             cursor.close()
 
-    def execute_many(self, query: str, rows: List[tuple]) -> bool:
+    def execute_many(
+        self, query: str, rows: List[tuple], batch_size: Optional[int] = None
+    ) -> bool:
         """
         Executes multiple insert queries with the given SQL query and rows.
 
         Args:
             query (str): The SQL query to execute for each row.
             rows (List[tuple]): The rows to insert, where each row is a tuple.
+            batch_size (int, optional): The number of rows to insert in each batch.
+                Defaults to None.
 
         Returns:
             bool: True if the queries were executed successfully,
@@ -216,11 +220,17 @@ class DatabaseHandler:
             return False
 
         cursor = self._connection.cursor()
+        cursor.fast_executemany = True
         try:
-            self._log.message("Executing Bulk Query...")
-            cursor.fast_executemany = True
-            cursor.executemany(query, rows)
-            self._connection.commit()
+            if batch_size is None:
+                self._log.message("Executing Bulk Query...")
+                cursor.executemany(query, rows)
+                self._connection.commit()
+            else:
+                self._log.message(f"Executing Bulk Query in Batches of {batch_size}")
+                for i in range(0, len(rows), batch_size):
+                    cursor.executemany(query, rows[i : i + batch_size])
+                    self._connection.commit()
             self._log.message("Executed Bulk Query Successfully.")
             return True
         except pyodbc.Error as error:

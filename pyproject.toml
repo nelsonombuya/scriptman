@@ -1,3 +1,19 @@
+[tool.poetry]
+name = "scriptman"
+version = "0.0.0.74"
+description = "A Python Package for Script Management"
+authors = ["nelsonombuya <developer@incognitouser.anonaddy.me>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-cov = "^6.0.0"
+
 [build-system]
-build-backend = "setuptools.build_meta"
-requires = ["setuptools", "setuptools-scm"]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

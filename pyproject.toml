@@ -1,19 +1,39 @@
+# POETRY
 [tool.poetry]
 name = "scriptman"
 version = "0.0.0.74"
 description = "A Python Package for Script Management"
-authors = ["nelsonombuya <developer@incognitouser.anonaddy.me>"]
+authors = ["Nelson Ombuya <developer@incognitouser.anonaddy.me>"]
 license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.13"
+loguru = "^0.7.3"
 
 
 [tool.poetry.group.dev.dependencies]
+black = "^24.10.0"
+isort = "^5.13.2"
+mypy = "^1.13.0"
 pytest = "^8.3.4"
 pytest-cov = "^6.0.0"
+
+[tool.poetry.scripts]
+scriptman = "scriptman._cli:exit"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+# TOOLS
+[tool.black]
+line-length = 90
+target-version = ['py313']
+
+[tool.isort]
+profile = "black"
+line_length = 90
+
+[tool.mypy]
+check_untyped_defs = true

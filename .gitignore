@@ -1,4 +1,2 @@
-.venv
 *.pyc
-*.env
-*.log
+*.yaml

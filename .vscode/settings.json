@@ -1,20 +1,3 @@
 {
-  "cSpell.words": [
-    "clearlock",
-    "colorama",
-    "enabledelayedexpansion",
-    "iniconfig",
-    "manylinux",
-    "musllinux",
-    "nelsonombuya",
-    "pluggy",
-    "pygments",
-    "scriptman",
-    "setlocal",
-    "setuptools",
-    "tomli",
-    "virtualenv",
-    "xdist",
-    "xmlschema"
-  ]
+  "cSpell.words": []
 }

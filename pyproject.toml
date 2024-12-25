@@ -9,7 +9,9 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.13"
+dynaconf = "^3.2.6"
 loguru = "^0.7.3"
+pydantic = "^2.10.3"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -18,9 +20,10 @@ isort = "^5.13.2"
 mypy = "^1.13.0"
 pytest = "^8.3.4"
 pytest-cov = "^6.0.0"
+pytest-mock = "^3.14.0"
 
 [tool.poetry.scripts]
-scriptman = "scriptman._cli:exit"
+scriptman = "scriptman.cli:CLIHandler.start_cli_instance"
 
 [build-system]
 requires = ["poetry-core"]

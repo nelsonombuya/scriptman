@@ -1,2 +1,4 @@
 *.pyc
-*.yaml
+*.log
+.secrets.*
+codium_*.py

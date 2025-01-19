@@ -1,7 +1,7 @@
 # POETRY
 [tool.poetry]
 name = "scriptman"
-version = "0.0.0.74"
+version = "2.0.178"
 description = "A Python Package for Script Management"
 authors = ["Nelson Ombuya <developer@incognitouser.anonaddy.me>"]
 license = "MIT"
@@ -12,6 +12,7 @@ python = "^3.13"
 dynaconf = "^3.2.6"
 loguru = "^0.7.3"
 pydantic = "^2.10.3"
+tomlkit = "^0.13.2"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -23,13 +24,13 @@ pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
 
 [tool.poetry.scripts]
-scriptman = "scriptman.cli:CLIHandler.start_cli_instance"
+scriptman = "scriptman.core._cli:CLIHandler.start_cli_instance"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-# TOOLS
+# OTHER TOOLS
 [tool.black]
 line-length = 90
 target-version = ['py313']

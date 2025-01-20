@@ -242,6 +242,19 @@ class ConfigHandler:
             logger.warning("⚠ The current project is not scriptman!")
             return False
 
+    def _update_scriptman(self) -> bool:
+        """
+        Updates the 'scriptman' package to the latest version.
+        """
+        logger.info("🔄 Updating ScriptMan package...")
+        result = run(["poetry", "install"], check=False)
+        if result.returncode == 0:
+            logger.info("✅ ScriptMan package updated successfully.")
+            return True
+        else:
+            logger.error("❌ Failed to update ScriptMan package.")
+            return False
+
     def _manage_scriptman_package(
         self,
         build: bool = False,
@@ -251,6 +264,7 @@ class ConfigHandler:
         if update:
             self._update_scriptman_dependencies()
             self._update_version_on_pyproject()
+            self._update_scriptman()
 
         return True
 

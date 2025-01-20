@@ -174,7 +174,11 @@ class CLIHandler:
             from scriptman.core._scripts import ScriptsHandler
 
             logger.info("🚀 Starting ScriptMan...")
-            scripts = [Path(_) for _ in args.scripts] or list(Path(".").glob("*.py"))
+            scripts = (
+                [Path(_) for _ in args.scripts]
+                if args.scripts
+                else list(Path(".").glob("*.py"))
+            )
 
             if not scripts:
                 logger.error("❓ No scripts found in the current directory.")
@@ -185,6 +189,7 @@ class CLIHandler:
                 return 1
 
             if args.retries >= 0:
+                logger.info(f"🔁 Retries set to {args.retries}")
                 config_handler.config.retries = args.retries
 
             ScriptsHandler().run_scripts(scripts)

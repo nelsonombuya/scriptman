@@ -54,12 +54,12 @@ class CLIHandler:
         Optionally, build and publish the package.
         """
         subparsers = parser.add_subparsers(dest="action", help="Available actions")
-        install_parser = subparsers.add_parser("install", help="Install scripts")
+        install_parser = subparsers.add_parser("package", help="Build Scriptman package")
         install_parser.add_argument(
-            "-uv",
-            "--update_version",
+            "-u",
+            "--update",
             action="store_true",
-            help="Update scriptman version based on current commit.",
+            help="Update scriptman dependencies and version based on current commit.",
         )
         install_parser.add_argument(
             "-b",
@@ -110,9 +110,17 @@ class CLIHandler:
             "--scripts",
             nargs="*",
             metavar="SCRIPT",
-            help="Specify scripts to run (comma-separated). "
+            help="Specify scripts to run. "
             "If not defined, will run all python scripts in the working directory. "
-            'Example: -s=script1.py,script2.py,"another script.py"',
+            'Example: -s script1.py script2.py "another script.py" "path/to/script.py"',
+        )
+        run_parser.add_argument(
+            "-r",
+            "--retries",
+            type=int,
+            default=0,
+            help="Specify the number of times to retry running the scripts in case of "
+            "failure. Default is 0 (no retries).",
         )
 
         """
@@ -146,18 +154,41 @@ class CLIHandler:
         parser = self._create_parser()
         args = parser.parse_args(argv or sys.argv[1:])
 
+        # Initialize the application
         self._initialize_logging()
 
-        if args.action == "install":
-            return config_handler._install_scriptman(
-                args.update_version, args.build, args.publish
+        if args.action == "package":
+            return config_handler._manage_scriptman_package(
+                publish=args.publish,
+                update=args.update,
+                build=args.build,
             )
 
         if args.action == "config":
-            return config_handler._update_configuration(args.config, args.value)
+            return config_handler._update_configuration(
+                param=args.config,
+                value=args.value,
+            )
 
-        logger.info("🚀 Starting ScriptMan...")
-        logger.debug(f"Arguments used: {args}")
+        if args.action == "run":
+            from scriptman.core._scripts import ScriptsHandler
+
+            logger.info("🚀 Starting ScriptMan...")
+            scripts = [Path(_) for _ in args.scripts] or list(Path(".").glob("*.py"))
+
+            if not scripts:
+                logger.error("❓ No scripts found in the current directory.")
+                return 1
+
+            if args.retries < 0:
+                logger.error("❌ Invalid number of retries provided. Must be >= 0.")
+                return 1
+
+            if args.retries >= 0:
+                config_handler.config.retries = args.retries
+
+            ScriptsHandler().run_scripts(scripts)
+
         return 0
 
     def _initialize_logging(self, verbose: bool = False) -> None:

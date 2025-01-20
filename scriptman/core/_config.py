@@ -1,7 +1,7 @@
-import subprocess
 from os import getcwd
 from pathlib import Path
-from typing import Literal, Optional, get_args, get_origin
+from subprocess import PIPE, run
+from typing import Callable, Literal, Optional, get_args, get_origin
 
 from dynaconf import Dynaconf
 from loguru import logger
@@ -37,12 +37,12 @@ class ConfigHandler:
             major_version_parts = major_version.split(".")
 
             # Calculate minor version based on the number of commits
-            minor_version = subprocess.run(
+            minor_version = run(
                 ["git", "rev-list", "--count", "HEAD"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
+                stdout=PIPE,
+                stderr=PIPE,
                 check=True,
+                text=True,
             ).stdout.strip()
 
             full_version = (
@@ -79,6 +79,11 @@ class ConfigHandler:
                 "description": "Set the logging level",
                 "default": "INFO",
             },
+            "retries": {
+                "type": int,
+                "description": "Number of retries for failed scripts",
+                "default": 0,
+            },
         }
 
     def _initialize(self) -> None:
@@ -95,6 +100,9 @@ class ConfigHandler:
         for param, config in self.configs.items():
             if param not in self.config:
                 self.config.set(param, config["default"])
+
+        # Initialize class variables
+        self.callback_function: Optional[Callable[[Exception, dict], None]] = None
 
     def _initialize_logs_dir(self) -> None:
         """Initialize the logs directory for the application."""
@@ -113,6 +121,10 @@ class ConfigHandler:
                 f"Invalid configuration parameter: {param}.\n"
                 f"Allowed parameters are:\n\t{allowed_params}"
             )
+            return False
+
+        if param.lower() == "retry" and value < 0:
+            logger.error("Invalid value for retries: Must be >= 0.")
             return False
 
         expected_type = self.configs[param]["type"]
@@ -201,15 +213,59 @@ class ConfigHandler:
         else:
             raise RuntimeError("The current project is not scriptman!")
 
-    def _install_scriptman(
+    def _update_scriptman_dependencies(self) -> bool:
+        """
+        Updates the dependencies of the 'scriptman' project in the pyproject.toml file.
+        """
+        pyproject_file = self.cwd / "pyproject.toml"
+
+        if not pyproject_file.exists():
+            logger.error(
+                f"The pyproject.toml not found at {pyproject_file}. "
+                "Are you using poetry?"
+            )
+            raise FileNotFoundError(f"The pyproject.toml not found at {pyproject_file}")
+
+        with pyproject_file.open("r", encoding="utf-8") as f:
+            pyproject_data = parse(f.read())
+
+        if pyproject_data.get("tool", {}).get("poetry", {}).get("name") == "scriptman":
+            logger.info("🔄 Updating ScriptMan dependencies...")
+            result = run(["poetry", "update"], check=False)
+            if result.returncode == 0:
+                logger.info("✅ Dependencies updated successfully.")
+                return True
+            else:
+                logger.error("❌ Failed to update dependencies.")
+                return False
+        else:
+            logger.warning("⚠ The current project is not scriptman!")
+            return False
+
+    def _manage_scriptman_package(
         self,
-        update_version: bool = True,
         build: bool = False,
+        update: bool = True,
         publish: bool = False,
     ) -> bool:
-        if update_version:
+        if update:
+            self._update_scriptman_dependencies()
             self._update_version_on_pyproject()
 
+        return True
+
+    def add_callback_function(
+        self, callback_function: Callable[[Exception, dict], None]
+    ) -> bool:
+        """
+        Add a callback function to the ConfigHandler instance.
+        It will be called when a script fails to execute.
+        """
+        if not callable(callback_function):
+            logger.error("Invalid callback function provided.")
+            return False
+
+        self.callback_function = callback_function
         return True
 
 

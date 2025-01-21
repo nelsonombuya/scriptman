@@ -239,15 +239,4 @@ class CLIHandler:
             format=file_log_format,
         )
 
-        # Instance handler
-        logger.add(
-            file,
-            colorize=True,
-            level=log_level,
-            rotation="1 day",
-            compression="zip",
-            retention="30 days",
-            format=file_log_format,
-        )
-
         logger.debug(f"✅ Logging initialized to console and {file}")

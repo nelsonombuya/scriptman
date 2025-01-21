@@ -1,5 +1,4 @@
 from asyncio import gather, run, to_thread
-from datetime import datetime
 from pathlib import Path
 from re import MULTILINE, sub
 
@@ -7,6 +6,7 @@ from loguru import logger
 
 from scriptman.core._config import config_handler
 from scriptman.utils._retry import retry
+from scriptman.utils._time_calculator import TimeCalculator
 
 
 class ScriptsHandler:
@@ -24,10 +24,16 @@ class ScriptsHandler:
                 scripts.remove(script)
                 continue
 
-        if config_handler.config.concurrent and len(scripts) > 1:
-            self._execute_scripts_concurrently(scripts)
-        else:
-            self._execute_scripts_sequentially(scripts)
+        with TimeCalculator.time_context_manager("🦸‍♂️ Scriptman"):
+            if config_handler.config.concurrent and len(scripts) > 1:
+                self._execute_scripts_concurrently(scripts)
+            else:
+                self._execute_scripts_sequentially(scripts)
+            logger.info(
+                f"✅ Finished running "
+                f"{len(scripts)} script{'s' if len(scripts) > 1 else ''}:"
+                "\n\t- " + "\n\t- ".join(script.name for script in scripts)
+            )
 
     def _execute_scripts_sequentially(self, scripts: list[Path]) -> None:
         """
@@ -58,23 +64,14 @@ class ScriptsHandler:
 
     def _run_script(self, script: Path):
         # FIXME: Log each script to a separate file, without the logs mixing up
-        log_file = (
-            Path(config_handler.config.logs_dir)
-            / f"{script.stem}-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
-        )
-        logger.add(log_file, rotation="1 day", retention="30 days")
+        success, error, details = self.execute(script)
 
-        try:
-            success, error, details = self.execute(script)
-
-            if not success:
-                if config_handler.callback_function is not None:
-                    config_handler.callback_function(
-                        error or Exception("A general error has occurred"),
-                        details or {},
-                    )
-        finally:
-            logger.remove()
+        if not success:
+            if config_handler.callback_function is not None:
+                config_handler.callback_function(
+                    error or Exception("A general error has occurred"),
+                    details or {},
+                )
 
     def execute(self, file_path: Path) -> tuple[bool, Exception | None, dict | None]:
         try:
@@ -91,10 +88,11 @@ class ScriptsHandler:
 
             logger.info(f"🚀 Running '{file_path.name}' script...")
             retries = getattr(config_handler.config, "retries", 0)
-            retry(retries)(exec)(script_content, globals())
-            message = f"'{file_path.name}' script ran successfully"
+            with TimeCalculator.time_context_manager(file_path.name):
+                retry(retries)(exec)(script_content, globals())
+            message = f"Script '{file_path.name}' executed successfully"
             logger.success(message)
             return True, None, {"message": message}
         except Exception as e:
-            logger.error(f"Error while running '{file_path.name}': {str(e)}")
+            logger.error(f"❌ Error running '{file_path.name}' script: {e}")
             return False, e, {"error": str(e)}

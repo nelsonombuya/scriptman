@@ -90,6 +90,11 @@ class ConfigHandler:
                 "description": "Number of retries for failed scripts",
                 "default": 0,
             },
+            "log_for_each_script": {
+                "type": bool,
+                "description": "Enable logging for each script instance",
+                "default": False,
+            },
         }
 
     def _initialize_defaults(self) -> None:

@@ -25,15 +25,15 @@ class Version:
         return f"{self.major}.{self.minor}.{self.commit}"
 
 
-class ConfigHandler:
+class Config:
     """
     📂 ConfigHandler Singleton Class
 
     Manages configuration, versioning, logging, and package management.
     """
 
-    _instance: Optional["ConfigHandler"] = None
     _version_file: Path = Path(__file__).parent.parent / "version.toml"
+    _instance: Optional["Config"] = None
     _version: Version = Version()
 
     def __new__(cls):
@@ -49,13 +49,13 @@ class ConfigHandler:
         """
         📝 Initialize configurations and create necessary directories.
         """
-        self.config = Dynaconf(
+        self.env = Dynaconf(
             root_path=self.cwd,
             settings_files=["scriptman.toml", ".secrets.toml"],
         )
         self._initialize_defaults()
         self.callback_function: Optional[Callable[[Exception, dict], None]] = None
-        Path(self.config.logs_dir).mkdir(parents=True, exist_ok=True)  # Create logs dir
+        Path(self.env.logs_dir).mkdir(parents=True, exist_ok=True)  # Create logs dir
 
     @property
     def cwd(self) -> Path:
@@ -104,8 +104,8 @@ class ConfigHandler:
         Ensures all configuration parameters have default values.
         """
         for param, config in self.configs.items():
-            if param not in self.config:
-                self.config.set(param, config["default"])
+            if param not in self.env:
+                self.env.set(param, config["default"])
 
     def _load_version_from_file(self) -> Optional[str]:
         """
@@ -195,7 +195,7 @@ class ConfigHandler:
             return False
 
         param = param.upper()
-        self.config.set(param, validated_value)
+        self.env.set(param, validated_value)
 
         try:
             self._save_config_to_file(param, validated_value)
@@ -406,5 +406,5 @@ class ConfigHandler:
 
 
 # Singleton instance
-config_handler: ConfigHandler = ConfigHandler()
-__all__ = ["config_handler"]
+config: Config = Config()
+__all__ = ["config"]

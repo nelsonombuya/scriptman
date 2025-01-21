@@ -24,7 +24,7 @@ pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
 
 [tool.poetry.scripts]
-scriptman = "scriptman.core._cli:CLIHandler.start_cli_instance"
+scriptman = "scriptman.core._cli:CLI.start_cli_instance"
 
 [build-system]
 requires = ["poetry-core"]

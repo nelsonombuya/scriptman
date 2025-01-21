@@ -4,15 +4,15 @@ from typing import Any, Callable, Optional, Type, Union, cast
 
 from loguru import logger
 
-from scriptman.core._config import config_handler
+from scriptman.core._config import config
 from scriptman.utils._generics import AsyncFunc, SyncFunc, T
 
 
 def retry(
-    max_retries: int = config_handler.config.get("RETRY.MAX_RETRIES", 1),
-    base_delay: float = config_handler.config.get("RETRY.BASE_DELAY", 1),
-    min_delay: float = config_handler.config.get("RETRY.MIN_DELAY", 1),
-    max_delay: float = config_handler.config.get("RETRY.MAX_DELAY", 10),
+    max_retries: int = config.env.get("RETRY.MAX_RETRIES", 1),
+    base_delay: float = config.env.get("RETRY.BASE_DELAY", 1),
+    min_delay: float = config.env.get("RETRY.MIN_DELAY", 1),
+    max_delay: float = config.env.get("RETRY.MAX_DELAY", 10),
     retry_on: Optional[Union[Type[Exception], tuple[Type[Exception], ...]]] = None,
 ) -> Callable:
     """

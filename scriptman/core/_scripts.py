@@ -4,7 +4,7 @@ from re import MULTILINE, sub
 
 from loguru import logger
 
-from scriptman.core._config import config_handler
+from scriptman.core._config import config
 from scriptman.utils._retry import retry
 from scriptman.utils._time_calculator import TimeCalculator
 
@@ -25,7 +25,7 @@ class ScriptsHandler:
                 continue
 
         with TimeCalculator.time_context_manager("🦸‍♂️ Scriptman"):
-            if config_handler.config.concurrent and len(scripts) > 1:
+            if config.env.concurrent and len(scripts) > 1:
                 self._execute_scripts_concurrently(scripts)
             else:
                 self._execute_scripts_sequentially(scripts)
@@ -67,8 +67,8 @@ class ScriptsHandler:
         success, error, details = self.execute(script)
 
         if not success:
-            if config_handler.callback_function is not None:
-                config_handler.callback_function(
+            if config.callback_function is not None:
+                config.callback_function(
                     error or Exception("A general error has occurred"),
                     details or {},
                 )
@@ -87,7 +87,7 @@ class ScriptsHandler:
             )
 
             logger.info(f"🚀 Running '{file_path.name}' script...")
-            retries = getattr(config_handler.config, "retries", 0)
+            retries = getattr(config.env, "retries", 0)
             with TimeCalculator.time_context_manager(file_path.name):
                 retry(retries)(exec)(script_content, globals())
             message = f"Script '{file_path.name}' executed successfully"

@@ -6,10 +6,10 @@ from typing import List, Optional
 
 from loguru import logger
 
-from scriptman.core._config import config_handler
+from scriptman.core._config import config
 
 
-class CLIHandler:
+class CLI:
     """
     🤖 Comprehensive Command Line Interface Handler for managing and running scripts.
 
@@ -31,7 +31,7 @@ class CLIHandler:
                 failure).
         """
 
-        return CLIHandler().run(argv)
+        return CLI().run(argv)
 
     def _create_parser(self) -> ArgumentParser:
         """
@@ -90,12 +90,12 @@ class CLIHandler:
         )
         config_parser.add_argument(
             "config",
-            choices=config_handler.configs.keys(),
+            choices=config.configs.keys(),
             help="Set configuration parameter to a specified value. "
             "Available options: "
             + ", ".join(
                 f"{k} ({v["type"]},  {v["description"]})"
-                for k, v in config_handler.configs.items()
+                for k, v in config.configs.items()
             ),
         )
         config_parser.add_argument(
@@ -141,7 +141,7 @@ class CLIHandler:
             "--version",
             action="version",
             help="Display version",
-            version=f"Scriptman {config_handler.version}",
+            version=f"Scriptman {config.version}",
         )
 
         return parser
@@ -162,18 +162,18 @@ class CLIHandler:
         args = parser.parse_args(argv or sys.argv[1:])
 
         if args.action == "package":
-            return config_handler._manage_scriptman_package(
+            return config._manage_scriptman_package(
                 update=args.update or True,
                 publish=args.publish,
                 build=args.build,
             )
 
         if args.reset:
-            config_handler.reset_scriptman_settings()
+            config.reset_scriptman_settings()
             return 0
 
         if args.action == "config":
-            return config_handler.validate_and_update_config(
+            return config.validate_and_update_config(
                 param=args.config,
                 value=args.value,
             )
@@ -181,7 +181,7 @@ class CLIHandler:
         if args.action == "run":
             from scriptman.core._scripts import ScriptsHandler
 
-            logger.info(f"🚀 ScriptMan v{config_handler.version}")
+            logger.info(f"🦸‍♂️ ScriptMan v{config.version}")
             scripts = (
                 [Path(_) for _ in args.scripts]
                 if args.scripts
@@ -198,7 +198,7 @@ class CLIHandler:
 
             if args.retries >= 0:
                 logger.info(f"🔁 Retries set to {args.retries}")
-                config_handler.config.retries = args.retries
+                config.env.retries = args.retries
 
             ScriptsHandler().run_scripts(scripts)
 
@@ -216,7 +216,7 @@ class CLIHandler:
         """
         logger.remove()
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        file = Path(config_handler.config.logs_dir) / f"{timestamp}.log"
+        file = Path(config.env.logs_dir) / f"{timestamp}.log"
 
         file_log_format = "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}"
         log_format = (
@@ -231,7 +231,7 @@ class CLIHandler:
 
         # Scriptman handler
         logger.add(
-            Path(config_handler.config.logs_dir) / "scriptman.log",
+            Path(config.env.logs_dir) / "scriptman.log",
             level=log_level,
             rotation="1 day",
             compression="zip",

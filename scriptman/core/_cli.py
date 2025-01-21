@@ -82,6 +82,12 @@ class CLIHandler:
         Used to update configuration options.
         """
         config_parser = subparsers.add_parser("config", help="Update configuration")
+        parser.add_argument(
+            "-r",
+            "--reset",
+            action="store_true",
+            help="Reset configuration to default values and delete scriptman.toml file.",
+        )
         config_parser.add_argument(
             "config",
             choices=config_handler.configs.keys(),
@@ -151,21 +157,23 @@ class CLIHandler:
         Returns:
             int: Exit code (0 for success, non-zero for failure)
         """
+        self._initialize_logging()
         parser = self._create_parser()
         args = parser.parse_args(argv or sys.argv[1:])
 
-        # Initialize the application
-        self._initialize_logging()
-
         if args.action == "package":
             return config_handler._manage_scriptman_package(
+                update=args.update or True,
                 publish=args.publish,
-                update=args.update,
                 build=args.build,
             )
 
+        if args.reset:
+            config_handler.reset_scriptman_settings()
+            return 0
+
         if args.action == "config":
-            return config_handler._update_configuration(
+            return config_handler.validate_and_update_config(
                 param=args.config,
                 value=args.value,
             )
@@ -173,7 +181,7 @@ class CLIHandler:
         if args.action == "run":
             from scriptman.core._scripts import ScriptsHandler
 
-            logger.info("🚀 Starting ScriptMan...")
+            logger.info(f"🚀 ScriptMan v{config_handler.version}")
             scripts = (
                 [Path(_) for _ in args.scripts]
                 if args.scripts
@@ -200,23 +208,46 @@ class CLIHandler:
         """
         📝 Initialize logging for the CLIHandler.
 
-        Configure the loguru logger to output to a file at
+        Configure the loguru logger to output to both console and a file at
         `scriptman/logs/{current_timestamp}.log` in the current directory.
 
         Args:
             verbose (bool): Enable verbose logging (default: False)
         """
+        logger.remove()
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         file = Path(config_handler.config.logs_dir) / f"{timestamp}.log"
 
-        # TODO: Implement consistent console and file logging without line information
+        file_log_format = "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}"
+        log_format = (
+            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+            "<level>{level:<8}</level> | "
+            "<level>{message}</level>"
+        )
+        log_level = "DEBUG" if verbose else "INFO"
+
+        # Console handler
+        logger.add(sys.stdout, colorize=True, level=log_level, format=log_format)
+
+        # Scriptman handler
         logger.add(
-            file,
-            colorize=True,
+            Path(config_handler.config.logs_dir) / "scriptman.log",
+            level=log_level,
             rotation="1 day",
             compression="zip",
             retention="30 days",
-            level="DEBUG" if verbose else "INFO",
-            format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
+            format=file_log_format,
         )
-        logger.debug(f"✅ Logging initialized to {file}")
+
+        # Instance handler
+        logger.add(
+            file,
+            colorize=True,
+            level=log_level,
+            rotation="1 day",
+            compression="zip",
+            retention="30 days",
+            format=file_log_format,
+        )
+
+        logger.debug(f"✅ Logging initialized to console and {file}")

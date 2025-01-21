@@ -90,6 +90,12 @@ class Config:
                 "description": "Number of retries for failed scripts",
                 "default": 0,
             },
+            "force": {
+                "type": bool,
+                "description": "Force execution of scripts even if they are already "
+                "running",
+                "default": False,
+            },
             "log_for_each_script": {
                 "type": bool,
                 "description": "Enable logging for each script instance",

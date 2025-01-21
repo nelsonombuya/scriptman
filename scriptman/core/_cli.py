@@ -128,6 +128,13 @@ class CLI:
             help="Specify the number of times to retry running the scripts in case of "
             "failure. Default is 0 (no retries).",
         )
+        run_parser.add_argument(
+            "-f",
+            "--force",
+            action="store_true",
+            default=False,
+            help="Force execution of scripts even if they are already running.",
+        )
 
         """
         Version
@@ -199,6 +206,10 @@ class CLI:
             if args.retries >= 0:
                 logger.info(f"🔁 Retries set to {args.retries}")
                 config.env.retries = args.retries
+
+            if args.force:
+                logger.warning("⚠️ Force flag set. Skipping lock for scripts.")
+                config.env.force = True
 
             ScriptsHandler().run_scripts(scripts)
 

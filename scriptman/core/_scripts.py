@@ -2,6 +2,7 @@ from asyncio import gather, run, to_thread
 from pathlib import Path
 from re import MULTILINE, sub
 
+from filelock import FileLock, Timeout
 from loguru import logger
 
 from scriptman.core._config import config
@@ -63,7 +64,40 @@ class ScriptsHandler:
         run(_run_all_scripts_async(scripts))
 
     def _run_script(self, script: Path):
+        """
+        🏃‍♂️ Runs a single script with a file lock mechanism.
+
+        Args:
+            script (Path): The path of the script to run.
+        """
         # FIXME: Log each script to a separate file, without the logs mixing up
+        lock_file = script.with_suffix(script.suffix + ".lock")
+        lock = FileLock(lock_file, timeout=0)
+
+        try:
+            if not config.env.force:
+                logger.debug(f"🔐 Acquiring lock for '{script.name}'...")
+                with lock:
+                    logger.debug(f"🔒 Lock acquired for '{script.name}'.")
+                    self._execute_with_logging(script)
+            else:
+                logger.warning(f"⚠ Force flag set. Skipping lock for '{script.name}'.")
+                self._execute_with_logging(script)
+        except Timeout:
+            logger.error(
+                f"Another instance of '{script.name}' is already running. "
+                "Run using --force to override."
+            )
+        finally:
+            logger.debug(f"🔓 Releasing lock for '{script.name}'.")
+
+    def _execute_with_logging(self, script: Path):
+        """
+        ⚙ Executes the script and logs output.
+
+        Args:
+            script (Path): The script to execute.
+        """
         success, error, details = self.execute(script)
 
         if not success:

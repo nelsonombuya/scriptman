@@ -13,6 +13,7 @@ dynaconf = "^3.2.6"
 loguru = "^0.7.3"
 pydantic = "^2.10.3"
 tomlkit = "^0.13.2"
+filelock = "^3.16.1"
 
 
 [tool.poetry.group.dev.dependencies]

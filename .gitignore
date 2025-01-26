@@ -1,4 +1,10 @@
+# File Extensions
 *.pyc
 *.log
+*.zip
 .secrets.*
 codium_*.py
+
+# Folders
+logs
+downloads

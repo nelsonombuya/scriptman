@@ -5,7 +5,7 @@ from re import MULTILINE, sub
 from filelock import FileLock, Timeout
 from loguru import logger
 
-from scriptman.core._config import config
+from scriptman.core.config import config
 from scriptman.utils._retry import retry
 from scriptman.utils._time_calculator import TimeCalculator
 

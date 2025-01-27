@@ -19,7 +19,7 @@ class Version(BaseModel):
 
     major: int = Field(default=2, description="Major version number")
     minor: int = Field(default=0, description="Minor version number")
-    commit: int = Field(default=0, description="Commit count")
+    commit: int = Field(default=193, description="Commit count")
 
     def __str__(self) -> str:
         """
@@ -159,6 +159,6 @@ class Version(BaseModel):
     def scriptman(self) -> str:
         scriptman_file = Path(__file__).parent / "logo.txt"
         if not scriptman_file.exists():
-            return f"🦸‍♂️ Scriptman v{self} 🦸‍♀️"
+            return f"Scriptman v{self}"
         with scriptman_file.open("r", encoding="utf-8") as f:
             return f.read()

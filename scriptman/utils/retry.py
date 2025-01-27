@@ -4,7 +4,7 @@ from typing import Any, Callable, Optional, Type, Union, cast
 
 from loguru import logger
 
-from scriptman.core._config import config
+from scriptman.core.config import config
 from scriptman.utils._generics import AsyncFunc, SyncFunc, T
 
 

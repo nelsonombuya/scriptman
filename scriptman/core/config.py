@@ -1,6 +1,7 @@
 import sys
 from datetime import datetime
 from pathlib import Path
+from subprocess import run
 from typing import Any, Callable, Optional
 
 from dynaconf import Dynaconf
@@ -231,6 +232,44 @@ class Config:
 
         self.callback_function = callback_function
         return True
+
+    def update_package(self, version: str = "latest") -> None:
+        """
+        📦 Update the scriptman package from GitHub.
+
+        Args:
+            version (str, optional): The version to update to. Defaults to "latest".
+        """
+
+        try:
+            if version == "latest":
+                major, minor, commit = str(
+                    self._version.read_version_from_pyproject()
+                ).split(".")
+
+                commit = self._version.get_commit_count()
+            else:
+                major, minor, commit = str(version).split(".")
+
+            major, minor, commit = int(major), int(minor), int(commit)
+        except ValueError:
+            raise ValueError(
+                f'Invalid version format: "{version}" '
+                "Please provide a valid major.minor.commit format with all integers."
+            )
+
+        self._version.major, self._version.minor, self._version.commit = (
+            major,
+            minor,
+            commit,
+        )
+
+        run(["poetry", "update"], check=True)  # Update Dependencies
+        self._version.update_version_in_file("major", self._version.major)
+        self._version.update_version_in_file("minor", self._version.minor)
+        self._version.update_version_in_file("commit", self._version.commit)
+        run(["poetry", "version", str(self._version)])  # Update Package Version
+        logger.info("📦 Package updated successfully")
 
 
 # Singleton instance

@@ -60,6 +60,16 @@ class GeneralParser(BaseParser):
             help="Display version",
             version=f"Scriptman {config._version}",
         )
+        self.parser.add_argument(
+            "-u",
+            "--update",
+            nargs="?",
+            const="latest",
+            metavar="VERSION",
+            help="Update Scriptman Package to the given version "
+            "(or 'latest' if not provided). "
+            "NOTE: Kindly use semantic versioning for the version.",
+        )
 
     def process(self, args: Namespace) -> int:
         """
@@ -86,6 +96,10 @@ class GeneralParser(BaseParser):
 
         if args.cleanup:
             CleanUp().cleanup()
+            return 0
+
+        if args.update:
+            config.update_package(version=args.update)
             return 0
 
         self.parser.print_help()

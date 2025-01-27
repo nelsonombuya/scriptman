@@ -5,7 +5,7 @@ from typing import Any, Callable, Optional, Type, Union, cast
 from loguru import logger
 
 from scriptman.core.config import config
-from scriptman.utils._generics import AsyncFunc, SyncFunc, T
+from scriptman.utils.generics import AsyncFunc, SyncFunc, T
 
 
 def retry(

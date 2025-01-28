@@ -7,4 +7,5 @@ codium_*.py
 
 # Folders
 logs
+.qodo
 downloads

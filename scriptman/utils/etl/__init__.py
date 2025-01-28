@@ -269,7 +269,7 @@ class ETL(DataFrame):
 
     def _upsert(
         self, database_handler: DatabaseHandler, table_name: str, record: dict[str, Any]
-    ) -> None:
+    ) -> bool:
         """
         Private method to upsert a single record into the database.
 
@@ -288,9 +288,11 @@ class ETL(DataFrame):
             table_name, DataFrame([record])
         )
 
+        results: list[bool] = []
         for value in values:
             try:
-                database_handler.execute_write_query(insert_query, value)
+                results.append(database_handler.execute_write_query(insert_query, value))
             except DatabaseError as error:
                 self.log.error(f"Database Error: {error}. Retrying using update...")
-                database_handler.execute_write_query(update_query, value)
+                results.append(database_handler.execute_write_query(update_query, value))
+        return all(results)

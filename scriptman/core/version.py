@@ -19,7 +19,7 @@ class Version(BaseModel):
 
     major: int = Field(default=2, description="Major version number")
     minor: int = Field(default=0, description="Minor version number")
-    commit: int = Field(default=197, description="Commit count")
+    commit: int = Field(default=201, description="Commit count")
 
     def __str__(self) -> str:
         """

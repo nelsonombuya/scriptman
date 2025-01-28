@@ -10,7 +10,7 @@ from scriptman.utils.retry import retry
 from scriptman.utils.time_calculator import TimeCalculator
 
 
-class ScriptsHandler:
+class Scripts:
     def run_scripts(self, scripts: list[Path]) -> None:
         """
         🏃‍♂️ Executes a list of scripts either concurrently or sequentially based on the

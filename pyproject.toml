@@ -12,8 +12,11 @@ python = "^3.13"
 dynaconf = "^3.2.6"
 filelock = "^3.16.1"
 loguru = "^0.7.3"
+pandas = "^2.2.3"
 pydantic = "^2.10.5"
 tomlkit = "^0.13.2"
+tqdm = "^4.67.1"
+sqlalchemy = "^2.0.37"
 
 
 [tool.poetry.group.dev.dependencies]

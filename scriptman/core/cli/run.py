@@ -5,7 +5,7 @@ from loguru import logger
 
 from scriptman.core.cli._parser import BaseParser
 from scriptman.core.config import config
-from scriptman.core.scripts import ScriptsHandler
+from scriptman.core.scripts import Scripts
 
 
 class RunSubParser(BaseParser):
@@ -100,7 +100,7 @@ class RunSubParser(BaseParser):
         config.env.force = args.force
 
         try:
-            ScriptsHandler().run_scripts(scripts)
+            Scripts().run_scripts(scripts)
             return 0
         except Exception as e:
             logger.error(f"❌ An error occurred while running the scripts: {e}")

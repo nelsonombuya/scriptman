@@ -68,8 +68,6 @@ from typing import List, Optional, Tuple, Union
 
 import pyodbc
 
-from scriptman._logs import LogHandler, LogLevel
-
 
 class DatabaseHandler:
     """

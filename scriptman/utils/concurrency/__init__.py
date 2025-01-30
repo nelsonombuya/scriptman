@@ -53,7 +53,7 @@ class TaskExecutor:
         process_pool_size: Optional[int] = None,
     ):
         """
-        Initialize the TaskExecutor with configurable pool sizes.
+        🚀 Initialize the TaskExecutor with configurable pool sizes.
 
         Args:
             thread_pool_size: Maximum number of threads for I/O-bound tasks
@@ -209,7 +209,8 @@ class TaskExecutor:
         batch_id: Optional[str] = None,
         raise_on_error: bool = True,
     ) -> BatchResult[T]:
-        """🌐 Process I/O-bound tasks in parallel using threading.
+        """
+        🌐 Process I/O-bound tasks in parallel using threading.
 
         Optimized for tasks that spend time waiting for external resources.
 
@@ -315,5 +316,5 @@ class TaskExecutor:
 
     @staticmethod
     def wait(coroutine: Coroutine[Any, Any, T]) -> T:
-        """Runs an async coroutine synchronously and waits for the result."""
+        """⌚ Runs an async coroutine synchronously and waits for the result."""
         return run(coroutine)

@@ -7,7 +7,8 @@ from pandas import DataFrame, read_csv
 
 from scriptman.core.config import config
 from scriptman.utils.concurrency import TaskExecutor
-from scriptman.utils.database._database import DatabaseError, DatabaseHandler
+from scriptman.utils.database._database import DatabaseHandler
+from scriptman.utils.database._exceptions import DatabaseError
 from scriptman.utils.etl._extractor import DataExtractor
 from scriptman.utils.generics import T
 from scriptman.utils.time_calculator import TimeCalculator
@@ -19,7 +20,7 @@ class ETL(DataFrame):
     @contextmanager
     def extraction_context(self, context_name: str = "Code Block"):
         """
-        A context manager for data extraction processes, logging the start, completion,
+        📂 A context manager for data extraction processes, logging the start, completion,
         and details of the extracted data.
 
         Args:
@@ -54,7 +55,7 @@ class ETL(DataFrame):
 
     def from_csv_file(self, file_name: str, directory: Optional[Path] = None) -> "ETL":
         """
-        Extract data from a CSV file.
+        📃 Extract data from a CSV file.
 
         Args:
             file_name (str): The name of the CSV file to extract from.
@@ -86,7 +87,7 @@ class ETL(DataFrame):
 
     def from_json_file(self, file_name: str, directory: Optional[Path] = None) -> "ETL":
         """
-        Extract data from a JSON file.
+        📃 Extract data from a JSON file.
 
         Args:
             file_name (str): The name of the JSON file to extract from.
@@ -126,13 +127,28 @@ class ETL(DataFrame):
         query: str,
         params: dict[str, Any],
     ) -> "ETL":
+        """
+        📂 Extract data from a database using a provided query.
+
+        Args:
+            database_handler (DatabaseHandler): The handler to manage the database
+                connection.
+            query (str): The SQL query to execute for data extraction.
+            params (dict[str, Any]): A dictionary of parameters to use in the query.
+
+        Returns:
+            ETL: The extracted data as an ETL object.
+
+        Logs:
+            - Context: "Database" extraction context.
+        """
         with self.extraction_context("Database"):
             self = ETL(database_handler.execute_read_query(query, params))
         return self
 
     def from_extractor(self, extractor: DataExtractor[T]) -> "ETL":
         """
-        Extract data using a custom extractor implementation
+        ⚙ Extract data using a custom extractor implementation
 
         Args:
             extractor: An instance of DataExtractor that implements the extraction logic
@@ -142,7 +158,7 @@ class ETL(DataFrame):
         """
         with self.extraction_context(extractor.__class__.__name__):
             data = extractor.extract()
-            if isinstance(data, (list, DataFrame, dict)):
+            if isinstance(data, (list, DataFrame, dict, tuple)):
                 self = ETL(data)
             else:
                 raise ValueError(f"Unsupported data type from extractor: {type(data)}")
@@ -154,7 +170,7 @@ class ETL(DataFrame):
 
     def to_json_file(self, file_name: str, directory: Optional[Path] = None) -> Path:
         """
-        Saves the data to a JSON file using the given file name and directory.
+        📃 Saves the data to a JSON file using the given file name and directory.
 
         Args:
             file_name (str): The name of the file to save.
@@ -181,7 +197,7 @@ class ETL(DataFrame):
 
     def to_csv_file(self, file_name: str, directory: Optional[Path] = None) -> Path:
         """
-        Saves the data to a CSV file using the given file name and directory.
+        📃 Saves the data to a CSV file using the given file name and directory.
 
         Args:
             file_name (str): The name of the file to save.
@@ -216,8 +232,11 @@ class ETL(DataFrame):
         method: Literal["truncate", "replace", "upsert"] = "upsert",
     ) -> bool:
         """
-        Loads the ETL data into a database table, with options for batch execution and
+        📂 Loads the ETL data into a database table, with options for batch execution and
         different loading methods (truncate, replace, upsert).
+
+        NOTE: To have the database be created/inserted/updated with the correct keys,
+        ensure that the indices are defined in the dataset using the `set_index` method.
 
         Args:
             database_handler (DatabaseHandler): The database handler to use for executing
@@ -249,11 +268,19 @@ class ETL(DataFrame):
         if method == "truncate" and table_exists:
             database_handler.truncate_table(table_name)
 
-        elif method == "replace" and table_exists:
+        if method == "replace" and table_exists:
             database_handler.drop_table(table_name)
 
+        if method == "upsert" and self.index.empty:
+            message = (
+                "Dataset has no index! "
+                "Please set the index using the `set_index` method."
+            )
+            self.log.warning(message)
+            raise ValueError(message)
+
         if not table_exists:
-            self.log.warning(f'Table "{table_name}" does not exist.')
+            self.log.warning(f'Table "{table_name}" does not exist. Creating table...')
             database_handler.create_table(
                 table_name=table_name,
                 keys=self.data.index.names,
@@ -283,7 +310,7 @@ class ETL(DataFrame):
             return all(
                 TaskExecutor.wait(
                     TaskExecutor().parallel_io_bound_task(
-                        func=self._upsert,
+                        func=self._insert_or_update,
                         args=[(database_handler, table_name, value) for value in values],
                     )
                 ).results
@@ -291,11 +318,11 @@ class ETL(DataFrame):
 
         return True
 
-    def _upsert(
+    def _insert_or_update(
         self, database_handler: DatabaseHandler, table_name: str, record: dict[str, Any]
     ) -> bool:
         """
-        Private method to upsert a single record into the database.
+        ✍🏾 Private method to insert/update a single record into the database.
 
         This method tries to insert the record into the database first, and if
         that fails, it retries using an update query.
@@ -303,7 +330,7 @@ class ETL(DataFrame):
         Args:
             database_handler (DatabaseHandler): The handler for the database.
             table_name (str): The name of the table.
-            record (dict[str, Any]): The record to upsert.
+            record (dict[str, Any]): The record to insert or update.
         """
         insert_query, values = database_handler.generate_prepared_insert_query(
             table_name, DataFrame([record])

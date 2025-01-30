@@ -63,7 +63,7 @@ class Config:
 
     def _initialize_logging(self, verbose: bool = False) -> None:
         """
-        Initialize logging for the CLI handler.
+        📝 Initialize logging for the CLI handler.
         """
         logger.remove()
         log_level = self.env.log_level

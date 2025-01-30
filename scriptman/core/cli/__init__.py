@@ -59,7 +59,7 @@ class CLI:
 
     def run(self, argv: Optional[list[str]] = None) -> int:
         """
-        Parse arguments and execute actions based on CLI configuration.
+        🏃🏾‍♂️ Parse arguments and execute actions based on CLI configuration.
 
         Args:
             argv (Optional[List[str]]): Command-line arguments.

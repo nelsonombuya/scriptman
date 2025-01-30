@@ -11,6 +11,13 @@ from scriptman.core.scripts import Scripts
 class RunSubParser(BaseParser):
 
     def __init__(self, sub_parser: _SubParsersAction) -> None:
+        """
+        🚀 Initializes a RunSubParser instance with an ArgumentParser.
+
+        Args:
+            sub_parser: ArgumentParser instance to use for parsing CLI arguments.
+        """
+
         self.parser: ArgumentParser = sub_parser.add_parser(
             "run", help="Run scripts with advanced configuration options."
         )

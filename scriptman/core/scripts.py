@@ -38,7 +38,7 @@ class Scripts:
 
     def _execute_scripts_sequentially(self, scripts: list[Path]) -> None:
         """
-        Executes a list of scripts sequentially.
+        🏃🏾‍♂️🏃🏾‍♂️ Executes a list of scripts sequentially.
 
         Args:
             scripts (list[Path]): A list of Path objects representing the scripts to be
@@ -49,7 +49,7 @@ class Scripts:
 
     def _execute_scripts_concurrently(self, scripts: list[Path]) -> None:
         """
-        Executes a list of scripts concurrently.
+        🛤 Executes a list of scripts concurrently.
 
         This method runs all the provided scripts asynchronously using asyncio.
 
@@ -108,6 +108,17 @@ class Scripts:
                 )
 
     def execute(self, file_path: Path) -> tuple[bool, Exception | None, dict | None]:
+        """
+        🏃🏾‍♂️ Runs a script and logs its output.
+
+        Args:
+            file_path (Path): The path of the script to run.
+
+        Returns:
+            tuple[bool, Exception | None, dict | None]: A tuple containing a boolean
+                indicating success, an exception representing the error if any, and a
+                dictionary containing any additional details.
+        """
         try:
             with open(file_path, "r") as script_file:
                 script_content = script_file.read()

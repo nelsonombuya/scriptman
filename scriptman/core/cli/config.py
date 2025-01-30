@@ -7,6 +7,13 @@ from scriptman.core.defaults import ConfigModel
 
 class ConfigSubParser(BaseParser):
     def __init__(self, sub_parser: _SubParsersAction) -> None:
+        """
+        🚀 Initialize a ConfigSubParser instance with an ArgumentParser.
+
+        Args:
+            sub_parser: ArgumentParser instance to use for parsing CLI arguments.
+        """
+
         self.parser: ArgumentParser = sub_parser.add_parser(
             "config", help="Manage scriptman settings"
         )
@@ -16,6 +23,12 @@ class ConfigSubParser(BaseParser):
 
     @property
     def command(self) -> str:
+        """
+        ⚙ Get the name of the command being parsed.
+
+        Returns:
+            str: The name of the command being parsed.
+        """
         return "config"
 
     def config(self):

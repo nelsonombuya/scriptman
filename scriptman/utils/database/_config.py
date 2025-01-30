@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class DatabaseConfig(BaseModel):
     """
-    Database configuration model to store the connection string for the database.
+    ⚙ Database configuration model to store the connection string for the database.
     """
 
     driver: str

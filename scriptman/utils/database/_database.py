@@ -14,7 +14,7 @@ from scriptman.utils.time_calculator import TimeCalculator
 class DatabaseHandler(ABC):
     def __init__(self, config: DatabaseConfig) -> None:
         """
-        Initializes the DatabaseHandler class.
+        🚀 Initializes the DatabaseHandler class.
 
         Args:
             connection_string (str): The connection string for the database.
@@ -29,7 +29,7 @@ class DatabaseHandler(ABC):
     @property
     def database_name(self) -> str:
         """
-        Get the name of the database.
+        🆔 Get the name of the database.
 
         Returns:
             str: The name of the database.
@@ -40,7 +40,7 @@ class DatabaseHandler(ABC):
     @abstractmethod
     def database_type(self) -> str:
         """
-        Get the type of the database.
+        🆔 Get the type of the database.
 
         Returns:
             str: The type of the database.
@@ -51,7 +51,10 @@ class DatabaseHandler(ABC):
     @abstractmethod
     def connection_string(self) -> str:
         """
-        Get the connection string for the database.
+        ✍🏾 Get the connection string for the database.
+
+        NOTE: This should convert the database config into an appropriate connection
+        string for the handler.
 
         Returns:
             str: The connection string for the database.
@@ -61,7 +64,7 @@ class DatabaseHandler(ABC):
     @abstractmethod
     def connect(self) -> bool:
         """
-        Connects to the database using the connection string provided.
+        🔗 Connects to the database using the connection string provided.
 
         Raises:
             DatabaseError: If a connection to the database cannot be established.
@@ -71,7 +74,7 @@ class DatabaseHandler(ABC):
     @abstractmethod
     def disconnect(self) -> bool:
         """
-        Closes the database connection if there was a connection.
+        🛑 Closes the database connection if there was a connection.
 
         Raises:
             DatabaseError: If there was an error disconnecting from the database.
@@ -83,7 +86,7 @@ class DatabaseHandler(ABC):
         self, query: str, params: dict[str, Any] = {}
     ) -> list[dict[str, Any]]:
         """
-        Executes the given SQL query with optional parameters and returns the
+        📖 Executes the given SQL query with optional parameters and returns the
         results as a list of dictionaries.
 
         NOTE: This method should be used for SELECT queries only; and is best used with
@@ -106,7 +109,7 @@ class DatabaseHandler(ABC):
         check_affected_rows: bool = False,
     ) -> bool:
         """
-        Executes the given SQL query with optional parameters and commits the
+        ✍🏾 Executes the given SQL query with optional parameters and commits the
         transaction.
 
         NOTE: This method should be used for INSERT, UPDATE, DELETE, and other write
@@ -131,7 +134,7 @@ class DatabaseHandler(ABC):
         batch_size: Optional[int] = config.env.get("BATCH_SIZE"),
     ) -> bool:
         """
-        Executes multiple SQL insert queries with the given SQL query and rows.
+        📃 Executes multiple SQL insert queries with the given SQL query and rows.
 
         NOTE: This method should be used for INSERT/UPDATE queries only; and is best used
         with prepared queries.
@@ -149,7 +152,7 @@ class DatabaseHandler(ABC):
 
     def table_exists(self, table_name: str) -> bool:
         """
-        Checks if the given table exists in the database.
+        ❓ Checks if the given table exists in the database.
 
         Args:
             table_name (str): The name of the table to check.
@@ -166,7 +169,7 @@ class DatabaseHandler(ABC):
 
     def table_has_records(self, table_name: str) -> bool:
         """
-        Checks if the given table has records in the database.
+        ❓ Checks if the given table has records in the database.
 
         Args:
             table_name (str): The name of the table to check.
@@ -181,7 +184,7 @@ class DatabaseHandler(ABC):
         self, table_name: str, columns: dict[str, str], keys: Optional[list[str]] = None
     ) -> bool:
         """
-        Creates a table with the given name and columns.
+        🔨 Creates a table with the given name and columns.
 
         Args:
             table_name (str): The name of the table.
@@ -216,7 +219,7 @@ class DatabaseHandler(ABC):
 
     def truncate_table(self, table_name: str) -> bool:
         """
-        Truncates the given table if it exists.
+        🧹 Truncates the given table if it exists.
 
         Args:
             table_name (str): The name of the table.
@@ -238,7 +241,7 @@ class DatabaseHandler(ABC):
 
     def drop_table(self, table_name: str) -> bool:
         """
-        Drops the given table if it exists.
+        🧹 Drops the given table if it exists.
 
         Args:
             table_name (str): The name of the table.
@@ -262,7 +265,7 @@ class DatabaseHandler(ABC):
         self, df: DataFrame, force_nvarchar: bool = False
     ) -> dict[str, str]:
         """
-        Returns a dictionary of column names to their corresponding SQL data types.
+        ❔ Returns a dictionary of column names to their corresponding SQL data types.
 
         This function takes a Pandas DataFrame and an optional boolean parameter
         `force_nvarchar` which if set to True will force all columns to be
@@ -301,7 +304,7 @@ class DatabaseHandler(ABC):
         self, table_name: str, df: DataFrame, prepare_data: bool = True
     ) -> tuple[str, list[dict[str, Any]]]:
         """
-        Generates a prepared SQL insert query for the given table and DataFrame.
+        ✍🏾 Generates a prepared SQL insert query for the given table and DataFrame.
 
         Args:
             table_name (str): The name of the table to insert into.
@@ -324,7 +327,7 @@ class DatabaseHandler(ABC):
         self, table_name: str, df: DataFrame, prepare_data: bool = True
     ) -> tuple[str, list[dict[str, Any]]]:
         """
-        Generates a prepared SQL update query for the given table and DataFrame.
+        ✍🏾 Generates a prepared SQL update query for the given table and DataFrame.
 
         Args:
             table_name (str): The name of the table to update.
@@ -350,7 +353,7 @@ class DatabaseHandler(ABC):
         self, table_name: str, df: DataFrame, prepare_data: bool = True
     ) -> tuple[str, list[dict[str, Any]]]:
         """
-        Generates a prepared SQL delete query for the given table and DataFrame.
+        ✍🏾 Generates a prepared SQL delete query for the given table and DataFrame.
 
         Args:
             table_name (str): The name of the table to delete from.
@@ -374,7 +377,7 @@ class DatabaseHandler(ABC):
         self, table_name: str, df: DataFrame, prepare_data: bool = True
     ) -> tuple[str, list[dict[str, Any]]]:
         """
-        Generates a prepared SQL upsert query for the given table and DataFrame.
+        ✍🏾 Generates a prepared SQL upsert query for the given table and DataFrame.
 
         Args:
             table_name (str): The name of the table to upsert into.
@@ -421,7 +424,7 @@ class DatabaseHandler(ABC):
         self, table_name: str, df: DataFrame, prepare_data: bool = True
     ) -> tuple[str, list[dict[str, Any]]]:
         """
-        Generates a SQL MERGE INTO query for the given table and DataFrame.
+        ✍🏾 Generates a SQL MERGE INTO query for the given table and DataFrame.
 
         Args:
             table_name (str): The name of the table to merge into.
@@ -463,7 +466,6 @@ class DatabaseHandler(ABC):
         values = self.transform_df_to_dict(df, prepare_data)
         return query, values
 
-    @TimeCalculator.calculate_time_for_function
     def convert_query_to_named_placeholders(
         self, query: str, values: list[tuple]
     ) -> tuple[str, list[dict[str, Any]]]:
@@ -483,76 +485,78 @@ class DatabaseHandler(ABC):
                 the list of dictionaries where the keys are the column names and
                 index names and the values are the corresponding values for each row.
         """
-        column_names: list = []
-        result: list[dict[str, Any]] = []
+        with TimeCalculator.time_context_manager("Reverse Engineering Query"):
+            column_names: list = []
+            result: list[dict[str, Any]] = []
 
-        if query.strip().upper().startswith("UPDATE"):  # UPDATE QUERY
-            search_result = search(r"SET (.*?) WHERE", query, IGNORECASE)
-            assert search_result is not None, "Invalid UPDATE query"
-            column_names = [
-                column.split("=")[0].strip().strip('"')
-                for column in search_result.group(1).split(",")
-            ]
+            if query.strip().upper().startswith("UPDATE"):  # UPDATE QUERY
+                search_result = search(r"SET (.*?) WHERE", query, IGNORECASE)
+                assert search_result is not None, "Invalid UPDATE query"
+                column_names = [
+                    column.split("=")[0].strip().strip('"')
+                    for column in search_result.group(1).split(",")
+                ]
 
-            search_result = search(r"WHERE (.*)", query, IGNORECASE)
-            assert search_result is not None, "Invalid UPDATE query"
-            where_clause = search_result.group(1)
-            index_names = [
-                column.split("=")[0].strip().strip('"')
-                for column in where_clause.split("AND")
-            ]
+                search_result = search(r"WHERE (.*)", query, IGNORECASE)
+                assert search_result is not None, "Invalid UPDATE query"
+                where_clause = search_result.group(1)
+                index_names = [
+                    column.split("=")[0].strip().strip('"')
+                    for column in where_clause.split("AND")
+                ]
 
-            for value_tuple in tqdm(values, desc="Processing rows"):
-                row_dict = {}
-                for i, column_name in enumerate(column_names):
-                    row_dict[column_name] = value_tuple[i]
-                for i, index_name in enumerate(index_names):
-                    row_dict[index_name] = value_tuple[len(column_names) + i]
-                result.append(row_dict)
+                for value_tuple in tqdm(values, desc="Processing rows"):
+                    row_dict = {}
+                    for i, column_name in enumerate(column_names):
+                        row_dict[column_name] = value_tuple[i]
+                    for i, index_name in enumerate(index_names):
+                        row_dict[index_name] = value_tuple[len(column_names) + i]
+                    result.append(row_dict)
 
-            column_names += index_names
+                column_names += index_names
 
-        elif query.strip().upper().startswith("INSERT INTO"):  # INSERT QUERY
-            match_result = match(
-                r'INSERT INTO "([^"]+)" \(([^)]+)\) VALUES \(([^)]+)\)',
-                query.strip(),
-                IGNORECASE,
-            )
-            assert match_result is not None, "Invalid INSERT INTO query"
-            column_names = [
-                column.strip().strip('"') for column in match_result.group(2).split(",")
-            ]
+            elif query.strip().upper().startswith("INSERT INTO"):  # INSERT QUERY
+                match_result = match(
+                    r'INSERT INTO "([^"]+)" \(([^)]+)\) VALUES \(([^)]+)\)',
+                    query.strip(),
+                    IGNORECASE,
+                )
+                assert match_result is not None, "Invalid INSERT INTO query"
+                column_names = [
+                    column.strip().strip('"')
+                    for column in match_result.group(2).split(",")
+                ]
 
-            for value_tuple in tqdm(values, desc="Processing rows"):
-                row_dict = {}
-                for i, column_name in enumerate(column_names):
-                    row_dict[column_name] = value_tuple[i]
-                result.append(row_dict)
+                for value_tuple in tqdm(values, desc="Processing rows"):
+                    row_dict = {}
+                    for i, column_name in enumerate(column_names):
+                        row_dict[column_name] = value_tuple[i]
+                    result.append(row_dict)
 
-        elif query.strip().upper().startswith("DELETE FROM"):  # DELETE QUERY
-            match_result = match(
-                r'DELETE FROM "([^"]+)" WHERE (.*)', query.strip(), IGNORECASE
-            )
-            assert match_result is not None, "Invalid DELETE FROM query"
-            column_names = [
-                column.split("=")[0].strip().strip('"')
-                for column in match_result.group(2).split("AND")
-            ]
+            elif query.strip().upper().startswith("DELETE FROM"):  # DELETE QUERY
+                match_result = match(
+                    r'DELETE FROM "([^"]+)" WHERE (.*)', query.strip(), IGNORECASE
+                )
+                assert match_result is not None, "Invalid DELETE FROM query"
+                column_names = [
+                    column.split("=")[0].strip().strip('"')
+                    for column in match_result.group(2).split("AND")
+                ]
 
-            for value_tuple in tqdm(values, desc="Processing rows"):
-                row_dict = {}
-                for i, column_name in enumerate(column_names):
-                    row_dict[column_name] = value_tuple[i]
-                result.append(row_dict)
+                for value_tuple in tqdm(values, desc="Processing rows"):
+                    row_dict = {}
+                    for i, column_name in enumerate(column_names):
+                        row_dict[column_name] = value_tuple[i]
+                    result.append(row_dict)
 
-        for column_name in tqdm(column_names, desc="Converting placeholders"):
-            query = sub(r"\?", f":{column_name}", query, count=1)
-        return query, result
+            for column_name in tqdm(column_names, desc="Converting placeholders"):
+                query = sub(r"\?", f":{column_name}", query, count=1)
+            return query, result
 
     @staticmethod
     def transform_df_to_dict(df: DataFrame, prepare: bool = True) -> list[dict[str, Any]]:
         """
-        Transforms a pandas DataFrame into a list of dictionaries.
+        ⛓ Transforms a pandas DataFrame into a list of dictionaries.
 
         Args:
             df (DataFrame): The DataFrame to transform.
@@ -573,27 +577,14 @@ class DatabaseHandler(ABC):
                     for key, value in df.reset_index().to_dict(orient="records")
                 ]
         else:
-            values = df.reset_index().to_dict(orient="records")  # type:ignore # HACK
+            # HACK: Ignoring the string index conversion for now
+            values = df.reset_index().to_dict(orient="records")  # type:ignore
 
         return values
 
     def __del__(self) -> None:
         """
-        Destructor to disconnect from the database when the instance is
+        🧹 Destructor to disconnect from the database when the instance is
         destroyed.
         """
         self.disconnect()
-
-
-class DatabaseError(Exception):
-    def __init__(self, message: str, original_exception: Optional[Exception] = None):
-        """
-        Initializes the DatabaseError class.
-
-        Args:
-            message (str): The error message.
-            original_exception (Exception, optional): The original exception that caused
-                this error. Defaults to None.
-        """
-        super().__init__(message)
-        self.original_exception = original_exception

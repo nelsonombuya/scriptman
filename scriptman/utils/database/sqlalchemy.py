@@ -6,17 +6,14 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from tqdm import tqdm
 
-from scriptman.utils.database._database import (
-    DatabaseConfig,
-    DatabaseError,
-    DatabaseHandler,
-)
+from scriptman.utils.database._database import DatabaseConfig, DatabaseHandler
+from scriptman.utils.database._exceptions import DatabaseError
 
 
 class SQLAlchemyHandler(DatabaseHandler):
     def __init__(self, config: DatabaseConfig) -> None:
         """
-        Initializes the SQLAlchemyHandler class.
+        🚀 Initializes the SQLAlchemyHandler class.
 
         Args:
             config (DatabaseConfig): The configuration settings for the database.
@@ -28,7 +25,7 @@ class SQLAlchemyHandler(DatabaseHandler):
     @property
     def database_type(self) -> str:
         """
-        Returns the type of database being used.
+        📁 Returns the type of database being used.
 
         Returns:
             str: The type of database being used.
@@ -38,7 +35,7 @@ class SQLAlchemyHandler(DatabaseHandler):
     @property
     def connection_string(self) -> str:
         """
-        Generates a connection string for the database using the configuration settings.
+        ✍🏾 Generates a connection string for the database using the configuration settings
 
         Returns:
             str: The connection string for the database.
@@ -53,7 +50,7 @@ class SQLAlchemyHandler(DatabaseHandler):
 
     def connect(self) -> bool:
         """
-        Connects to the database using the connection string provided.
+        🔗 Connects to the database using the connection string provided.
 
         Returns:
             bool: True if a connection to the database was established, False otherwise.
@@ -73,7 +70,7 @@ class SQLAlchemyHandler(DatabaseHandler):
 
     def disconnect(self) -> bool:
         """
-        Closes the database connection if there was a connection.
+        🛑 Closes the database connection if there was a connection.
 
         Returns:
             bool: True if the connection was closed successfully, False otherwise.
@@ -93,7 +90,7 @@ class SQLAlchemyHandler(DatabaseHandler):
         self, query: str, params: dict[str, Any] = {}
     ) -> list[dict[str, Any]]:
         """
-        Executes the given SQL query with optional parameters and returns the
+        📖 Executes the given SQL query with optional parameters and returns the
         results as a list of dictionaries.
 
         Args:
@@ -126,7 +123,7 @@ class SQLAlchemyHandler(DatabaseHandler):
         check_affected_rows: bool = False,
     ) -> bool:
         """
-        Executes a given SQL write query with optional parameters and commits the
+        ✍🏾 Executes a given SQL write query with optional parameters and commits the
         transaction.
 
         Args:
@@ -168,7 +165,7 @@ class SQLAlchemyHandler(DatabaseHandler):
         batch_size: Optional[int] = None,
     ) -> bool:
         """
-        Executes a bulk write operation with the given query and rows of parameters.
+        ⛓ Executes a bulk write operation with the given query and rows of parameters.
         Optionally processes the data in batches for memory efficiency.
 
         Args:

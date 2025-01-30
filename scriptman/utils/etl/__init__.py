@@ -18,13 +18,13 @@ class ETL(DataFrame):
     log: Logger = logger
 
     @contextmanager
-    def extraction_context(self, context_name: str = "Code Block"):
+    def extraction_context(self, context: str = "Code Block"):
         """
         📂 A context manager for data extraction processes, logging the start, completion,
         and details of the extracted data.
 
         Args:
-            context_name (str): The name of the context for logging purposes.
+            context (str): The name of the context for logging purposes.
 
         Yields:
             None: This is a generator function used as a context manager.
@@ -37,11 +37,11 @@ class ETL(DataFrame):
         """
 
         try:
-            with TimeCalculator.time_context_manager(context_name):
-                self.log.info(f"Data extraction from {context_name} started...")
+            with TimeCalculator.context(context):
+                self.log.info(f"Data extraction from {context} started...")
                 yield
         finally:
-            self.log.success(f"Data extraction from {context_name} complete.")
+            self.log.success(f"Data extraction from {context} complete.")
             num_records = len(self.data)
             if num_records > 0:
                 self.log.debug(f"Number of records extracted: {num_records}")

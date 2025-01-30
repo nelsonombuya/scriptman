@@ -50,7 +50,7 @@ class TimeCalculator:
             return time_parts[0]
 
     @staticmethod
-    def calculate_time_for_function(func: Callable) -> Callable:
+    def decorator(func: Callable) -> Callable:
         """
         🕰️ A decorator to calculate and display the time taken by a function.
 
@@ -72,7 +72,7 @@ class TimeCalculator:
 
     @contextmanager
     @staticmethod
-    def time_context_manager(context_name: str = "Code Block"):
+    def context(context: str = "Code Block"):
         """
         A context manager to calculate and display the time taken within a context.
         """
@@ -81,4 +81,4 @@ class TimeCalculator:
             yield
         finally:
             time_taken = TimeCalculator.calculate_time_taken(start_time, perf_counter())
-            logger.info(f"{context_name} took {time_taken} to execute.")
+            logger.info(f"{context} took {time_taken} to execute.")

@@ -485,7 +485,7 @@ class DatabaseHandler(ABC):
                 the list of dictionaries where the keys are the column names and
                 index names and the values are the corresponding values for each row.
         """
-        with TimeCalculator.time_context_manager("Reverse Engineering Query"):
+        with TimeCalculator.context("Reverse Engineering Query"):
             column_names: list = []
             result: list[dict[str, Any]] = []
 
@@ -571,7 +571,7 @@ class DatabaseHandler(ABC):
         values: list[dict[str, Any]]
 
         if prepare:
-            with TimeCalculator.time_context_manager("DataFrame to Dictionary"):
+            with TimeCalculator.context("DataFrame to Dictionary"):
                 values = [
                     {str(key): value}
                     for key, value in df.reset_index().to_dict(orient="records")

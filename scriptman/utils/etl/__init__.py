@@ -8,6 +8,8 @@ from pandas import DataFrame, read_csv
 from scriptman.core.config import config
 from scriptman.utils.concurrency import TaskExecutor
 from scriptman.utils.database._database import DatabaseError, DatabaseHandler
+from scriptman.utils.etl._extractor import DataExtractor
+from scriptman.utils.generics import T
 from scriptman.utils.time_calculator import TimeCalculator
 
 
@@ -126,6 +128,24 @@ class ETL(DataFrame):
     ) -> "ETL":
         with self.extraction_context("Database"):
             self = ETL(database_handler.execute_read_query(query, params))
+        return self
+
+    def from_extractor(self, extractor: DataExtractor[T]) -> "ETL":
+        """
+        Extract data using a custom extractor implementation
+
+        Args:
+            extractor: An instance of DataExtractor that implements the extraction logic
+
+        Returns:
+            ETL: The extracted data as an ETL object
+        """
+        with self.extraction_context(extractor.__class__.__name__):
+            data = extractor.extract()
+            if isinstance(data, (list, DataFrame, dict)):
+                self = ETL(data)
+            else:
+                raise ValueError(f"Unsupported data type from extractor: {type(data)}")
         return self
 
     """
@@ -250,19 +270,23 @@ class ETL(DataFrame):
             self.log.warning(
                 f"Bulk Query Execution Failed: {error}. Executing single queries..."
             )
-            TaskExecutor.run_async(
-                TaskExecutor().parallel_io_bound_task(
-                    func=database_handler.execute_write_query,
-                    args=[(query, row) for row in values],
-                )
+            return all(
+                TaskExecutor.wait(
+                    TaskExecutor().parallel_io_bound_task(
+                        func=database_handler.execute_write_query,
+                        args=[(query, row) for row in values],
+                    )
+                ).results
             )
         except DatabaseError as error:
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
-            TaskExecutor.run_async(
-                TaskExecutor().parallel_io_bound_task(
-                    func=self._upsert,
-                    args=[(database_handler, table_name, value) for value in values],
-                )
+            return all(
+                TaskExecutor.wait(
+                    TaskExecutor().parallel_io_bound_task(
+                        func=self._upsert,
+                        args=[(database_handler, table_name, value) for value in values],
+                    )
+                ).results
             )
 
         return True

@@ -46,3 +46,14 @@ class ConfigModel(BaseModel):
         default=False,
         description="Enable logging for each script instance",
     )
+    selenium_optimizations: bool = Field(
+        default=True,
+        description="Enable selenium optimizations",
+    )
+    chrome_download_url: str = Field(
+        default=(
+            "https://googlechromelabs.github.io/chrome-for-testing/"
+            "known-good-versions-with-downloads.json"
+        ),
+        description="URL to fetch Chrome download URLs",
+    )

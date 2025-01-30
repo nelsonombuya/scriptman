@@ -1,4 +1,3 @@
-# POETRY
 [tool.poetry]
 name = "scriptman"
 version = "2.0.201"
@@ -18,7 +17,6 @@ tomlkit = "^0.13.2"
 tqdm = "^4.67.1"
 sqlalchemy = "^2.0.37"
 
-
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"
 isort = "^5.13.2"
@@ -26,6 +24,11 @@ mypy = "^1.13.0"
 pytest = "^8.3.4"
 pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
+selenium = "^4.28.1"
+webdriver-manager = "^4.0.2"
+
+[tool.poetry.extras]
+selenium = ["selenium", "webdriver-manager"]
 
 [tool.poetry.scripts]
 scriptman = "scriptman.core.cli:CLI.start_cli_instance"
@@ -41,7 +44,7 @@ target-version = ['py313']
 
 [tool.isort]
 profile = "black"
-line_length = 90
+line-length = 90
 
 [tool.mypy]
 check_untyped_defs = true

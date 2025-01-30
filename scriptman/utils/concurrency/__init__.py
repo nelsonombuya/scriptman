@@ -314,6 +314,6 @@ class TaskExecutor:
         self._process_pool.shutdown(wait=True)
 
     @staticmethod
-    def run_async(coroutine: Coroutine) -> Any:
-        """Runs an async coroutine synchronously."""
+    def wait(coroutine: Coroutine[Any, Any, T]) -> T:
+        """Runs an async coroutine synchronously and waits for the result."""
         return run(coroutine)

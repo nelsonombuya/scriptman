@@ -9,3 +9,4 @@ codium_*.py
 logs
 .qodo
 downloads
+.tmp.driveupload

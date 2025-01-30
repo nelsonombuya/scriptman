@@ -75,7 +75,7 @@ class SeleniumInstance(ABC):
         ] = "click",
     ) -> bool:
         """
-        Interact with a web element on the page.
+        👉🏾 Interact with a web element on the page.
 
         Args:
             xpath (str): The XPath expression to locate the web element.
@@ -135,7 +135,7 @@ class SeleniumInstance(ABC):
 
     def wait_for_downloads_to_finish(self, file_name: Optional[str] = None) -> None:
         """
-        Wait for all downloads to finish before continuing.
+        ⌚ Wait for all downloads to finish before continuing.
 
         Args:
             file_name (Optional[str]): The name of the file you want to wait for its
@@ -167,7 +167,6 @@ class SeleniumInstance(ABC):
 
     def __del__(self) -> None:
         """
-        Close the WebDriver instance when the InteractionHandler
-        instance is deleted.
+        🧹 Close the WebDriver instance when the InteractionHandler instance is deleted.
         """
         self.driver.quit()

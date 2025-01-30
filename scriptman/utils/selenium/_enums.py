@@ -2,23 +2,49 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Generic, Union
 
-from selenium.webdriver import Chrome as ChromeDriver
-from selenium.webdriver import Edge as EdgeDriver
-from selenium.webdriver import Firefox as FirefoxDriver
+from loguru import logger
+
 
 from scriptman.utils.generics import T
-from scriptman.utils.selenium.browsers.edge import Edge
-from scriptman.utils.selenium.browsers.firefox import Firefox
-from scriptman.utils.selenium.browsers.chrome import Chrome
+from scriptman.utils.selenium.browsers.edge import Edge, EdgeDriver
+from scriptman.utils.selenium.browsers.firefox import Firefox, FirefoxDriver
+from scriptman.utils.selenium.browsers.chrome import Chrome, ChromeDriver
 
 Driver = Union[ChromeDriver, EdgeDriver, FirefoxDriver]
 
 
 class SeleniumBrowser(ABC, Generic[T]):
-    @property
+    _driver: T
+
+    def __init__(self) -> None:
+        """
+        🚀 Initialize the SeleniumBrowser instance and set the WebDriver instance.
+
+        This method calls the abstract method `_get_driver` to initialize the WebDriver
+        instance and assigns it to the `_driver` attribute.
+        """
+        self.log = logger.bind(handler=self.__class__.__qualname__)
+        self._driver = self._get_driver()
+
     @abstractmethod
-    def driver(self) -> T:
+    def _get_driver(self) -> T:
+        """
+        🏎 Get the WebDriver instance associated with the current browser.
+
+        Returns:
+            T: The WebDriver instance.
+        """
         pass
+
+    @property
+    def driver(self) -> T:
+        """
+        🏎 Get the WebDriver instance associated with the current Selenium browser.
+
+        Returns:
+            T: The WebDriver instance (Chrome, Edge, or Firefox) used by the browser.
+        """
+        return self._driver
 
 
 class Browsers(Enum):
@@ -40,7 +66,7 @@ class Browsers(Enum):
     CHROME_LOCAL = "Google Chrome (Local)"
 
 
-BrowserMap: dict[Browsers, type[SeleniumBrowser[Driver]]] = {
+BrowserMap: dict[Browsers, type[SeleniumBrowser]] = {
     Browsers.EDGE: Edge,
     Browsers.CHROME: Chrome,
     Browsers.FIREFOX: Firefox,

@@ -11,19 +11,10 @@ from scriptman.utils.selenium._enums import SeleniumBrowser
 
 
 class Edge(SeleniumBrowser[EdgeDriver]):
-    def __init__(self) -> None:
-        """
-        Initialize Edge instance and set the downloads directory.
-        """
-        self._driver = self._get_driver()
-
-    @property
-    def driver(self) -> EdgeDriver:
-        return self._driver
 
     def _get_driver(self) -> EdgeDriver:
         """
-        Get an Edge WebDriver instance with specified options.
+        🏎 Get an Edge WebDriver instance with specified options.
 
         Returns:
             webdriver.Edge: An Edge WebDriver instance.
@@ -36,7 +27,7 @@ class Edge(SeleniumBrowser[EdgeDriver]):
         self, edge_executable_path: Optional[Path] = None
     ) -> EdgeOptions:
         """
-        Get Edge WebDriver options with specified configurations.
+        ⚙ Get Edge WebDriver options with specified configurations.
 
         Args:
             edge_executable_path (str, optional): Path to the Edge binary

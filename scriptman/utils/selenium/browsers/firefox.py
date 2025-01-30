@@ -10,14 +10,14 @@ from scriptman.utils.selenium._enums import SeleniumBrowser
 
 
 class Firefox(SeleniumBrowser[FirefoxDriver]):
-    def __init__(self) -> None:
-        self._driver = self._get_driver()
-
-    @property
-    def driver(self) -> FirefoxDriver:
-        return self._driver
 
     def _get_driver(self) -> webdriver.Firefox:
+        """
+        🏎 Get the Firefox WebDriver instance associated with the current browser.
+
+        Returns:
+            webdriver.Firefox: The Firefox WebDriver instance.
+        """
         options = self._get_firefox_options()
         service = Service(GeckoDriverManager().install())
         return webdriver.Firefox(options=options, service=service)
@@ -27,7 +27,7 @@ class Firefox(SeleniumBrowser[FirefoxDriver]):
         firefox_executable_path: Optional[str] = None,
     ) -> webdriver.FirefoxOptions:
         """
-        Get Firefox WebDriver options with specified configurations.
+        ⚙ Get Firefox WebDriver options with specified configurations.
 
         Args:
             firefox_executable_path (str, optional): Path to the Firefox binary

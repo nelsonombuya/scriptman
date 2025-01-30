@@ -13,8 +13,8 @@ class SeleniumExtractor(SeleniumInstance, DataExtractor[PossibleSeleniumDataType
     @abstractmethod
     def extract(self) -> PossibleSeleniumDataTypes:
         """
-        Extract data from the source. If downloading a file, returns a Path object, or a
-        string containing the glob pattern; which will search for the file in the
+        🗃 Extract data from the source. If downloading a file, returns a Path object, or
+        a string containing the glob pattern; which will search for the file in the
         scriptman download folder.
 
         Returns:

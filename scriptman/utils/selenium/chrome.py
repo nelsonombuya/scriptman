@@ -1,4 +1,5 @@
 from pathlib import Path
+from shutil import rmtree
 from typing import Literal, Optional
 from zipfile import ZipFile
 from os import name
@@ -97,6 +98,7 @@ class ChromeDownloader:
     """
 
     log: Logger = logger.bind(handler="Chrome Downloader")
+    chrome_download_dir: Path = Path(config.env.downloads_dir, "..", "selenium")
 
     def download(self, version: int, app: Literal["driver", "browser"]) -> Path:
         """
@@ -143,8 +145,7 @@ class ChromeDownloader:
         app_name: str = "chromedriver" if app == "driver" else "chrome"
         suffix: str = ".exe" if name == "nt" else ""
         path: Path = Path(
-            config.env.downloads_dir,
-            "selenium",
+            self.chrome_download_dir,
             f"{app}-{self._get_system_platform()}-{version}",
             app_name + suffix,
         )
@@ -223,8 +224,7 @@ class ChromeDownloader:
         app_name: str = "chromedriver" if app == "driver" else "chrome"
         suffix: str = ".exe" if name == "nt" else ""
         path: Path = Path(
-            config.env.downloads_dir,
-            "selenium",
+            self.chrome_download_dir,
             f"{app}-{self._get_system_platform()}-{version}",
             app_name + suffix,
         )
@@ -264,3 +264,9 @@ class ChromeDownloader:
         zip_download_path.unlink()  # Remove the downloaded zip file
         self.log.debug(f"Downloaded {app} to {path.parent}")
         return path
+
+    @classmethod
+    def cleanup_chrome_downloads(cls) -> None:
+        """🧹 Clean up Chrome downloads."""
+        cls.log.debug("Cleaning up Chrome downloads...")
+        rmtree(cls.chrome_download_dir)

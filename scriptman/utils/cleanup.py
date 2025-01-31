@@ -74,6 +74,10 @@ class CleanUp:
 
             logger.warning(error_message)
 
+        # Extras
+        self.selenium_cleanup()  # Clean up downloaded Selenium files
+        self.diskcache_cleanup()  # Clean up diskcache cache
+
     def safe_remove_file(self, file_path: Union[Path, str]) -> bool:
         """Safely remove a file with error handling."""
         try:
@@ -95,3 +99,21 @@ class CleanUp:
         except OSError as e:
             logger.error(f"Error removing directory {dir_path}: {e}")
         return False
+
+    def diskcache_cleanup(self) -> None:
+        """🧹 Clean up diskcache files."""
+        try:
+            from scriptman.utils.cache.diskcache import DiskCacheBackend
+
+            DiskCacheBackend.clean_cache_dir()
+        except ImportError as e:
+            logger.warning(f"Skipped cleaning up diskcache files: {e}")
+
+    def selenium_cleanup(self) -> None:
+        """🧹 Clean up Selenium downloads and cache folders."""
+        try:
+            from scriptman.utils.selenium.chrome import ChromeDownloader
+
+            ChromeDownloader.cleanup_chrome_downloads()
+        except ImportError as e:
+            logger.warning(f"Skipped cleaning up Selenium files: {e}")

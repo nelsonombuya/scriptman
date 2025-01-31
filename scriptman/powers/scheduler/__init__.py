@@ -1,12 +1,13 @@
 from typing import Optional
+
 from loguru import logger
 
 try:
-    from scriptman.powers.scheduler.models import Job
-    from apscheduler.schedulers.base import BaseScheduler
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from apscheduler.schedulers.base import BaseScheduler
 
     from scriptman.core.config import Config
+    from scriptman.powers.scheduler.models import Job
 
 except ImportError:
     raise ImportError(

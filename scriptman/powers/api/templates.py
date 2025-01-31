@@ -4,9 +4,9 @@ from typing import Any
 from fastapi import status
 from loguru import logger
 
+from scriptman.powers.api.exceptions import APIException
 from scriptman.powers.api.request import Request
 from scriptman.powers.api.response import Response
-from scriptman.powers.api.exceptions import APIException
 
 
 def create_successful_response(request: Request, response: dict) -> dict[str, Any]:

@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Union
+
 from scriptman.powers.etl.extractor import DataExtractor
 from scriptman.powers.selenium import SeleniumInstance
 

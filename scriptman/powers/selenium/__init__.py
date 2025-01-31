@@ -16,8 +16,8 @@ try:
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.wait import WebDriverWait
 
-    from scriptman.powers.selenium._enums import BrowserMap, Browsers, Driver
     from scriptman.powers.selenium._chrome import Chrome
+    from scriptman.powers.selenium._enums import BrowserMap, Browsers, Driver
 except ImportError:
     raise ImportError(
         "Selenium is not installed. "

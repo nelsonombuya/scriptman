@@ -3,8 +3,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from scriptman.powers.api.request import Request
 from scriptman.powers.api.exceptions import APIException
+from scriptman.powers.api.request import Request
 
 
 class Response(BaseModel):

@@ -6,6 +6,7 @@
     "driveupload",
     "infobars",
     "mariadb",
+    "mypy",
     "mysql",
     "postgresql",
     "qodo",

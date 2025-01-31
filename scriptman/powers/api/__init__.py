@@ -6,13 +6,13 @@ from loguru import logger
 from pydantic import ValidationError
 from requests import RequestException, Response
 
-from scriptman.powers.generics import ResponseModelT
+from scriptman.powers.api.exceptions import APIException
 from scriptman.powers.api.request_handlers import (
     DefaultRequestHandler,
     HTTPMethod,
     RequestHandler,
 )
-from scriptman.powers.api.exceptions import APIException
+from scriptman.powers.generics import ResponseModelT
 
 
 class BaseAPIClient(ABC, Generic[ResponseModelT]):

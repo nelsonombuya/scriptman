@@ -2,8 +2,8 @@ from pathlib import Path
 from typing import Optional
 
 from selenium.webdriver import Edge as EdgeDriver
-from selenium.webdriver.edge.service import Service
 from selenium.webdriver import EdgeOptions
+from selenium.webdriver.edge.service import Service
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from scriptman.core.config import config

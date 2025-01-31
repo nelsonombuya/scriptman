@@ -16,6 +16,7 @@ logs
 .qodo
 downloads
 __pycache__
+.mypy_cache
 pytest_cache
 .tmp.driveupload
 scriptman/selenium

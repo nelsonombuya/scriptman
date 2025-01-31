@@ -276,6 +276,19 @@ class Config:
         run(["poetry", "version", str(self._version)])  # Update Package Version
         logger.info("📦 Package updated successfully")
 
+    def lint(self) -> None:
+        """
+        ⚡ Lint the project files.
+        """
+        run(["isort", "."], check=True)
+        run(["black", "."], check=True)
+
+    def typecheck(self) -> None:
+        """
+        🚀 Typecheck the project files.
+        """
+        run(["mypy", "."], check=True)
+
 
 # Singleton instance
 config: Config = Config()

@@ -1,13 +1,15 @@
 [tool.poetry]
 name = "scriptman"
 version = "2.0.221"
-description = "A Python Package for Script Management"
+description = "A powerful Python package for automation, script management, and workflow orchestration."
 authors = ["Nelson Ombuya <developer@incognitouser.anonaddy.me>"]
 license = "MIT"
 readme = "README.md"
+homepage = "https://github.com/nelsonombuya/scriptman"
+repository = "https://github.com/nelsonombuya/scriptman"
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = ">=3.12,<3.14"
 dynaconf = "^3.2.6"
 filelock = "^3.16.1"
 loguru = "^0.7.3"
@@ -15,6 +17,7 @@ pydantic = "^2.10.5"
 tomlkit = "^0.13.2"
 tqdm = "^4.67.1"
 
+# Feature-specific dependencies
 [tool.poetry.group.api.dependencies]
 fastapi = "^0.115.8"
 requests = "^2.32.3"
@@ -24,13 +27,18 @@ uvicorn = "^0.34.0"
 pandas = "^2.2.3"
 sqlalchemy = "^2.0.37"
 
-[tool.poetry.group.selenium.dependencies]
-selenium = "^4.28.1"
-webdriver-manager = "^4.0.2"
-
 [tool.poetry.group.cache.dependencies]
 dill = "^0.3.9"
 diskcache = "^5.6.3"
+
+[tool.poetry.group.lint.dependencies]
+black = "^24.10.0"
+isort = "^5.13.2"
+mypy = "^1.13.0"
+
+[tool.poetry.group.selenium.dependencies]
+selenium = "^4.28.1"
+webdriver-manager = "^4.0.2"
 
 [tool.poetry.group.scheduler.dependencies]
 apscheduler = "^3.11.0"
@@ -39,12 +47,6 @@ apscheduler = "^3.11.0"
 pytest = "^8.3.4"
 pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
-
-[tool.poetry.group.lint.dependencies]
-black = "^24.10.0"
-isort = "^5.13.2"
-mypy = "^1.13.0"
-
 
 [tool.poetry.extras]
 api = ["fastapi", "uvicorn", "requests"]
@@ -60,14 +62,17 @@ scriptman = "scriptman.core.cli:CLI.start_cli_instance"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-# OTHER TOOLS
+# Formatting & Linting Configuration
 [tool.black]
 line-length = 90
-target-version = ['py313']
+target-version = ["py312", "py313"]
 
 [tool.isort]
 profile = "black"
-line-length = 90
 
 [tool.mypy]
+strict = true
+warn_return_any = true
 check_untyped_defs = true
+warn_unused_configs = true
+disallow_untyped_defs = true

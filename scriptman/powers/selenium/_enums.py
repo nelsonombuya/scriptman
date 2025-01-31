@@ -4,11 +4,10 @@ from typing import Generic, Union
 
 from loguru import logger
 
-
 from scriptman.powers.generics import T
+from scriptman.powers.selenium._chrome import Chrome, ChromeDriver
 from scriptman.powers.selenium._edge import Edge, EdgeDriver
 from scriptman.powers.selenium._firefox import Firefox, FirefoxDriver
-from scriptman.powers.selenium._chrome import Chrome, ChromeDriver
 
 Driver = Union[ChromeDriver, EdgeDriver, FirefoxDriver]
 

@@ -2,7 +2,6 @@ from typing import Any, Callable, Coroutine, TypeVar
 
 from pydantic import BaseModel
 
-
 # ⚙ Type variables for generic types
 T = TypeVar("T")  # For generic argument types
 R = TypeVar("R")  # For generic return types (if both T and R are used)

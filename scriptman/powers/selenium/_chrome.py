@@ -1,19 +1,18 @@
+from os import name
 from pathlib import Path
+from platform import architecture, machine, system
 from shutil import rmtree
 from typing import Literal, Optional
 from zipfile import ZipFile
-from os import name
-from platform import system, machine, architecture
 
 from loguru import Logger, logger
 from requests import get
+from selenium.webdriver import Chrome as ChromeDriver
+from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
 from scriptman.core.config import config
-from selenium.webdriver import Chrome as ChromeDriver
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-
 from scriptman.powers.selenium._enums import SeleniumBrowser
 
 

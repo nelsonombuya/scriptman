@@ -48,19 +48,28 @@ class GeneralParser(BaseParser):
             action="store_true",
             help="Reset configuration to default values, and delete scriptman.toml file",
         )
+
         self.parser.add_argument(
             "-c",
             "--cleanup",
             action="store_true",
             help="Clean up cache, downloaded files, and logs older than 30 days.",
         )
+
         self.parser.add_argument(
-            "-v",
-            "--version",
-            action="version",
-            help="Display version",
-            version=f"Scriptman {config._version}",
+            "-l",
+            "--lint",
+            action="store_true",
+            help="Perform code linting on the project files.",
         )
+
+        self.parser.add_argument(
+            "-t",
+            "--typecheck",
+            action="store_true",
+            help="Run type checking on the project files using the mypy tool.",
+        )
+
         self.parser.add_argument(
             "-u",
             "--update",
@@ -71,6 +80,14 @@ class GeneralParser(BaseParser):
             "provided). If you use 'next' as a version, it will bump the commit version "
             "up to the latest version + 1 (e.g., 1.0.0 -> 1.0.1). "
             "NOTE: Kindly use semantic versioning for the version.",
+        )
+
+        self.parser.add_argument(
+            "-v",
+            "--version",
+            action="version",
+            help="Display version",
+            version=f"Scriptman {config._version}",
         )
 
     def process(self, args: Namespace) -> int:
@@ -104,5 +121,14 @@ class GeneralParser(BaseParser):
             config.update_package(version=args.update)
             return 0
 
+        if args.lint:
+            config.lint()
+            return 0
+
+        if args.typecheck:
+            config.typecheck()
+            return 0
+
+        # Display help message
         self.parser.print_help()
         return 0

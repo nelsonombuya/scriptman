@@ -36,8 +36,12 @@ webdriver-manager = "^4.0.2"
 diskcache = "^5.6.3"
 dill = "^0.3.9"
 
+# Scheduler
+apscheduler = "^3.11.0"
+
 [tool.poetry.extras]
 cache = ["dill", "diskcache"]
+scheduler = ["apscheduler"]
 selenium = ["selenium", "webdriver-manager"]
 
 [tool.poetry.scripts]

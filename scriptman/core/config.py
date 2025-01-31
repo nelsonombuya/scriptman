@@ -19,18 +19,18 @@ class Config:
     Manages configuration, versioning, logging, and package management.
     """
 
-    _instance: Optional["Config"] = None
+    __instance: Optional["Config"] = None
 
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         """
         🔒 Singleton implementation ensuring a single instance.
         """
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialize()
-        return cls._instance
+        if cls.__instance is None:
+            cls.__instance = super(Config, cls).__new__(cls, *args, **kwargs)
+            cls.__instance.__initialized = False
+        return cls.__instance
 
-    def _initialize(
+    def __init__(
         self, config: ConfigModel = ConfigModel(), version: Version = Version()
     ) -> None:
         """
@@ -40,6 +40,9 @@ class Config:
             config (ConfigModel): Configuration settings.
             version (Version): Version information.
         """
+        if self.__initialized:
+            return
+
         self.env = Dynaconf(
             root_path=config.cwd,
             settings_files=["scriptman.toml", ".secrets.toml"],
@@ -50,6 +53,7 @@ class Config:
         self._initialize_logging()
         self._initialize_directories()
         self.callback_function: Optional[Callable[[Exception, dict], None]] = None
+        self.__initialized = True
 
     def _initialize_defaults(self) -> None:
         """

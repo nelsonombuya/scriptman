@@ -67,8 +67,9 @@ class GeneralParser(BaseParser):
             nargs="?",
             const="latest",
             metavar="VERSION",
-            help="Update Scriptman Package to the given version "
-            "(or 'latest' if not provided). "
+            help="Update Scriptman Package to the given version (or 'latest' if not "
+            "provided). If you use 'next' as a version, it will bump the commit version "
+            "up to the latest version + 1 (e.g., 1.0.0 -> 1.0.1). "
             "NOTE: Kindly use semantic versioning for the version.",
         )
 

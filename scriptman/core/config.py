@@ -242,12 +242,13 @@ class Config:
         """
 
         try:
-            if version == "latest":
+            if version == "latest" or version == "next":
                 major, minor, commit = str(
                     self._version.read_version_from_pyproject()
                 ).split(".")
 
                 commit = self._version.get_commit_count()
+                commit += 1 if version == "next" else 0
             else:
                 major, minor, commit = str(version).split(".")
 

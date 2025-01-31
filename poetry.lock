@@ -376,6 +376,34 @@ files = [
 toml = ["tomli"]
 
 [[package]]
+name = "dill"
+version = "0.3.9"
+description = "serialize all of Python"
+optional = false
+python-versions = ">=3.8"
+groups = ["dev"]
+files = [
+    {file = "dill-0.3.9-py3-none-any.whl", hash = "sha256:468dff3b89520b474c0397703366b7b95eebe6303f108adf9b19da1f702be87a"},
+    {file = "dill-0.3.9.tar.gz", hash = "sha256:81aa267dddf68cbfe8029c42ca9ec6a4ab3b22371d1c450abc54422577b4512c"},
+]
+
+[package.extras]
+graph = ["objgraph (>=1.7.2)"]
+profile = ["gprof2dot (>=2022.7.29)"]
+
+[[package]]
+name = "diskcache"
+version = "5.6.3"
+description = "Disk Cache -- Disk and file backed persistent cache."
+optional = false
+python-versions = ">=3"
+groups = ["dev"]
+files = [
+    {file = "diskcache-5.6.3-py3-none-any.whl", hash = "sha256:5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19"},
+    {file = "diskcache-5.6.3.tar.gz", hash = "sha256:2c3a3fa2743d8535d832ec61c2054a1641f41775aa7c556758a109941e33e4fc"},
+]
+
+[[package]]
 name = "dynaconf"
 version = "3.2.7"
 description = "The dynamic configurator for your Python Project"
@@ -1481,9 +1509,10 @@ files = [
 h11 = ">=0.9.0,<1"
 
 [extras]
+cache = []
 selenium = []
 
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.13"
-content-hash = "4b4285f8b5b64ae38bff799f9856bb103ac8ef17054f0daa5ed85d9689c4ce22"
+content-hash = "8ef90f1b22c0b1026470abf0818b14a35b3661b098d0803a5b87e6075bca7240"

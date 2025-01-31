@@ -18,16 +18,26 @@ tqdm = "^4.67.1"
 sqlalchemy = "^2.0.37"
 
 [tool.poetry.group.dev.dependencies]
+# Linting
 black = "^24.10.0"
 isort = "^5.13.2"
 mypy = "^1.13.0"
+
+# Testing
 pytest = "^8.3.4"
 pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
+
+# Selenium
 selenium = "^4.28.1"
 webdriver-manager = "^4.0.2"
 
+# Cache
+diskcache = "^5.6.3"
+dill = "^0.3.9"
+
 [tool.poetry.extras]
+cache = ["dill", "diskcache"]
 selenium = ["selenium", "webdriver-manager"]
 
 [tool.poetry.scripts]

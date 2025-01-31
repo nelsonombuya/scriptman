@@ -1,13 +1,22 @@
 # File Extensions
+*.db*
 *.pyc
+*.env
 *.log
+*.aof
+*.rdb
 *.zip
+*.coverage
 .secrets.*
+desktop.ini
 codium_*.py
 
 # Folders
 logs
 .qodo
 downloads
+__pycache__
+pytest_cache
 .tmp.driveupload
+scriptman/selenium
 .tmp.drivedownload

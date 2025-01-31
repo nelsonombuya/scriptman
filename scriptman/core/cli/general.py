@@ -60,14 +60,7 @@ class GeneralParser(BaseParser):
             "-l",
             "--lint",
             action="store_true",
-            help="Perform code linting on the project files.",
-        )
-
-        self.parser.add_argument(
-            "-t",
-            "--typecheck",
-            action="store_true",
-            help="Run type checking on the project files using the mypy tool.",
+            help="Perform code linting and typechecking on the project files.",
         )
 
         self.parser.add_argument(
@@ -123,10 +116,6 @@ class GeneralParser(BaseParser):
 
         if args.lint:
             config.lint()
-            return 0
-
-        if args.typecheck:
-            config.typecheck()
             return 0
 
         # Display help message

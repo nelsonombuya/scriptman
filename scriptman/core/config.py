@@ -278,16 +278,12 @@ class Config:
 
     def lint(self) -> None:
         """
-        ⚡ Lint the project files.
+        ⚡ Lint and typecheck the project files.
         """
         run(["isort", "."], check=True)
         run(["black", "."], check=True)
-
-    def typecheck(self) -> None:
-        """
-        🚀 Typecheck the project files.
-        """
         run(["mypy", "."], check=True)
+
 
 
 # Singleton instance

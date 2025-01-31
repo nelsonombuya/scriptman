@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Generic, Optional
+from typing import Any, Generic, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -35,7 +35,7 @@ class TaskResult(BaseModel, Generic[T]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode="after")
-    def calculate_duration(self):
+    def calculate_duration(self) -> "TaskResult[T]":
         """
         🌟 Duration Calculator - Automatically calculates the task duration during
         initialization if `start_time` and `end_time` are provided.
@@ -58,7 +58,7 @@ class BatchResult(BaseModel, Generic[T]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode="after")
-    def calculate_duration(self):
+    def calculate_duration(self) -> "BatchResult[T]":
         """
         🌟 Duration Calculator - Automatically calculates the task duration
         during initialization if `start_time` and `end_time` are provided.
@@ -70,7 +70,7 @@ class BatchResult(BaseModel, Generic[T]):
     @field_validator("tasks", mode="after")
     @classmethod
     def validate_tasks(cls, value: list[TaskResult[T]]) -> list[TaskResult[T]]:
-        task_ids: set = set()
+        task_ids: set[str] = set()
         for task in value:
             if task.task_id in task_ids:
                 raise ValueError(f"Duplicate task ID: {task.task_id}")
@@ -132,7 +132,7 @@ class BatchResult(BaseModel, Generic[T]):
         return self.tasks
 
     @property
-    def stats(self) -> dict:
+    def stats(self) -> dict[str, Any]:
         """
         🗃️ Stats - Provides a dictionary representation of the instance's statistics.
 

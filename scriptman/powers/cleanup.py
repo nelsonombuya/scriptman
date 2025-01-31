@@ -6,6 +6,8 @@ from typing import Union
 
 from loguru import logger
 
+from scriptman.core.config import config
+
 
 class CleanUp:
     def cleanup(
@@ -77,6 +79,7 @@ class CleanUp:
         # Extras
         self.selenium_cleanup()  # Clean up downloaded Selenium files
         self.diskcache_cleanup()  # Clean up diskcache cache
+        self.mypy_cleanup()  # Clean up mypy cache
 
     def safe_remove_file(self, file_path: Union[Path, str]) -> bool:
         """Safely remove a file with error handling."""
@@ -117,3 +120,7 @@ class CleanUp:
             ChromeDownloader.cleanup_chrome_downloads()
         except ImportError as e:
             logger.warning(f"Skipped cleaning up Selenium files: {e}")
+
+    def mypy_cleanup(self) -> None:
+        """🧹 Clean up mypy cache files."""
+        Path(config.env.cwd).joinpath(".mypy_cache").unlink(missing_ok=True)

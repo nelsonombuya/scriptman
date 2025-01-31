@@ -285,7 +285,6 @@ class Config:
         run(["mypy", "."], check=True)
 
 
-
 # Singleton instance
 config: Config = Config()
 __all__ = ["config"]

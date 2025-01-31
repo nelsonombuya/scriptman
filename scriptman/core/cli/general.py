@@ -39,6 +39,7 @@ class GeneralParser(BaseParser):
             `scriptman.toml` file.
         - `-c` or `--cleanup`: Clean up cache, downloaded files, and logs older than
             30 days.
+        - `-u` or `--update`: Update Scriptman Package to the given version.
         - `-v` or `--version`: Display version.
         """
         self.parser.add_argument(

@@ -578,7 +578,7 @@ class DatabaseHandler(ABC):
                 ]
         else:
             # HACK: Ignoring the string index conversion for now
-            values = df.reset_index().to_dict(orient="records")  # type:ignore
+            values = df.reset_index().to_dict(orient="records")  # type: ignore
 
         return values
 

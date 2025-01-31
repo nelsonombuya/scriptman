@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "scriptman"
-version = "2.0.211"
+version = "2.0.213"
 description = "A Python Package for Script Management"
 authors = ["Nelson Ombuya <developer@incognitouser.anonaddy.me>"]
 license = "MIT"

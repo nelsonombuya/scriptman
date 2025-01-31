@@ -19,7 +19,7 @@ class Version(BaseModel):
 
     major: int = Field(default=2, description="Major version number")
     minor: int = Field(default=0, description="Minor version number")
-    commit: int = Field(default=211, description="Commit count")
+    commit: int = Field(default=213, description="Commit count")
 
     def __str__(self) -> str:
         """
@@ -112,15 +112,19 @@ class Version(BaseModel):
         pyproject_file = Path(getcwd()) / "pyproject.toml"
 
         if not pyproject_file.exists():
-            raise FileNotFoundError(f"The pyproject.toml not found at {pyproject_file}")
+            raise FileNotFoundError(
+                f"The pyproject.toml not found at {pyproject_file}, "
+                "Is the current directory the scriptman package?"
+            )
 
         with pyproject_file.open("r", encoding="utf-8") as f:
             pyproject_data = parse(f.read())
 
         if pyproject_data.get("tool", {}).get("poetry", {}).get("name") == "scriptman":
+            # HACK: Ignoring the "__getitem__" method not defined on type "Item"
             return pyproject_data["tool"]["poetry"]["version"]  # type: ignore
         else:
-            raise RuntimeError("The current project is not scriptman!")
+            raise RuntimeError("The current project is not the scriptman package!")
 
     def update_version_on_pyproject(self):
         """
@@ -148,6 +152,7 @@ class Version(BaseModel):
             pyproject_data = parse(f.read())
 
         if pyproject_data.get("tool", {}).get("poetry", {}).get("name") == "scriptman":
+            # HACK: Ignoring the "__getitem__" method not defined on type "Item"
             pyproject_data["tool"]["poetry"]["version"] = str(self)  # type: ignore
 
             with pyproject_file.open("w", encoding="utf-8") as f:

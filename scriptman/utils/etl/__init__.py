@@ -229,7 +229,7 @@ class ETL(DataFrame):
         batch_execute: bool = True,
         force_nvarchar: bool = False,
         batch_size: Optional[int] = None,
-        method: Literal["truncate", "replace", "upsert"] = "upsert",
+        method: Literal["truncate", "replace", "insert", "update", "upsert"] = "upsert",
     ) -> bool:
         """
         📂 Loads the ETL data into a database table, with options for batch execution and
@@ -248,8 +248,8 @@ class ETL(DataFrame):
                 types. Defaults to False.
             batch_size (Optional[int], optional): The number of rows to include in each
                 batch. Defaults to None.
-            method (Literal["truncate", "replace", "upsert"], optional): The method to use
-                for loading data (truncate, replace, upsert). Defaults to "upsert".
+            method (Literal["truncate", "replace", "insert", "update", "upsert"]):
+                The loading method to use. Defaults to "upsert".
 
         Raises:
             ValueError: If the dataset is empty or if bulk execute is disabled.
@@ -271,12 +271,12 @@ class ETL(DataFrame):
         if method == "replace" and table_exists:
             database_handler.drop_table(table_name)
 
-        if method == "upsert" and self.index.empty:
+        if (method == "upsert" or method == "update") and self.index.empty:
             message = (
                 "Dataset has no index! "
                 "Please set the index using the `set_index` method."
             )
-            self.log.warning(message)
+            self.log.error(message)
             raise ValueError(message)
 
         if not table_exists:
@@ -287,7 +287,11 @@ class ETL(DataFrame):
                 columns=database_handler.get_table_data_types(self, force_nvarchar),
             )
 
-        query, values = database_handler.generate_prepared_upsert_query(table_name, self)
+        query, values = {
+            "insert": database_handler.generate_prepared_insert_query,
+            "update": database_handler.generate_prepared_update_query,
+            "upsert": database_handler.generate_prepared_upsert_query,
+        }.get(method, database_handler.generate_prepared_upsert_query)(table_name, self)
 
         try:
             if not batch_execute:

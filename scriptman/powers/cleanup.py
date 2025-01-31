@@ -103,7 +103,7 @@ class CleanUp:
     def diskcache_cleanup(self) -> None:
         """🧹 Clean up diskcache files."""
         try:
-            from scriptman.utils.cache.diskcache import DiskCacheBackend
+            from scriptman.powers.cache.diskcache import DiskCacheBackend
 
             DiskCacheBackend.clean_cache_dir()
         except ImportError as e:
@@ -112,7 +112,7 @@ class CleanUp:
     def selenium_cleanup(self) -> None:
         """🧹 Clean up Selenium downloads and cache folders."""
         try:
-            from scriptman.utils.selenium._chrome import ChromeDownloader
+            from scriptman.powers.selenium._chrome import ChromeDownloader
 
             ChromeDownloader.cleanup_chrome_downloads()
         except ImportError as e:

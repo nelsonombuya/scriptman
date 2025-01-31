@@ -14,7 +14,7 @@ from scriptman.core.config import config
 from selenium.webdriver import Chrome as ChromeDriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 
-from scriptman.utils.selenium._enums import SeleniumBrowser
+from scriptman.powers.selenium._enums import SeleniumBrowser
 
 
 class Chrome(SeleniumBrowser[ChromeDriver]):

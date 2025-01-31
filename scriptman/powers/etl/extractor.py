@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Generic
 
-from scriptman.utils.generics import T
+from scriptman.powers.generics import T
 
 
 class DataExtractor(ABC, Generic[T]):

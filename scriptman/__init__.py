@@ -1,4 +1,4 @@
-from scriptman import utils
+from scriptman import powers
 from scriptman.core.config import config
 
-__all__: list[str] = ["utils", "config"]
+__all__: list[str] = ["powers", "config"]

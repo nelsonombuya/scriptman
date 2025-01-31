@@ -15,8 +15,8 @@ from uuid import uuid4
 
 from tqdm import tqdm
 
-from scriptman.utils.concurrency._models import BatchResult, TaskResult, TaskStatus
-from scriptman.utils.generics import AsyncFunc, SyncFunc, T
+from scriptman.powers.concurrency._models import BatchResult, TaskResult, TaskStatus
+from scriptman.powers.generics import AsyncFunc, SyncFunc, T
 
 
 class TaskExecutor:

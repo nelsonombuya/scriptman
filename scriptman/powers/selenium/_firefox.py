@@ -6,7 +6,7 @@ from selenium.webdriver.firefox.service import Service
 from webdriver_manager.firefox import GeckoDriverManager
 
 from scriptman.core.config import config
-from scriptman.utils.selenium._enums import SeleniumBrowser
+from scriptman.powers.selenium._enums import SeleniumBrowser
 
 
 class Firefox(SeleniumBrowser[FirefoxDriver]):

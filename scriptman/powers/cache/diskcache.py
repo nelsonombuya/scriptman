@@ -7,7 +7,7 @@ from typing import Any, Optional
 from diskcache import FanoutCache
 from loguru import logger
 
-from scriptman.utils.cache._backend import CacheBackend
+from scriptman.powers.cache._backend import CacheBackend
 
 """DiskCache Backends"""
 

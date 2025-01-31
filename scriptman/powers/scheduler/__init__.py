@@ -2,7 +2,7 @@ from typing import Optional
 from loguru import logger
 
 try:
-    from scriptman.utils.scheduler.models import Job
+    from scriptman.powers.scheduler.models import Job
     from apscheduler.schedulers.base import BaseScheduler
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
 

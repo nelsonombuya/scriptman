@@ -6,8 +6,8 @@ from filelock import FileLock, Timeout
 from loguru import logger
 
 from scriptman.core.config import config
-from scriptman.utils.retry import retry
-from scriptman.utils.time_calculator import TimeCalculator
+from scriptman.powers.retry import retry
+from scriptman.powers.time_calculator import TimeCalculator
 
 
 class Scripts:

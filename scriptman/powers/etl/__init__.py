@@ -3,15 +3,23 @@ from pathlib import Path
 from typing import Any, Literal, Optional
 
 from loguru import Logger, logger
-from pandas import DataFrame, read_csv
 
 from scriptman.core.config import config
-from scriptman.utils.concurrency import TaskExecutor
-from scriptman.utils.database._database import DatabaseHandler
-from scriptman.utils.database._exceptions import DatabaseError
-from scriptman.utils.etl.extractor import DataExtractor
-from scriptman.utils.generics import T
-from scriptman.utils.time_calculator import TimeCalculator
+from scriptman.powers.concurrency import TaskExecutor
+from scriptman.powers.database._database import DatabaseHandler
+from scriptman.powers.database._exceptions import DatabaseError
+from scriptman.powers.etl.extractor import DataExtractor
+from scriptman.powers.generics import T
+from scriptman.powers.time_calculator import TimeCalculator
+
+try:
+    from pandas import DataFrame, read_csv
+except ImportError:
+    raise ImportError(
+        "Pandas is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[etl]."
+    )
 
 
 class ETL(DataFrame):

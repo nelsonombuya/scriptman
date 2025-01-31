@@ -1,13 +1,21 @@
 from typing import Any, Optional
 
 from loguru import logger
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
-from sqlalchemy.exc import SQLAlchemyError
 from tqdm import tqdm
 
-from scriptman.utils.database._database import DatabaseConfig, DatabaseHandler
-from scriptman.utils.database._exceptions import DatabaseError
+from scriptman.powers.database._database import DatabaseConfig, DatabaseHandler
+from scriptman.powers.database._exceptions import DatabaseError
+
+try:
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import Engine
+    from sqlalchemy.exc import SQLAlchemyError
+except ImportError:
+    raise ImportError(
+        "SQLAlchemy is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[etl]."
+    )
 
 
 class SQLAlchemyHandler(DatabaseHandler):

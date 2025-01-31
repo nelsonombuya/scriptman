@@ -1,8 +1,8 @@
 from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Union
-from scriptman.utils.etl.extractor import DataExtractor
-from scriptman.utils.selenium import SeleniumInstance
+from scriptman.powers.etl.extractor import DataExtractor
+from scriptman.powers.selenium import SeleniumInstance
 
 PossibleSeleniumDataTypes = Union[dict[str, Any], list[dict[str, Any]], Path, str]
 

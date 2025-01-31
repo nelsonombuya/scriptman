@@ -7,7 +7,7 @@ from typing import Literal, Optional
 from loguru import logger
 
 from scriptman.core.config import config
-from scriptman.utils.selenium._enums import SeleniumBrowser
+from scriptman.powers.selenium._enums import SeleniumBrowser
 
 try:
     from selenium.webdriver.common.action_chains import ActionChains
@@ -16,8 +16,8 @@ try:
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.wait import WebDriverWait
 
-    from scriptman.utils.selenium._enums import BrowserMap, Browsers, Driver
-    from scriptman.utils.selenium._chrome import Chrome
+    from scriptman.powers.selenium._enums import BrowserMap, Browsers, Driver
+    from scriptman.powers.selenium._chrome import Chrome
 except ImportError:
     raise ImportError(
         "Selenium is not installed. "

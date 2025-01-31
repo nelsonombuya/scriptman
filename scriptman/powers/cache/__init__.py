@@ -9,11 +9,11 @@ from dill import dumps
 from loguru import logger
 
 from scriptman.core.config import config
-from scriptman.utils.cache._backend import CacheBackend
-from scriptman.utils.generics import AsyncFunc, SyncFunc, T
+from scriptman.powers.cache._backend import CacheBackend
+from scriptman.powers.generics import AsyncFunc, SyncFunc, T
 
 try:
-    from scriptman.utils.cache.diskcache import FanoutCacheBackend
+    from scriptman.powers.cache.diskcache import FanoutCacheBackend
 except ImportError:
     raise ImportError(
         "DiskCache backend is not installed. "

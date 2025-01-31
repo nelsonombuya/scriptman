@@ -4,7 +4,7 @@ from typing import Generic, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from scriptman.utils.generics import T
+from scriptman.powers.generics import T
 
 
 class TaskStatus(str, Enum):

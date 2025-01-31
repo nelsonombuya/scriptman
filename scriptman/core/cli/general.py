@@ -2,7 +2,7 @@ from argparse import ArgumentParser, Namespace
 
 from scriptman.core.cli._parser import BaseParser
 from scriptman.core.config import config
-from scriptman.utils.cleanup import CleanUp
+from scriptman.powers.cleanup import CleanUp
 
 
 class GeneralParser(BaseParser):

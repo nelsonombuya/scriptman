@@ -5,7 +5,7 @@ from loguru import logger
 from pydantic import BaseModel, field_validator
 from pydantic.config import ConfigDict
 
-from scriptman.utils.generics import AsyncFunc, SyncFunc, T
+from scriptman.powers.generics import AsyncFunc, SyncFunc, T
 
 try:
     from apscheduler.triggers.base import BaseTrigger

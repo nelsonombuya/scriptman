@@ -7,8 +7,8 @@ from pandas import DataFrame
 from tqdm import tqdm
 
 from scriptman.core.config import config
-from scriptman.utils.database._config import DatabaseConfig
-from scriptman.utils.time_calculator import TimeCalculator
+from scriptman.powers.database._config import DatabaseConfig
+from scriptman.powers.time_calculator import TimeCalculator
 
 
 class DatabaseHandler(ABC):

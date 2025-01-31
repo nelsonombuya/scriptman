@@ -7,7 +7,7 @@ from selenium.webdriver import EdgeOptions
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from scriptman.core.config import config
-from scriptman.utils.selenium._enums import SeleniumBrowser
+from scriptman.powers.selenium._enums import SeleniumBrowser
 
 
 class Edge(SeleniumBrowser[EdgeDriver]):

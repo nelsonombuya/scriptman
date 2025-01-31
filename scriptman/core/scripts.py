@@ -25,7 +25,7 @@ class Scripts:
                 scripts.remove(script)
                 continue
 
-        with TimeCalculator.time_context_manager("🦸‍♂️ Scriptman"):
+        with TimeCalculator.context("🦸‍♂️ Scriptman"):
             if config.env.concurrent and len(scripts) > 1:
                 self._execute_scripts_concurrently(scripts)
             else:
@@ -132,8 +132,8 @@ class Scripts:
             )
 
             logger.info(f"🚀 Running '{file_path.name}' script...")
-            retries = getattr(config.env, "retries", 0)
-            with TimeCalculator.time_context_manager(file_path.name):
+            retries = config.env.get("retries", 0)
+            with TimeCalculator.context(context=file_path.name):
                 retry(retries)(exec)(script_content, globals())
             message = f"Script '{file_path.name}' executed successfully"
             logger.success(message)

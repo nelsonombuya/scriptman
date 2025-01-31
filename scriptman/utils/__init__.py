@@ -16,12 +16,12 @@ from scriptman.utils import retry
 from scriptman.utils import generics
 from scriptman.utils.cleanup import CleanUp
 from scriptman.utils.concurrency import BatchResult, TaskExecutor, TaskResult
-from scriptman.utils.retry import Retry
+from scriptman.utils.retry import retry
 from scriptman.utils.time_calculator import TimeCalculator
 
 __all__: list[str] = [
     "generics",
-    "Retry",
+    "retry",
     "CleanUp",
     "TaskExecutor",
     "TaskResult",

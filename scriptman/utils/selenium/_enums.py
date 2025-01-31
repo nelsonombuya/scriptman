@@ -6,9 +6,9 @@ from loguru import logger
 
 
 from scriptman.utils.generics import T
-from scriptman.utils.selenium.edge import Edge, EdgeDriver
-from scriptman.utils.selenium.firefox import Firefox, FirefoxDriver
-from scriptman.utils.selenium.chrome import Chrome, ChromeDriver
+from scriptman.utils.selenium._edge import Edge, EdgeDriver
+from scriptman.utils.selenium._firefox import Firefox, FirefoxDriver
+from scriptman.utils.selenium._chrome import Chrome, ChromeDriver
 
 Driver = Union[ChromeDriver, EdgeDriver, FirefoxDriver]
 

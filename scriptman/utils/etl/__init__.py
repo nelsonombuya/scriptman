@@ -9,7 +9,7 @@ from scriptman.core.config import config
 from scriptman.utils.concurrency import TaskExecutor
 from scriptman.utils.database._database import DatabaseHandler
 from scriptman.utils.database._exceptions import DatabaseError
-from scriptman.utils.etl._extractor import DataExtractor
+from scriptman.utils.etl.extractor import DataExtractor
 from scriptman.utils.generics import T
 from scriptman.utils.time_calculator import TimeCalculator
 

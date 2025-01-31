@@ -112,7 +112,7 @@ class CleanUp:
     def selenium_cleanup(self) -> None:
         """🧹 Clean up Selenium downloads and cache folders."""
         try:
-            from scriptman.utils.selenium.chrome import ChromeDownloader
+            from scriptman.utils.selenium._chrome import ChromeDownloader
 
             ChromeDownloader.cleanup_chrome_downloads()
         except ImportError as e:

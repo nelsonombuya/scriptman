@@ -1,6 +1,7 @@
 from asyncio import gather, run, to_thread
 from pathlib import Path
 from re import MULTILINE, sub
+from typing import Any
 
 from filelock import FileLock, Timeout
 from loguru import logger
@@ -63,7 +64,7 @@ class Scripts:
 
         run(_run_all_scripts_async(scripts))
 
-    def _run_script(self, script: Path):
+    def _run_script(self, script: Path) -> None:
         """
         🏃‍♂️ Runs a single script with a file lock mechanism.
 
@@ -91,7 +92,7 @@ class Scripts:
         finally:
             logger.debug(f"🔓 Releasing lock for '{script.name}'.")
 
-    def _execute_with_logging(self, script: Path):
+    def _execute_with_logging(self, script: Path) -> None:
         """
         ⚙ Executes the script and logs output.
 
@@ -99,15 +100,16 @@ class Scripts:
             script (Path): The script to execute.
         """
         success, error, details = self.execute(script)
-
         if not success:
-            if config.callback_function is not None:
-                config.callback_function(
+            if config.__callback_function is not None:
+                config.__callback_function(
                     error or Exception("A general error has occurred"),
                     details or {},
                 )
 
-    def execute(self, file_path: Path) -> tuple[bool, Exception | None, dict | None]:
+    def execute(
+        self, file_path: Path
+    ) -> tuple[bool, Exception | None, dict[str, Any] | None]:
         """
         🏃🏾‍♂️ Runs a script and logs its output.
 
@@ -132,9 +134,8 @@ class Scripts:
             )
 
             logger.info(f"🚀 Running '{file_path.name}' script...")
-            retries = config.env.get("retries", 0)
             with TimeCalculator.context(context=file_path.name):
-                retry(retries)(exec)(script_content, globals())
+                retry(config.get("retries", 0))(exec)(script_content, globals())
             message = f"Script '{file_path.name}' executed successfully"
             logger.success(message)
             return True, None, {"message": message}

@@ -6,7 +6,7 @@ from typing import Literal
 
 from loguru import logger
 from pydantic import BaseModel, Field
-from tomlkit import dumps, parse
+from tomlkit import parse
 
 
 # NOTE: Do not use emoji in this file
@@ -19,7 +19,19 @@ class Version(BaseModel):
 
     major: int = Field(default=2, description="Major version number")
     minor: int = Field(default=0, description="Minor version number")
-    commit: int = Field(default=221, description="Commit count")
+    commit: int = Field(default=226, description="Commit count")
+
+    @property
+    def scriptman(self) -> str:
+        scriptman_file = Path(__file__).parent / "logo.txt"
+        if not scriptman_file.exists():
+            return f"Scriptman v{self}"
+        with scriptman_file.open("r", encoding="utf-8") as f:
+            return "\n\n" + f.read() + "\n\n" + "\n".join(self.stats)
+
+    @property
+    def stats(self) -> list[str]:
+        return [f"Scriptman v{self}"]
 
     def __str__(self) -> str:
         """
@@ -30,7 +42,7 @@ class Version(BaseModel):
         """
         return f"{self.major}.{self.minor}.{self.commit}"
 
-    def pattern(self, field: str) -> Pattern:
+    def pattern(self, field: str) -> Pattern[str]:
         """
         Generates a regex pattern to match a version field declaration in the version
         file.
@@ -98,7 +110,7 @@ class Version(BaseModel):
             logger.error(f"Failed to get commit count: {e}")
             return 0
 
-    def read_version_from_pyproject(self):
+    def read_version_from_pyproject(self) -> str:
         """
         Read the version from the pyproject.toml file.
 
@@ -121,49 +133,6 @@ class Version(BaseModel):
             pyproject_data = parse(f.read())
 
         if pyproject_data.get("tool", {}).get("poetry", {}).get("name") == "scriptman":
-            # HACK: Ignoring the "__getitem__" method not defined on type "Item"
-            return pyproject_data["tool"]["poetry"]["version"]  # type: ignore
+            return pyproject_data.get("tool", {}).get("poetry", {}).get("version")
         else:
             raise RuntimeError("The current project is not the scriptman package!")
-
-    def update_version_on_pyproject(self):
-        """
-        Updates the version of the 'scriptman' project in the pyproject.toml file.
-        This method checks if the pyproject.toml file exists in the current working
-        directory.
-
-        If the file exists, it reads the file and parses its content. If the project name
-        in the pyproject.toml file is 'scriptman', it updates the version to the value of
-        `self.version`.
-
-        The updated content is then written back to the pyproject.toml file.
-
-        Raises:
-            FileNotFoundError: If the pyproject.toml file is not found in the current
-                working directory.
-            RuntimeError: If the project name in the pyproject.toml file is not scriptman.
-        """
-        pyproject_file = Path(getcwd()) / "pyproject.toml"
-
-        if not pyproject_file.exists():
-            raise FileNotFoundError(f"The pyproject.toml not found at {pyproject_file}")
-
-        with pyproject_file.open("r", encoding="utf-8") as f:
-            pyproject_data = parse(f.read())
-
-        if pyproject_data.get("tool", {}).get("poetry", {}).get("name") == "scriptman":
-            # HACK: Ignoring the "__getitem__" method not defined on type "Item"
-            pyproject_data["tool"]["poetry"]["version"] = str(self)  # type: ignore
-
-            with pyproject_file.open("w", encoding="utf-8") as f:
-                f.write(dumps(pyproject_data))
-        else:
-            raise RuntimeError("The current project is not scriptman!")
-
-    @property
-    def scriptman(self) -> str:
-        scriptman_file = Path(__file__).parent / "logo.txt"
-        if not scriptman_file.exists():
-            return f"Scriptman v{self}"
-        with scriptman_file.open("r", encoding="utf-8") as f:
-            return f.read()

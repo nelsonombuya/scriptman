@@ -50,6 +50,11 @@ class ConfigModel(BaseModel):
         default=True,
         description="Enable selenium optimizations",
     )
+    selenium_local_mode: bool = Field(
+        default=True,
+        description="Enable selenium local mode (Download and run a local copy of the "
+        "browser)",
+    )
     chrome_download_url: str = Field(
         default=(
             "https://googlechromelabs.github.io/chrome-for-testing/"

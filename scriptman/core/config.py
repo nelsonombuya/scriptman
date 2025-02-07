@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional
 
 from dynaconf import Dynaconf
 from loguru import logger
+from pydantic import ValidationError
 from tomlkit import dumps, parse
 
 from scriptman.core.defaults import ConfigModel
@@ -19,9 +20,11 @@ class Config:
     Manages configuration, versioning, logging, and package management.
     """
 
+    __initialized: bool = False
     __instance: Optional["Config"] = None
+    __callback_function: Optional[Callable[[Exception, dict[str, Any]], None]] = None
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args: Any, **kwargs: Any) -> "Config":
         """
         🔒 Singleton implementation ensuring a single instance.
         """
@@ -44,33 +47,75 @@ class Config:
             return
 
         self.env = Dynaconf(
-            root_path=config.cwd,
+            root_path=str(config.cwd),
             settings_files=["scriptman.toml", ".secrets.toml"],
         )
         self._configs = config
         self._version = version
-        self._initialize_defaults()
-        self._initialize_logging()
-        self._initialize_directories()
-        self.callback_function: Optional[Callable[[Exception, dict], None]] = None
+        self.__initialize_defaults()
+        self.__initialize_directories()
+        self.__initialize_scriptman_logging()
         self.__initialized = True
 
-    def _initialize_defaults(self) -> None:
+    def get(self, key: str, default: Any = None) -> Any:
+        """
+        🔍 Retrieve a configuration value from the underlying Dynaconf
+        settings.
+
+        Args:
+            key (str): The key to retrieve the value for.
+            default (Any): The default value to return if the key is not
+                present in the configuration.
+
+        Returns:
+            Any: The configuration value for the given key or the default
+                value if the key is not present.
+        """
+        try:
+            logger.debug(f"Retrieving config: {key}")
+            return self.env[key]
+        except KeyError:
+            logger.debug(f"Config not found: {key}")
+            return default
+
+    def set(self, key: str, value: Any) -> None:
+        """
+        💻 Set a configuration value in the underlying Dynaconf settings.
+
+        Args:
+            key (str): The key to set the value for.
+            value (Any): The value to set for the given key.
+        """
+        self.env[key] = value
+        logger.debug(f"Config updated: {key} = {value}")
+
+    def __initialize_defaults(self) -> None:
         """
         🔄 Initialize configuration defaults.
 
         Ensures all configuration parameters have default values.
         """
-        for param, config in self._configs:
-            if param not in self.env:
-                self.env.set(param, config)
+        for field_name, field in self._configs.model_fields.items():
+            if field_name not in self.env:
+                self.env[field_name] = field.default
 
-    def _initialize_logging(self, verbose: bool = False) -> None:
+    def __initialize_directories(self) -> None:
+        """
+        📁 Initialize directories for the scriptman package.
+        """
+        for dir in [
+            Path(str(self.get("logs_dir", "logs"))),
+            Path(str(self.get("scripts_dir", "scripts"))),
+            Path(str(self.get("downloads_dir", "downloads"))),
+        ]:
+            dir.mkdir(parents=True, exist_ok=True)
+
+    def __initialize_scriptman_logging(self) -> None:
         """
         📝 Initialize logging for the CLI handler.
         """
         logger.remove()
-        log_level = self.env.log_level
+        log_level = str(self.get("log_level", "INFO"))
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
         # Console handler
@@ -85,7 +130,7 @@ class Config:
 
         # File handler
         logger.add(
-            Path(self.env.logs_dir) / f"{timestamp}.log",
+            Path(str(self.get("logs_dir", "logs"))) / f"{timestamp}.log",
             level=log_level,
             rotation="1 day",
             compression="zip",
@@ -94,14 +139,6 @@ class Config:
         )
 
         logger.debug("✅ Logging initialized")
-
-    def _initialize_directories(self) -> None:
-        """
-        📁 Initialize directories for the scriptman package.
-        """
-        Path(self.env.logs_dir).mkdir(parents=True, exist_ok=True)
-        Path(self.env.scripts_dir).mkdir(parents=True, exist_ok=True)
-        Path(self.env.downloads_dir).mkdir(parents=True, exist_ok=True)
 
     def reset_configuration(self, param: str) -> bool:
         """
@@ -112,7 +149,7 @@ class Config:
         """
         try:
             default = self._configs.model_fields[param].default
-            self.env.set(param, default)
+            self.set(param, default)
             logger.info(f"Config reset: {param} = {default}")
             return True
         except KeyError:
@@ -123,12 +160,9 @@ class Config:
         """
         🔄 Resets the configuration to its default values and removes the
         `scriptman.toml` file.
-
-        This method is useful for resetting the configuration to its original
-        state, for example, after testing or when the user wants to start fresh.
         """
-        self._initialize_defaults()
-        (Path(self.env.cwd) / "scriptman.toml").unlink(missing_ok=True)
+        self.__initialize_defaults()
+        Path(str(self.get("cwd", "."))).joinpath("scriptman.toml").unlink(missing_ok=True)
         logger.info("🔄 Configuration reset and deleted scriptman.toml file")
 
     def validate_and_update_configuration(self, param: str, value: Any) -> bool:
@@ -155,7 +189,7 @@ class Config:
             return False
 
         param = param.upper()
-        self.env.set(param, validated_value)
+        self.set(param, validated_value)
 
         try:
             self._save_config_to_file(param, validated_value)
@@ -188,14 +222,17 @@ class Config:
             current_settings = self._configs.model_dump()
             value_type = type(current_settings[param])
 
-            if value_type is bool and value in ["true", "false"]:
+            if value_type is bool and value.lower() in ["true", "false"]:
                 value = value.lower() == "true"
             else:
                 value = value_type(value)
-            # TODO: Reformat pydantic validation errors
+
             current_settings.update({param: value})
             self._configs = self._configs.model_validate(current_settings)
             return True, None, value
+        except ValidationError as e:
+            # TODO: Reformat pydantic validation errors
+            return False, f"Invalid configuration value for {param}: {e}", None
         except Exception as e:
             return False, f"Invalid configuration value for {param}: {e}", None
 
@@ -207,8 +244,8 @@ class Config:
             param (str): The configuration parameter.
             value (Any): The value to save.
         """
-        settings_file = Path(self.env.cwd) / "scriptman.toml"
-        config_data = {}
+        settings_file = Path(str(self.get("cwd", "."))).joinpath("scriptman.toml")
+        config_data: dict[str, Any] = {}
 
         if settings_file.exists():
             with settings_file.open("r", encoding="utf-8") as f:
@@ -219,7 +256,7 @@ class Config:
             f.write(dumps(config_data))
 
     def add_callback_function(
-        self, callback_function: Callable[[Exception, dict], None]
+        self, callback_function: Callable[[Exception, dict[str, Any]], None]
     ) -> bool:
         """
         🔄 Add a callback function to handle exceptions.
@@ -234,29 +271,24 @@ class Config:
             logger.error("Invalid callback function provided.")
             return False
 
-        self.callback_function = callback_function
+        self.__callback_function = callback_function
         return True
 
     def update_package(self, version: str = "latest") -> None:
         """
         📦 Update the scriptman package from GitHub.
-
-        Args:
-            version (str, optional): The version to update to. Defaults to "latest".
         """
-
         try:
             if version == "latest" or version == "next":
-                major, minor, commit = str(
-                    self._version.read_version_from_pyproject()
-                ).split(".")
+                major, minor, commit = [
+                    int(v)
+                    for v in str(self._version.read_version_from_pyproject()).split(".")
+                ]
 
                 commit = self._version.get_commit_count()
                 commit += 1 if version == "next" else 0
             else:
-                major, minor, commit = str(version).split(".")
-
-            major, minor, commit = int(major), int(minor), int(commit)
+                major, minor, commit = [int(v) for v in str(version).split(".")]
         except ValueError:
             raise ValueError(
                 f'Invalid version format: "{version}" '
@@ -280,9 +312,9 @@ class Config:
         """
         ⚡ Lint and typecheck the project files.
         """
-        run(["isort", "."], check=True)
-        run(["black", "."], check=True)
-        run(["mypy", "."], check=True)
+        run(["isort", "."], check=True)  # Sort imports
+        run(["black", "."], check=True)  # Format
+        run(["mypy", "."], check=True)  # Typecheck
 
 
 # Singleton instance

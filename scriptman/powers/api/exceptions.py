@@ -37,7 +37,7 @@ class APIException(Exception):
         self.response: Optional[dict[str, Any]] = response
         self.stacktrace: list[dict[str, Any]] = self._generate_stacktrace()
 
-    def _generate_stacktrace(self) -> list[dict]:
+    def _generate_stacktrace(self) -> list[dict[str, str | int | None]]:
         """
         📊 Generates a structured stacktrace.
 

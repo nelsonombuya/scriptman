@@ -75,9 +75,10 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
             requests.RequestException: When request fails
         """
         response = self._send_request(self._clean_url(url), method, params, body, timeout)
+        data: dict[str, Any] = response.json()
 
         if not response_model and not self.default_response_model:
-            return response.json()
+            return data
 
         return self.validate_response(
             response, response_model or self.default_response_model
@@ -170,7 +171,7 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         Raises:
             APIException: If validation fails.
         """
-        data = response.json()
+        data: dict[str, Any] = response.json()
         if not response_model:
             self.handle_error_response(response)
             return data

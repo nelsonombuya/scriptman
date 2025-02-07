@@ -3,11 +3,14 @@ from uuid import uuid4
 
 from fastapi import Request
 from loguru import logger
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import Response
 
 
 class FastAPIMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         """
         📥 Handles a request and logs its details.
 
@@ -17,8 +20,7 @@ class FastAPIMiddleware(BaseHTTPMiddleware):
 
         Args:
             request (Request): The incoming request.
-            call_next (Callable[[Request], Awaitable[Response]]): The next
-                middleware or endpoint to call.
+            call_next (RequestResponseEndpoint): The next middleware in the chain.
 
         Returns:
             Response: The response to the request.

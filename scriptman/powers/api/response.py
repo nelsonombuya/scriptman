@@ -30,21 +30,40 @@ class Response(BaseModel):
     status_code: int
     request: Request
     response: Optional[dict[str, Any]] = None
-    stacktrace: Optional[list[dict]] = None
+    stacktrace: Optional[list[dict[str, str | int | None]]] = None
 
-    def __init__(self, **data):
+    def __init__(
+        self,
+        message: str,
+        status_code: int,
+        request: Request,
+        response: Optional[dict[str, Any]] = None,
+        stacktrace: Optional[list[dict[str, str | int | None]]] = None,
+    ) -> None:
         """
         Initialize Response model with response time calculation.
 
         Args:
-            **data (dict): The keyword arguments to be passed to the Response
-                model.
+            message (str): The message of the response.
+            status_code (int): The status code of the response.
+            request (Request): The details of the request.
+            response (dict[str, Any], optional): The response data.
+            stacktrace (list[dict], optional): The structured stacktrace
+                information (in case an error occurred). Defaults to None.
 
         Automatically calculates response time after model initialization.
         Uses the request timestamp and current response timestamp to compute
         the difference in seconds.
         """
-        super().__init__(**data)
+        super().__init__(
+            **{
+                "message": message,
+                "request": request,
+                "response": response,
+                "stacktrace": stacktrace,
+                "status_code": status_code,
+            }
+        )
         request_timestamp = datetime.fromisoformat(self.request.timestamp)
         response_timestamp = datetime.fromisoformat(self.timestamp)
         response_time = response_timestamp - request_timestamp
@@ -52,7 +71,7 @@ class Response(BaseModel):
 
     @field_validator("message", mode="before")
     @classmethod
-    def not_empty_string(cls, v: str):
+    def not_empty_string(cls, v: str) -> str:
         """Ensure that the message field is not empty."""
         if not v or v.isspace():
             raise ValueError("Message cannot be empty")
@@ -60,7 +79,7 @@ class Response(BaseModel):
 
     @field_validator("timestamp", mode="before")
     @classmethod
-    def not_invalid_timestamp(cls, v: str):
+    def not_invalid_timestamp(cls, v: str) -> str:
         """Ensure that the timestamp field is not an invalid timestamp."""
         try:
             datetime.fromisoformat(v)
@@ -70,7 +89,7 @@ class Response(BaseModel):
 
     @field_validator("status_code", mode="before")
     @classmethod
-    def not_invalid_status_code(cls, v: int):
+    def not_invalid_status_code(cls, v: int) -> int:
         """Ensure that the status code field is not an invalid status code."""
         if v < 100 or v > 599:
             raise ValueError("Invalid status code")

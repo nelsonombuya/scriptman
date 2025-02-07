@@ -9,7 +9,9 @@ from scriptman.powers.api.request import Request
 from scriptman.powers.api.response import Response
 
 
-def create_successful_response(request: Request, response: dict) -> dict[str, Any]:
+def create_successful_response(
+    request: Request, response: dict[str, Any]
+) -> dict[str, Any]:
     """
     ✨ Creates a successful response for a completed request.
 

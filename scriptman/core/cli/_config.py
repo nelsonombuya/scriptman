@@ -6,7 +6,7 @@ from scriptman.core.defaults import ConfigModel
 
 
 class ConfigSubParser(BaseParser):
-    def __init__(self, sub_parser: _SubParsersAction) -> None:
+    def __init__(self, sub_parser: "_SubParsersAction[ArgumentParser]") -> None:
         """
         🚀 Initialize a ConfigSubParser instance with an ArgumentParser.
 
@@ -31,7 +31,7 @@ class ConfigSubParser(BaseParser):
         """
         return "config"
 
-    def config(self):
+    def config(self) -> None:
         """
         📝 Set configuration parameter to a specified value.
 

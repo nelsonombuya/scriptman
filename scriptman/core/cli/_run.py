@@ -10,7 +10,7 @@ from scriptman.core.scripts import Scripts
 
 class RunSubParser(BaseParser):
 
-    def __init__(self, sub_parser: _SubParsersAction) -> None:
+    def __init__(self, sub_parser: "_SubParsersAction[ArgumentParser]") -> None:
         """
         🚀 Initializes a RunSubParser instance with an ArgumentParser.
 
@@ -35,7 +35,7 @@ class RunSubParser(BaseParser):
         """
         return "run"
 
-    def run(self):
+    def run(self) -> None:
         """
         ⚙ Add arguments for running scripts with advanced configuration options.
 

@@ -4,10 +4,10 @@ from typing import Optional
 
 from loguru import logger
 
+from scriptman.core.cli._config import ConfigSubParser
+from scriptman.core.cli._general import GeneralParser
 from scriptman.core.cli._parser import BaseParser
-from scriptman.core.cli.config import ConfigSubParser
-from scriptman.core.cli.general import GeneralParser
-from scriptman.core.cli.run import RunSubParser
+from scriptman.core.cli._run import RunSubParser
 
 
 class CLI:

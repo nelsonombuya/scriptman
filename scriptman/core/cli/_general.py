@@ -29,7 +29,7 @@ class GeneralParser(BaseParser):
         """
         return "general"
 
-    def general_arguments(self):
+    def general_arguments(self) -> None:
         """
         ⚙ Adds general arguments to the CLI parser.
 

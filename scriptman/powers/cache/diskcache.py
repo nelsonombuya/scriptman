@@ -7,6 +7,7 @@ from typing import Any, Optional
 from diskcache import FanoutCache
 from loguru import logger
 
+from scriptman.core.config import config
 from scriptman.powers.cache._backend import CacheBackend
 
 """DiskCache Backends"""
@@ -22,25 +23,25 @@ class EvictionPolicy(Enum):
 class DiskCacheBackend(CacheBackend, ABC):
     """Abstract Base Class for DiskCache implementations of the cache backend."""
 
-    DISK_CACHE_DIR: Path = Path(__file__).parent.parent.parent / "cache"
+    _CACHE_DIR: Path = Path(config.get("disk_cache_dir", "../../../cache"))
 
-    def get(self, key: str, retry: bool = True, **kwargs) -> Any:
+    def get(self, key: str, retry: bool = True, **kwargs: Any) -> Any:
         return self.cache.get(key=key, retry=retry, **kwargs)
 
-    def set(self, key: str, value: Any, ttl: Optional[int] = None, **kwargs) -> bool:
-        return self.cache.set(key=key, value=value, expire=ttl, **kwargs)
+    def set(self, key: str, value: Any, ttl: Optional[int] = None, **kwargs: Any) -> bool:
+        return bool(self.cache.set(key=key, value=value, expire=ttl, **kwargs))
 
-    def delete(self, key: str, **kwargs) -> bool:
-        return self.cache.delete(key, **kwargs)
+    def delete(self, key: str, **kwargs: Any) -> bool:
+        return bool(self.cache.delete(key, **kwargs))
 
     @staticmethod
-    def clean_cache_dir():
+    def clean_cache_dir() -> None:
         from datetime import datetime
 
         now = datetime.now()
 
         # Remove all *.db files not modified in the past 24 hours
-        for file in DiskCacheBackend.DISK_CACHE_DIR.glob("*.db"):
+        for file in DiskCacheBackend._CACHE_DIR.glob("*.db"):
             file_mod_time = datetime.fromtimestamp(file.stat().st_mtime)
             if (now - file_mod_time).total_seconds() > 24 * 60 * 60:
                 try:
@@ -50,7 +51,7 @@ class DiskCacheBackend(CacheBackend, ABC):
                     logger.error(f"💥 Error removing file {file}: {e}")
 
         # Remove all empty folders
-        for folder in DiskCacheBackend.DISK_CACHE_DIR.glob("*"):
+        for folder in DiskCacheBackend._CACHE_DIR.glob("*"):
             if folder.is_dir() and len(list(folder.iterdir())) == 0:
                 try:
                     folder.rmdir()
@@ -68,10 +69,10 @@ class FanoutCacheBackend(DiskCacheBackend):
         shards: int = 8,
         statistics: bool = True,
         eviction_policy: EvictionPolicy = EvictionPolicy.LRS,
-        **kwargs,
+        **kwargs: Any,
     ):
         self._cache = FanoutCache(
-            directory=directory or FanoutCacheBackend.DISK_CACHE_DIR,
+            __directory=directory or FanoutCacheBackend._CACHE_DIR,
             eviction_policy=eviction_policy.value,
             statistics=statistics,
             shards=shards,

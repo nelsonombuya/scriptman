@@ -22,6 +22,10 @@ class ConfigModel(BaseModel):
         default=Path(__file__).parent.parent / "downloads",
         description="Path to the downloads directory",
     )
+    disk_cache_dir: DirectoryPath = Field(
+        default=Path(__file__).parent.parent / "cache",
+        description="Path to the disk cache directory",
+    )
     ignore_dirs: list[str] = Field(
         default=[],
         description="List of folders to ignore for script execution.",

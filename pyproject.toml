@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "scriptman"
-version = "2.0.221"
+version = "2.0.226"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 authors = ["Nelson Ombuya <developer@incognitouser.anonaddy.me>"]
 license = "MIT"
@@ -16,15 +16,18 @@ loguru = "^0.7.3"
 pydantic = "^2.10.5"
 tomlkit = "^0.13.2"
 tqdm = "^4.67.1"
+types-tqdm = "^4.67.0.20241221"
 
 # Feature-specific dependencies
 [tool.poetry.group.api.dependencies]
 fastapi = "^0.115.8"
 requests = "^2.32.3"
+types-requests = "^2.32.0.20241016"
 uvicorn = "^0.34.0"
 
 [tool.poetry.group.etl.dependencies]
 pandas = "^2.2.3"
+pandas-stubs = "^2.2.3.241126"
 sqlalchemy = "^2.0.37"
 
 [tool.poetry.group.cache.dependencies]
@@ -32,16 +35,15 @@ dill = "^0.3.9"
 diskcache = "^5.6.3"
 
 [tool.poetry.group.lint.dependencies]
-types-requests = "^2.32.0.20241016"
-types-ujson = "^5.10.0.20240515"
-types-tqdm = "^4.67.0.20241221"
-pandas-stubs = "^2.2.3.241126"
 black = "^24.10.0"
 isort = "^5.13.2"
 mypy = "^1.13.0"
 
 [tool.poetry.group.selenium.dependencies]
 selenium = "^4.28.1"
+requests = "^2.32.3"
+types-selenium = "^3.141.9"
+types-requests = "^2.32.0.20241016"
 webdriver-manager = "^4.0.2"
 
 [tool.poetry.group.scheduler.dependencies]
@@ -79,4 +81,5 @@ strict = true
 warn_return_any = true
 check_untyped_defs = true
 warn_unused_configs = true
+warn_redundant_casts = true
 disallow_untyped_defs = true

@@ -133,6 +133,9 @@ class Version(BaseModel):
             pyproject_data = parse(f.read())
 
         if pyproject_data.get("tool", {}).get("poetry", {}).get("name") == "scriptman":
-            return pyproject_data.get("tool", {}).get("poetry", {}).get("version")
+            if result := pyproject_data.get("tool", {}).get("poetry", {}).get("version"):
+                return str(result)
+            else:
+                raise RuntimeError("Failed to read version from pyproject.toml")
         else:
             raise RuntimeError("The current project is not the scriptman package!")

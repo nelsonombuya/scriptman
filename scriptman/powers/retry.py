@@ -5,16 +5,16 @@ from typing import Any, Callable, Optional, Type, Union, cast
 from loguru import logger
 
 from scriptman.core.config import config
-from scriptman.powers.generics import AsyncFunc, SyncFunc, T
+from scriptman.powers.generics import AsyncFunc, Func, SyncFunc, T
 
 
 def retry(
-    max_retries: int = config.env.get("RETRY.MAX_RETRIES", 1),
-    base_delay: float = config.env.get("RETRY.BASE_DELAY", 1),
-    min_delay: float = config.env.get("RETRY.MIN_DELAY", 1),
-    max_delay: float = config.env.get("RETRY.MAX_DELAY", 10),
+    max_retries: int = config.get("RETRY.MAX_RETRIES", 1),
+    base_delay: float = config.get("RETRY.BASE_DELAY", 1),
+    min_delay: float = config.get("RETRY.MIN_DELAY", 1),
+    max_delay: float = config.get("RETRY.MAX_DELAY", 10),
     retry_on: Optional[Union[Type[Exception], tuple[Type[Exception], ...]]] = None,
-) -> Callable:
+) -> Callable[..., Func[T]]:
     """
     🔁 A simple retry decorator supporting both sync and async functions
 
@@ -36,7 +36,7 @@ def retry(
     assert max_retries >= 0, f"max_retries must be non-negative, got {max_retries}"
     assert max_ge_min, f"max_delay ({max_delay}) must be >= min_delay ({min_delay})"
 
-    def decorator(func: SyncFunc[T] | AsyncFunc[T]) -> SyncFunc[T] | AsyncFunc[T]:
+    def decorator(func: Func[T]) -> Func[T]:
         @wraps(func)
         async def async_wrapper(*args: Any, **kwargs: Any) -> T:
             for attempt in range(max_retries + 1):

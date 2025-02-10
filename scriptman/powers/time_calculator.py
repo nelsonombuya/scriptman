@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from time import perf_counter
-from typing import Callable
+from typing import Any, Callable, Generator
 
 from loguru import logger
 
@@ -50,7 +50,7 @@ class TimeCalculator:
             return time_parts[0]
 
     @staticmethod
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         """
         🕰️ A decorator to calculate and display the time taken by a function.
 
@@ -61,7 +61,7 @@ class TimeCalculator:
             Callable: The wrapped function.
         """
 
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             start_time = perf_counter()
             result = func(*args, **kwargs)
             time_taken = TimeCalculator.calculate_time_taken(start_time, perf_counter())
@@ -72,7 +72,7 @@ class TimeCalculator:
 
     @contextmanager
     @staticmethod
-    def context(context: str = "Code Block"):
+    def context(context: str = "Code Block") -> Generator[None]:
         """
         A context manager to calculate and display the time taken within a context.
         """

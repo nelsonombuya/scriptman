@@ -1,4 +1,4 @@
-from typing import Any, Callable, Coroutine, TypeVar
+from typing import Any, Callable, Coroutine, TypeVar, Union
 
 from pydantic import BaseModel
 
@@ -11,6 +11,9 @@ SyncFunc = Callable[..., T]
 
 # For asynchronous functions
 AsyncFunc = Callable[..., Coroutine[Any, Any, T]]
+
+# For both sync and async functions
+Func = Union[SyncFunc[T], AsyncFunc[T]]
 
 # For generic response types
 ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)

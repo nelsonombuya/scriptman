@@ -1,23 +1,25 @@
-from abc import ABC
-from pathlib import Path
-from random import uniform
-from time import sleep
-from typing import Literal, Optional
-
-from loguru import logger
-
-from scriptman.core.config import config
-from scriptman.powers.selenium._enums import SeleniumBrowser
-
 try:
+    from abc import ABC
+    from pathlib import Path
+    from random import uniform
+    from time import sleep
+    from typing import Literal, Optional
+
+    from loguru import logger
     from selenium.webdriver.common.action_chains import ActionChains
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.wait import WebDriverWait
 
+    from scriptman.core.config import config
     from scriptman.powers.selenium._chrome import Chrome
-    from scriptman.powers.selenium._enums import BrowserMap, Browsers, Driver
+    from scriptman.powers.selenium._enums import (
+        BrowserMap,
+        Browsers,
+        Driver,
+        SeleniumBrowser,
+    )
 except ImportError:
     raise ImportError(
         "Selenium is not installed. "
@@ -29,24 +31,20 @@ except ImportError:
 class SeleniumInstance(ABC):
     def __init__(
         self,
-        browser: Browsers = Browsers.CHROME_LOCAL,
+        browser: Browsers = Browsers.CHROME,
         browser_queue: Optional[list[Browsers]] = None,
     ) -> None:
         """
         🚀 Initialize SeleniumInstance with the given browser and optional browser queue.
 
         Args:
-            browser (Browsers, optional): The browser to use. Defaults to
-                Browsers.CHROME_LOCAL.
+            browser (Browsers, optional): The browser to use. Defaults to Browsers.CHROME.
             browser_queue (Optional[list[Browsers]], optional): The browser queue to use
                 for the instance, such that if one fails, it will try the next one.
                 Defaults to None.
         """
         self._queue: Optional[list[Browsers]] = browser_queue
-        self._browser: SeleniumBrowser = BrowserMap.get(browser, Chrome)()
-
-        if browser in [Browsers.CHROME_LOCAL] and isinstance(self._browser, Chrome):
-            self._browser._local_mode = True
+        self._browser: SeleniumBrowser[Driver] = BrowserMap.get(browser, Chrome)()
 
     @property
     def driver(self) -> Driver:
@@ -98,12 +96,12 @@ class SeleniumInstance(ABC):
 
         sleep(rest)  # Rest before each interaction to offset the bot detection
         if mode in ["deny_cookies", "accept_cookies"]:  # Deny or accept cookies
-            mode = "js_click"
             xpath = xpath or (
                 '//*[@id="tarteaucitronAllDenied2"]'
                 if mode == "deny_cookies"
                 else '//*[@id="tarteaucitronAllAllowed2"]'
             )
+            mode = "js_click"
 
         wait = WebDriverWait(self.driver, timeout)
         if mode == "wait":  # Wait for the element to become invisible
@@ -111,14 +109,14 @@ class SeleniumInstance(ABC):
             return True
 
         element = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
-        ActionChains(self.driver).move_to_element(element).perform()
+        ActionChains(self.driver).move_to_element(element).perform()  # type:ignore
 
         if mode == "click":  # Click on the web element
             element.click()
             return True
 
         if mode == "js_click":  # Perform a JavaScript click on the web element
-            self.driver.execute_script("arguments[0].click();", element)
+            self.driver.execute_script("arguments[0].click();", element)  # type:ignore
             return True
 
         if mode == "send_keys":  # Send keys (text input) to the web element
@@ -141,13 +139,13 @@ class SeleniumInstance(ABC):
             file_name (Optional[str]): The name of the file you want to wait for its
                 download to complete. Defaults to None.
         """
-        directory = Path(config.env.downloads_dir)
-        files = [f.name for f in directory.iterdir()]
         download_extensions = (".tmp", ".crdownload")
+        directory = Path(str(config.env.downloads_dir))
+        files = list(directory.iterdir())
 
         if not file_name:
 
-            def is_new_file_added(driver) -> bool:
+            def is_new_file_added(driver: Driver) -> bool:
                 current_files = list(directory.iterdir())
                 new_files = [
                     file
@@ -160,7 +158,7 @@ class SeleniumInstance(ABC):
             return
         else:
 
-            def does_file_exist(driver) -> bool:
+            def does_file_exist(driver: Driver) -> bool:
                 return bool(list(Path(directory).glob(f"{file_name}*")))
 
             WebDriverWait(self.driver, 300, 1).until(does_file_exist)

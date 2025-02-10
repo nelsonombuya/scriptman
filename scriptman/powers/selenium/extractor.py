@@ -2,10 +2,34 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Union
 
-from scriptman.powers.etl.extractor import DataExtractor
-from scriptman.powers.selenium import SeleniumInstance
+try:
 
-PossibleSeleniumDataTypes = Union[dict[str, Any], list[dict[str, Any]], Path, str]
+    from pandas import DataFrame
+
+    from scriptman.powers.etl.extractor import DataExtractor
+except ImportError:
+    raise ImportError(
+        "ETL is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[etl]."
+    )
+
+try:
+    from scriptman.powers.selenium import SeleniumInstance
+except ImportError:
+    raise ImportError(
+        "Selenium is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[selenium]."
+    )
+
+PossibleSeleniumDataTypes = Union[
+    str,
+    Path,
+    DataFrame,
+    dict[str, Any],
+    list[dict[str, Any]],
+]
 
 
 class SeleniumExtractor(SeleniumInstance, DataExtractor[PossibleSeleniumDataTypes]):
@@ -19,6 +43,8 @@ class SeleniumExtractor(SeleniumInstance, DataExtractor[PossibleSeleniumDataType
         scriptman download folder.
 
         Returns:
-            PossibleSeleniumDataTypes: The extracted data or file path or glob pattern.
+            PossibleSeleniumDataTypes: The extracted data or file path or file glob
+                pattern. If file glob pattern is used, it will search for the file in
+                the scriptman download folder.
         """
         pass

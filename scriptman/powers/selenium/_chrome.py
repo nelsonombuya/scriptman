@@ -1,24 +1,29 @@
-from os import name
-from pathlib import Path
-from platform import architecture, machine, system
-from shutil import rmtree
-from typing import Literal, Optional
-from zipfile import ZipFile
+try:
+    from os import name
+    from pathlib import Path
+    from platform import architecture, machine, system
+    from shutil import rmtree
+    from typing import Any, Literal, Optional
+    from zipfile import ZipFile
 
-from loguru import Logger, logger
-from requests import get
-from selenium.webdriver import Chrome as ChromeDriver
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+    from loguru import Logger, logger
+    from requests import get
+    from selenium.webdriver import Chrome as ChromeDriver
+    from selenium.webdriver.chrome.options import Options as ChromeOptions
+    from selenium.webdriver.chrome.service import Service
+    from webdriver_manager.chrome import ChromeDriverManager
 
-from scriptman.core.config import config
-from scriptman.powers.selenium._enums import SeleniumBrowser
+    from scriptman.core.config import config
+    from scriptman.powers.selenium._enums import SeleniumBrowser
+except ImportError:
+    raise ImportError(
+        "Selenium is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[selenium]."
+    )
 
 
 class Chrome(SeleniumBrowser[ChromeDriver]):
-    _local_mode: bool = False
-
     def _get_driver(self) -> ChromeDriver:
         """
         🏎 Get the Chrome WebDriver instance associated with the current browser.
@@ -34,12 +39,12 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
         except ValueError:
             self.log.debug("Setting up Chrome in Local mode...")
             cd = ChromeDownloader()
-            chrome_version = config.env.get("chrome_version", 126)
+            chrome_version = config.get("selenium_chrome_version", 126)
             chrome_browser = cd.download(chrome_version, "browser")
             chrome_driver = cd.download(chrome_version, "driver")
             options = self._get_chrome_options(chrome_browser)
             service = Service(executable_path=chrome_driver)
-        return ChromeDriver(options, service)
+        return ChromeDriver(options=options, service_args=service)
 
     def _get_chrome_options(
         self, chrome_executable_path: Optional[Path] = None
@@ -58,24 +63,23 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
         if chrome_executable_path:
             options.binary_location = chrome_executable_path.resolve().as_posix()
 
-        if config.env.get("selenium_optimizations"):
-            [
+        if config.get("selenium_optimizations", False):
+
+            for arg in [
+                "--headless",
+                "--no-sandbox",
+                "--mute-audio",
+                "--disable-gpu",
+                "--disable-infobars",
+                "--disable-extensions",
+                "--disable-dev-shm-usage",
+                "--disable-notifications",
+                "--disable-setuid-sandbox",
+                "--remote-debugging-port=9222",
+                "--disable-browser-side-navigation",
+                "--disable-blink-features=AutomationControlled",
+            ]:
                 options.add_argument(arg)
-                for arg in [
-                    "--headless",
-                    "--no-sandbox",
-                    "--mute-audio",
-                    "--disable-gpu",
-                    "--disable-infobars",
-                    "--disable-extensions",
-                    "--disable-dev-shm-usage",
-                    "--disable-notifications",
-                    "--disable-setuid-sandbox",
-                    "--remote-debugging-port=9222",
-                    "--disable-browser-side-navigation",
-                    "--disable-blink-features=AutomationControlled",
-                ]
-            ]
 
         options.add_experimental_option(
             "prefs",
@@ -97,7 +101,11 @@ class ChromeDownloader:
     """
 
     log: Logger = logger.bind(handler="Chrome Downloader")
-    chrome_download_dir: Path = Path(config.env.downloads_dir, "..", "selenium")
+    chrome_download_dir: Path = Path(
+        config.get("downloads_dir", Path(__file__).parent.parent.parent / "downloads"),
+        "selenium",
+        "chrome",
+    )
 
     def download(self, version: int, app: Literal["driver", "browser"]) -> Path:
         """
@@ -155,7 +163,7 @@ class ChromeDownloader:
             else None
         )
 
-    def _fetch_download_urls(self) -> dict:
+    def _fetch_download_urls(self) -> dict[str, Any]:
         """
         📩 Fetch and return Chrome download URLs.
 
@@ -163,12 +171,13 @@ class ChromeDownloader:
             dict: JSON data containing download URLs.
         """
         self.log.debug("Fetching Chrome download URLs...")
-        response = get(config.env.chrome_download_url)
+        response = get(config.get("chrome_download_url"))
         response.raise_for_status()
-        return response.json()
+        data: dict[str, Any] = response.json()
+        return data
 
     def _get_app_url(
-        self, version_info: dict, app: Literal["driver", "browser"]
+        self, version_info: dict[str, Any], app: Literal["driver", "browser"]
     ) -> Optional[str]:
         """
         🔗 Get the download URL for the specified Chrome version and platform.
@@ -185,7 +194,8 @@ class ChromeDownloader:
             for download_info in version_info["downloads"].get(app, []):
                 if download_info["platform"] == current_platform:
                     self.log.debug(f"Found {str(app).title()} URL for {current_platform}")
-                    return download_info["url"]
+                    return str(download_info["url"])
+        return None
 
     def _get_system_platform(self) -> str:
         """
@@ -248,7 +258,7 @@ class ChromeDownloader:
         response = get(url)
         response.raise_for_status()
         zip_download_path = Path(
-            path.parent, f"chrome{'driver' if app == 'chromedriver' else ''}.zip"
+            path.parent, f"chrome{'driver' if app == 'driver' else ''}.zip"
         )
         zip_download_path.mkdir(parents=True, exist_ok=True)
 

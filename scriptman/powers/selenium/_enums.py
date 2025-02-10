@@ -1,19 +1,45 @@
-from abc import ABC, abstractmethod
-from enum import Enum
-from typing import Generic, Union
+try:
+    from abc import ABC, abstractmethod
+    from enum import Enum
+    from typing import Generic, Union
 
-from loguru import logger
+    from loguru import logger
+    from selenium.webdriver import Chrome as ChromeDriver
 
-from scriptman.powers.generics import T
-from scriptman.powers.selenium._chrome import Chrome, ChromeDriver
-from scriptman.powers.selenium._edge import Edge, EdgeDriver
-from scriptman.powers.selenium._firefox import Firefox, FirefoxDriver
+    from scriptman.core.config import config
+    from scriptman.powers.generics import T
+    from scriptman.powers.selenium._chrome import Chrome
+except ImportError:
+    raise ImportError(
+        "Selenium is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[selenium]."
+    )
 
-Driver = Union[ChromeDriver, EdgeDriver, FirefoxDriver]
+
+class Browsers(Enum):
+    """
+    🌐 Browser Enums
+
+    This enum contains the different browsers that Scriptman supports.
+
+    Attributes:
+        CHROME (str): Google Chrome
+    """
+
+    CHROME = "Google Chrome"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+Driver = Union[ChromeDriver]
+BrowserMap: dict[Browsers, type["SeleniumBrowser[Driver]"]] = {Browsers.CHROME: Chrome}
 
 
 class SeleniumBrowser(ABC, Generic[T]):
     _driver: T
+    _local_mode: bool = config.get("selenium_local_mode", True)
 
     def __init__(self) -> None:
         """
@@ -44,30 +70,3 @@ class SeleniumBrowser(ABC, Generic[T]):
             T: The WebDriver instance (Chrome, Edge, or Firefox) used by the browser.
         """
         return self._driver
-
-
-class Browsers(Enum):
-    """
-    🌐 Browser Enums
-
-    This enum contains the different browsers that Scriptman supports.
-
-    Attributes:
-        EDGE (str): Microsoft Edge
-        CHROME (str): Google Chrome
-        FIREFOX (str): Mozilla Firefox
-        CHROME_LOCAL (str): Google Chrome (Downloaded and Locally Installed Instance)
-    """
-
-    EDGE = "Microsoft Edge"
-    CHROME = "Google Chrome"
-    FIREFOX = "Mozilla Firefox"
-    CHROME_LOCAL = "Google Chrome (Local)"
-
-
-BrowserMap: dict[Browsers, type[SeleniumBrowser]] = {
-    Browsers.EDGE: Edge,
-    Browsers.CHROME: Chrome,
-    Browsers.FIREFOX: Firefox,
-    Browsers.CHROME_LOCAL: Chrome,
-}

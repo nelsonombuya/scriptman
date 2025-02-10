@@ -1,19 +1,18 @@
-from contextlib import contextmanager
-from pathlib import Path
-from typing import Any, Literal, Optional
-
-from loguru import Logger, logger
-
-from scriptman.core.config import config
-from scriptman.powers.concurrency import TaskExecutor
-from scriptman.powers.database._database import DatabaseHandler
-from scriptman.powers.database._exceptions import DatabaseError
-from scriptman.powers.etl.extractor import DataExtractor
-from scriptman.powers.generics import T
-from scriptman.powers.time_calculator import TimeCalculator
-
 try:
+    from contextlib import contextmanager
+    from pathlib import Path
+    from typing import Any, Generator, Literal, Optional
+
+    from loguru import Logger, logger
     from pandas import DataFrame, read_csv
+
+    from scriptman.core.config import config
+    from scriptman.powers.concurrency import TaskExecutor
+    from scriptman.powers.database._database import DatabaseHandler
+    from scriptman.powers.database._exceptions import DatabaseError
+    from scriptman.powers.etl.extractor import DataExtractor
+    from scriptman.powers.generics import T
+    from scriptman.powers.time_calculator import TimeCalculator
 except ImportError:
     raise ImportError(
         "Pandas is not installed. "
@@ -24,9 +23,15 @@ except ImportError:
 
 class ETL(DataFrame):
     log: Logger = logger
+    default_downloads_dir: Path = Path(
+        config.get(
+            "downloads_dir",
+            Path(__file__).parent.parent / "downloads",
+        )
+    )
 
     @contextmanager
-    def extraction_context(self, context: str = "Code Block"):
+    def extraction_context(self, context: str = "Code Block") -> Generator[None]:
         """
         📂 A context manager for data extraction processes, logging the start, completion,
         and details of the extracted data.
@@ -82,8 +87,7 @@ class ETL(DataFrame):
             - Warning: If no records were extracted.
         """
 
-        directory = directory or Path(config.env.downloads_dir)
-        files = directory.glob(f"{file_name}.csv")
+        files = self.default_downloads_dir.glob(f"{file_name}.csv")
         if not files:
             raise FileNotFoundError(f"No files matched the pattern: {file_name}.csv")
 
@@ -114,8 +118,7 @@ class ETL(DataFrame):
             - Warning: If no records were extracted.
         """
 
-        directory = directory or Path(config.env.downloads_dir)
-        files = directory.glob(f"{file_name}.json")
+        files = self.default_downloads_dir.glob(f"{file_name}.json")
         if not files:
             raise FileNotFoundError(f"No files matched the pattern: {file_name}.json")
 
@@ -196,9 +199,8 @@ class ETL(DataFrame):
             self.log.warning("Dataset is empty!")
             raise ValueError("Dataset is empty!")
 
-        directory = directory or Path(config.env.downloads_dir)
-        directory.mkdir(parents=True, exist_ok=True)
-        file_path = directory / f"{file_name}.json"
+        self.default_downloads_dir.mkdir(parents=True, exist_ok=True)
+        file_path = self.default_downloads_dir / f"{file_name}.json"
         self.to_json(file_path, orient="records")
         self.log.success(f"Data saved to {file_path}")
         return file_path
@@ -223,9 +225,8 @@ class ETL(DataFrame):
             self.log.warning("Dataset is empty!")
             raise ValueError("Dataset is empty!")
 
-        directory = directory or Path(config.env.downloads_dir)
-        directory.mkdir(parents=True, exist_ok=True)
-        file_path = directory / f"{file_name}.csv"
+        self.default_downloads_dir.mkdir(parents=True, exist_ok=True)
+        file_path = self.default_downloads_dir / f"{file_name}.csv"
         self.to_csv(file_path, index=False)
         self.log.success(f"Data saved to {file_path}")
         return file_path
@@ -311,7 +312,7 @@ class ETL(DataFrame):
             )
             return all(
                 TaskExecutor.wait(
-                    TaskExecutor().parallel_io_bound_task(
+                    TaskExecutor[bool]().parallel_io_bound_task(
                         func=database_handler.execute_write_query,
                         args=[(query, row) for row in values],
                     )
@@ -321,7 +322,7 @@ class ETL(DataFrame):
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
             return all(
                 TaskExecutor.wait(
-                    TaskExecutor().parallel_io_bound_task(
+                    TaskExecutor[bool]().parallel_io_bound_task(
                         func=self._insert_or_update,
                         args=[(database_handler, table_name, value) for value in values],
                     )

@@ -10,16 +10,16 @@ from asyncio import (
 )
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from datetime import datetime
-from typing import Any, Coroutine, Optional
+from typing import Any, Coroutine, Generic, Optional, Union, cast
 from uuid import uuid4
 
 from tqdm import tqdm
 
 from scriptman.powers.concurrency._models import BatchResult, TaskResult, TaskStatus
-from scriptman.powers.generics import AsyncFunc, SyncFunc, T
+from scriptman.powers.generics import Func, SyncFunc, T
 
 
-class TaskExecutor:
+class TaskExecutor(Generic[T]):
     """🧩 Task Executor
 
     Efficiently manages parallel task execution using both threading and multiprocessing
@@ -59,16 +59,16 @@ class TaskExecutor:
             thread_pool_size: Maximum number of threads for I/O-bound tasks
             process_pool_size: Maximum number of processes for CPU-bound tasks
         """
-        self._background_tasks: dict[str, Task] = {}
+        self._background_tasks: dict[str, Task[TaskResult[T]]] = {}
         self._thread_pool = ThreadPoolExecutor(max_workers=thread_pool_size)
         self._process_pool = ProcessPoolExecutor(max_workers=process_pool_size)
 
     async def run_in_background(
         self,
-        func: SyncFunc[T] | AsyncFunc[T],
+        func: Func[T],
         raise_on_error: bool = True,
-        *args: tuple,
-        **kwargs: dict,
+        *args: Any,
+        **kwargs: Any,
     ) -> str:
         """
         🚀 Run a single task in the background.
@@ -85,25 +85,26 @@ class TaskExecutor:
             str : Task ID of the background task
         """
         task_id = f"background_task_{func.__name__}_{uuid4().hex[:8]}"
-
-        if iscoroutinefunction(func):
-            coroutine = self._create_task_result(
-                task_id=task_id,
-                raise_errors=raise_on_error,
-                coroutine=func(*args, **kwargs),
-            )
-        else:
-            # Convert synchronous function to coroutine
-            coroutine = self._create_task_result(
-                task_id=task_id,
-                raise_errors=raise_on_error,
-                coroutine=wrap_future(self._thread_pool.submit(func, *args, **kwargs)),
-            )
+        coroutine = self.__create_task_result(
+            task_id=task_id,
+            raise_errors=raise_on_error,
+            coroutine=(
+                func(*args, **kwargs)
+                if iscoroutinefunction(func)
+                else wrap_future(
+                    self._thread_pool.submit(
+                        cast(SyncFunc[T], func),  # Convert sync function to coroutine
+                        *args,
+                        **kwargs,
+                    )
+                )
+            ),
+        )
 
         self._background_tasks[task_id] = create_task(coroutine)
         return task_id
 
-    async def get_background_result(self, task_id: str) -> TaskResult:
+    async def get_background_result(self, task_id: str) -> TaskResult[T]:
         """
         📊 Get the result of a background task by its ID.
 
@@ -146,8 +147,8 @@ class TaskExecutor:
     async def parallel_cpu_bound_task(
         self,
         func: SyncFunc[T],
-        args: list[tuple] = [],
-        kwargs: list[dict] = [],
+        args: list[tuple[Any, ...]] = [],
+        kwargs: list[dict[str, Any]] = [],
         batch_size: int = 100,
         batch_id: Optional[str] = None,
         raise_on_error: bool = True,
@@ -179,7 +180,7 @@ class TaskExecutor:
 
             batch_results = await gather(
                 *[
-                    self._create_task_result(
+                    self.__create_task_result(
                         parent_id=batch_id,
                         raise_errors=raise_on_error,
                         coroutine=wrap_future(future),
@@ -202,9 +203,9 @@ class TaskExecutor:
 
     async def parallel_io_bound_task(
         self,
-        func: SyncFunc[T] | AsyncFunc[T],
-        args: list[tuple] = [],
-        kwargs: list[dict] = [],
+        func: Func[T],
+        args: list[tuple[Any, ...]] = [],
+        kwargs: list[dict[str, Any]] = [],
         batch_size: int = 100,
         batch_id: Optional[str] = None,
         raise_on_error: bool = True,
@@ -237,7 +238,7 @@ class TaskExecutor:
             if iscoroutinefunction(func):
                 batch_results = await gather(
                     *[
-                        self._create_task_result(
+                        self.__create_task_result(
                             parent_id=batch_id,
                             raise_errors=raise_on_error,
                             coroutine=func(*task_args, **task_kwargs),
@@ -249,14 +250,18 @@ class TaskExecutor:
             else:
                 batch_results = await gather(
                     *[
-                        self._create_task_result(
+                        self.__create_task_result(
                             parent_id=batch_id,
                             raise_errors=raise_on_error,
                             coroutine=wrap_future(future),
                             task_id=f"{func.__name__}_{uuid4().hex[:8]}",
                         )
                         for future in [
-                            self._thread_pool.submit(func, *task_args, **task_kwargs)
+                            self._thread_pool.submit(
+                                cast(SyncFunc[T], func),  # Convert sync func to coroutine
+                                *task_args,
+                                **task_kwargs,
+                            )
                             for task_args, task_kwargs in zip(batch_args, batch_kwargs)
                         ]
                     ]
@@ -271,10 +276,10 @@ class TaskExecutor:
             end_time=datetime.now(),
         )
 
-    async def _create_task_result(
+    async def __create_task_result(
         self,
         task_id: str,
-        coroutine: Future[T] | Coroutine[Any, Any, T],
+        coroutine: Union[Future[T], Coroutine[Any, Any, T]],
         parent_id: Optional[str] = None,
         raise_errors: bool = True,
     ) -> TaskResult[T]:
@@ -301,7 +306,7 @@ class TaskExecutor:
 
         return result
 
-    async def cleanup(self, wait: bool = True):
+    async def cleanup(self, wait: bool = True) -> None:
         """🧹 Clean up executor resources and cancel running tasks."""
         if not wait:  # Cancel all running background tasks
             for task in self._background_tasks.values():
@@ -317,4 +322,10 @@ class TaskExecutor:
     @staticmethod
     def wait(coroutine: Coroutine[Any, Any, T]) -> T:
         """⌚ Runs an async coroutine synchronously and waits for the result."""
+        if coroutine is None:
+            return None  # type:ignore
+
+        if isinstance(coroutine, Future) or isinstance(coroutine, Task):
+            return cast(T, coroutine.result())
+
         return run(coroutine)

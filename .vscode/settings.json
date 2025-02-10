@@ -1,3 +1,12 @@
 {
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "todo-tree.tree.scanMode": "workspace only",
+  "python.testing.pytestArgs": [
+    "tests",
+    "--cov=.",
+    "--doctest-modules",
+    "--cov-report=term-missing"
+  ],
   "cSpell.words": ["scriptman", "tarteaucitron"]
 }

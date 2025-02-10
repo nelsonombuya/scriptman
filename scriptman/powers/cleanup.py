@@ -123,4 +123,4 @@ class CleanUp:
 
     def mypy_cleanup(self) -> None:
         """🧹 Clean up mypy cache files."""
-        Path(config.env.cwd).joinpath(".mypy_cache").unlink(missing_ok=True)
+        Path(config.get("cwd", ".")).joinpath(".mypy_cache").unlink(missing_ok=True)

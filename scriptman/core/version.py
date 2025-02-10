@@ -19,7 +19,7 @@ class Version(BaseModel):
 
     major: int = Field(default=2, description="Major version number")
     minor: int = Field(default=0, description="Minor version number")
-    commit: int = Field(default=244, description="Commit count")
+    commit: int = Field(default=245, description="Commit count")
 
     @property
     def scriptman(self) -> str:
@@ -132,8 +132,8 @@ class Version(BaseModel):
         with pyproject_file.open("r", encoding="utf-8") as f:
             pyproject_data = parse(f.read())
 
-        if pyproject_data.get("tool", {}).get("poetry", {}).get("name") == "scriptman":
-            if result := pyproject_data.get("tool", {}).get("poetry", {}).get("version"):
+        if pyproject_data.get("project", {}).get("name") == "scriptman":
+            if result := pyproject_data.get("project", {}).get("version"):
                 return str(result)
             else:
                 raise RuntimeError("Failed to read version from pyproject.toml")

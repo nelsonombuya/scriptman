@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.0.245"
+version = "2.0.246"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -40,10 +40,24 @@ selenium = [
 scriptman = "scriptman.core.cli:CLI.start_cli_instance"
 
 # Development dependency groups (used only during development)
+[tool.poetry.group.api.dependencies]
+fastapi = "^0.115.8"
+pydantic = "^2.10.5"
+
+[tool.poetry.group.cache.dependencies]
+diskcache = "^5.6.3"
+dill = "^0.3.9"
+
+[tool.poetry.group.etl.dependencies]
+sqlalchemy = "^2.0.38"
+
 [tool.poetry.group.lint.dependencies]
 black = "^24.10.0"
 isort = "^5.13.2"
 mypy = "^1.13.0"
+
+[tool.poetry.group.scheduler.dependencies]
+apscheduler = "^3.11.0"
 
 [tool.poetry.group.selenium.dependencies]
 selenium = "^4.28.1"
@@ -51,9 +65,6 @@ requests = "^2.32.3"
 types-selenium = "^3.141.9"
 types-requests = "^2.32.0.20241016"
 webdriver-manager = "^4.0.2"
-
-[tool.poetry.group.scheduler.dependencies]
-apscheduler = "^3.11.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.4"

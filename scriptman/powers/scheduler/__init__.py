@@ -1,12 +1,12 @@
-from typing import Optional
-
-from loguru import logger
-
 try:
+    from typing import Any, Generic, Optional
+
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
     from apscheduler.schedulers.base import BaseScheduler
+    from loguru import logger
 
     from scriptman.core.config import Config
+    from scriptman.powers.generics import T
     from scriptman.powers.scheduler.models import Job
 
 except ImportError:
@@ -17,11 +17,12 @@ except ImportError:
     )
 
 
-class Scheduler:
-    __instance: Optional["Scheduler"] = None
+class Scheduler(Generic[T]):
+    __initialized: bool = False
+    __instance: Optional["Scheduler[T]"] = None
     __scheduler: BaseScheduler = AsyncIOScheduler()
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args: Any, **kwargs: Any) -> "Scheduler[T]":
         """
         1️⃣ Ensure only a single instance of Scheduler exists (singleton pattern).
 
@@ -47,7 +48,7 @@ class Scheduler:
         self.__scheduler.start()
         self.__initialized = True
 
-    def add_job(self, job: Job) -> None:
+    def add_job(self, job: Job[T]) -> None:
         """
         ➕ Add a job to the scheduler.
 
@@ -81,7 +82,7 @@ class Scheduler:
         else:
             logger.warning(f"Job with ID {job_id} not found")
 
-    def __del__(self):
+    def __del__(self) -> None:
         """
         👋 Goodbye! Shut down the scheduler when the instance is deleted.
         """

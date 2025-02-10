@@ -53,7 +53,7 @@ class Job(BaseModel, Generic[T]):
             raise ValueError("Max instances must be greater than 0")
         return v
 
-    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
+    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """
         💡 Returns a job info dictionary.
 
@@ -68,7 +68,7 @@ class Job(BaseModel, Generic[T]):
         """
 
         @wraps(self.function)
-        def wrapper(*f_args, **f_kwargs) -> Any:
+        def wrapper(*f_args: Any, **f_kwargs: Any) -> Any:
             try:
                 return self.function(*f_args, **f_kwargs)
             except Exception as e:

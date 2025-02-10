@@ -1,12 +1,19 @@
-from json import dumps
-from typing import Any
+try:
+    from json import dumps
+    from typing import Any
 
-from fastapi import status
-from loguru import logger
+    from fastapi import status
+    from loguru import logger
 
-from scriptman.powers.api.exceptions import APIException
-from scriptman.powers.api.request import Request
-from scriptman.powers.api.response import Response
+    from scriptman.powers.api.exceptions import APIException
+    from scriptman.powers.api.request import Request
+    from scriptman.powers.api.response import Response
+except ImportError:
+    raise ImportError(
+        "FastAPI is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[api]."
+    )
 
 
 def create_successful_response(

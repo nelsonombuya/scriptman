@@ -1,7 +1,14 @@
-from enum import Enum
-from typing import Any, Optional, Protocol
+try:
+    from enum import Enum
+    from typing import Any, Optional, Protocol
 
-from requests import Response, request
+    from requests import Response, request
+except ImportError:
+    raise ImportError(
+        "Requests is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[api]."
+    )
 
 
 class HTTPMethod(str, Enum):

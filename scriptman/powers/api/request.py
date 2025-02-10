@@ -1,7 +1,14 @@
-from datetime import datetime
-from uuid import uuid4
+try:
+    from datetime import datetime
+    from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+    from pydantic import BaseModel, ConfigDict, Field
+except ImportError:
+    raise ImportError(
+        "Pydantic is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[api]."
+    )
 
 
 class Request(BaseModel):

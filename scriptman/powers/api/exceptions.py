@@ -1,8 +1,15 @@
-import sys
-from traceback import extract_tb
-from typing import Any, Optional
+try:
+    import sys
+    from traceback import extract_tb
+    from typing import Any, Optional
 
-from fastapi import status
+    from fastapi import status
+except ImportError:
+    raise ImportError(
+        "FastAPI is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[api]."
+    )
 
 
 class APIException(Exception):

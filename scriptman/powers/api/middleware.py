@@ -1,10 +1,17 @@
-from pathlib import Path
-from uuid import uuid4
+try:
+    from pathlib import Path
+    from uuid import uuid4
 
-from fastapi import Request
-from loguru import logger
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.responses import Response
+    from fastapi import Request
+    from loguru import logger
+    from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+    from starlette.responses import Response
+except ImportError:
+    raise ImportError(
+        "FastAPI is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[api]."
+    )
 
 
 class FastAPIMiddleware(BaseHTTPMiddleware):

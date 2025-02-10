@@ -1,10 +1,17 @@
-from datetime import datetime
-from typing import Any, Optional
+try:
+    from datetime import datetime
+    from typing import Any, Optional
 
-from pydantic import BaseModel, Field, field_validator
+    from pydantic import BaseModel, Field, field_validator
 
-from scriptman.powers.api.exceptions import APIException
-from scriptman.powers.api.request import Request
+    from scriptman.powers.api.exceptions import APIException
+    from scriptman.powers.api.request import Request
+except ImportError:
+    raise ImportError(
+        "Pydantic is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[api]."
+    )
 
 
 class Response(BaseModel):

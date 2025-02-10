@@ -1,18 +1,26 @@
-from abc import ABC, abstractmethod
-from json import dumps
-from typing import Any, Generic, Optional
+try:
+    from abc import ABC, abstractmethod
+    from json import dumps
+    from typing import Any, Generic, Optional
 
-from loguru import logger
-from pydantic import ValidationError
-from requests import RequestException, Response
+    from loguru import logger
+    from pydantic import ValidationError
+    from requests import RequestException, Response
 
-from scriptman.powers.api.exceptions import APIException
-from scriptman.powers.api.request_handlers import (
-    DefaultRequestHandler,
-    HTTPMethod,
-    RequestHandler,
-)
-from scriptman.powers.generics import ResponseModelT
+    from scriptman.powers.api.exceptions import APIException
+    from scriptman.powers.api.request_handlers import (
+        DefaultRequestHandler,
+        HTTPMethod,
+        RequestHandler,
+    )
+    from scriptman.powers.generics import ResponseModelT
+
+except ImportError as e:
+    raise ImportError(
+        f"An error occurred: {e} \n"
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[api]."
+    )
 
 
 class BaseAPIClient(ABC, Generic[ResponseModelT]):

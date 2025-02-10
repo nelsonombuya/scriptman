@@ -1,15 +1,15 @@
-from typing import Any, Optional
-
-from loguru import logger
-from tqdm import tqdm
-
-from scriptman.powers.database._database import DatabaseConfig, DatabaseHandler
-from scriptman.powers.database._exceptions import DatabaseError
-
 try:
+    from typing import Any, Optional
+
+    from loguru import logger
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import Engine
     from sqlalchemy.exc import SQLAlchemyError
+    from tqdm import tqdm
+
+    from scriptman.powers.database._config import DatabaseConfig
+    from scriptman.powers.database._database import DatabaseHandler
+    from scriptman.powers.database._exceptions import DatabaseError
 except ImportError:
     raise ImportError(
         "SQLAlchemy is not installed. "

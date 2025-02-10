@@ -1,14 +1,21 @@
-from abc import ABC, abstractmethod
-from re import IGNORECASE, match, search, sub
-from typing import Any, Optional
+try:
+    from abc import ABC, abstractmethod
+    from re import IGNORECASE, match, search, sub
+    from typing import Any, Optional
 
-from loguru import logger
-from pandas import DataFrame
-from tqdm import tqdm
+    from loguru import logger
+    from pandas import DataFrame
+    from tqdm import tqdm
 
-from scriptman.core.config import config
-from scriptman.powers.database._config import DatabaseConfig
-from scriptman.powers.time_calculator import TimeCalculator
+    from scriptman.core.config import config
+    from scriptman.powers.database._config import DatabaseConfig
+    from scriptman.powers.time_calculator import TimeCalculator
+except ImportError:
+    raise ImportError(
+        "Pandas is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[etl]."
+    )
 
 
 class DatabaseHandler(ABC):
@@ -131,7 +138,7 @@ class DatabaseHandler(ABC):
         self,
         query: str,
         rows: list[dict[str, Any]] = [],
-        batch_size: Optional[int] = config.env.get("BATCH_SIZE"),
+        batch_size: Optional[int] = config.get("BATCH_SIZE"),
     ) -> bool:
         """
         📃 Executes multiple SQL insert queries with the given SQL query and rows.
@@ -467,7 +474,7 @@ class DatabaseHandler(ABC):
         return query, values
 
     def convert_query_to_named_placeholders(
-        self, query: str, values: list[tuple]
+        self, query: str, values: list[tuple[Any, ...]]
     ) -> tuple[str, list[dict[str, Any]]]:
         """
         Reverse engineers a prepared SQL query (INSERT, UPDATE, DELETE) and its values
@@ -486,7 +493,7 @@ class DatabaseHandler(ABC):
                 index names and the values are the corresponding values for each row.
         """
         with TimeCalculator.context("Reverse Engineering Query"):
-            column_names: list = []
+            column_names: list[str] = []
             result: list[dict[str, Any]] = []
 
             if query.strip().upper().startswith("UPDATE"):  # UPDATE QUERY

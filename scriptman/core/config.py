@@ -22,7 +22,7 @@ class Config:
 
     __initialized: bool = False
     __instance: Optional["Config"] = None
-    __callback_function: Optional[Callable[[Exception, dict[str, Any]], None]] = None
+    __callback_function: Optional[Callable[[Exception], None]] = None
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "Config":
         """
@@ -56,6 +56,17 @@ class Config:
         self.__initialize_directories()
         self.__initialize_scriptman_logging()
         self.__initialized = True
+
+    @property
+    def callback_function(self) -> Callable[[Exception], None] | None:
+        """
+        📞 Retrieve the callback function to handle exceptions.
+
+        Returns:
+            Callable[[Exception], None] | None: The callback function to handle exceptions
+                or None if no function has been set.
+        """
+        return self.__callback_function
 
     def get(self, key: str, default: Any = None) -> Any:
         """
@@ -256,7 +267,7 @@ class Config:
             f.write(dumps(config_data))
 
     def add_callback_function(
-        self, callback_function: Callable[[Exception, dict[str, Any]], None]
+        self, callback_function: Callable[[Exception], None]
     ) -> bool:
         """
         🔄 Add a callback function to handle exceptions.
@@ -268,8 +279,7 @@ class Config:
             bool: True if the function was added successfully, False otherwise.
         """
         if not callable(callback_function):
-            logger.error("Invalid callback function provided.")
-            return False
+            raise ValueError("Callback function must be callable")
 
         self.__callback_function = callback_function
         return True

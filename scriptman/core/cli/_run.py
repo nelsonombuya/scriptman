@@ -92,7 +92,6 @@ class RunSubParser(BaseParser):
             int: Exit code (0 for success, non-zero for failure)
         """
         print(config._version.scriptman)  # Just looks cool
-        logger.info(f"🦸‍♂️ ScriptMan v{config._version} 🦸‍♀️")
         scripts = (
             [Path(script) for script in args.scripts]
             if args.scripts

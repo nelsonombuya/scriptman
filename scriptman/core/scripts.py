@@ -1,17 +1,28 @@
 from asyncio import gather, run, to_thread
 from pathlib import Path
 from re import MULTILINE, sub
-from typing import Any
 
 from filelock import FileLock, Timeout
 from loguru import logger
 
 from scriptman.core.config import config
+from scriptman.powers.concurrency import TaskExecutor
 from scriptman.powers.retry import retry
 from scriptman.powers.time_calculator import TimeCalculator
 
 
 class Scripts:
+    def __init__(self) -> None:
+        """
+        ✨ Initializes the Scripts class with an empty dictionary to store
+        script execution results.
+
+        The dictionary maps each script path to a boolean indicating whether
+        the script executed successfully, or an exception if the script
+        execution failed.
+        """
+        self.__results: dict[Path, bool | Exception] = {}
+
     def run_scripts(self, scripts: list[Path]) -> None:
         """
         🏃‍♂️ Executes a list of scripts either concurrently or sequentially based on the
@@ -26,29 +37,50 @@ class Scripts:
                 scripts.remove(script)
                 continue
 
-        with TimeCalculator.context("🦸‍♂️ Scriptman"):
+        with TimeCalculator.context("Scriptman"):
             if config.env.concurrent and len(scripts) > 1:
-                self._execute_scripts_concurrently(scripts)
+                self.__execute_scripts_concurrently(scripts)
             else:
-                self._execute_scripts_sequentially(scripts)
+                self.__execute_scripts_sequentially(scripts)
+
             logger.info(
                 f"✅ Finished running "
-                f"{len(scripts)} script{'s' if len(scripts) > 1 else ''}:"
-                "\n\t- " + "\n\t- ".join(script.name for script in scripts)
+                f"{len(scripts)} script{'s' if len(scripts) > 1 else ''}: \n\t- "
+                + "\n\t- ".join([self.__format_result(script) for script in scripts])
             )
 
-    def _execute_scripts_sequentially(self, scripts: list[Path]) -> None:
+    def __format_result(self, script: Path) -> str:
+        """
+        ✍🏾 Formats the result of a single script execution into a string.
+
+        Args:
+            script (Path): The path of the script that was executed.
+
+        Returns:
+            str: A string that represents the status of the script execution.
+        """
+        result = self.__results.get(script, Exception("Script not executed"))
+        if result is True:
+            status = "✅"
+        else:
+            status = f"❌ -> {type(result).__qualname__}: {str(result)}"
+        return f"{script.name} - {status}"
+
+    def __execute_scripts_sequentially(self, scripts: list[Path]) -> None:
         """
         🏃🏾‍♂️🏃🏾‍♂️ Executes a list of scripts sequentially.
 
         Args:
             scripts (list[Path]): A list of Path objects representing the scripts to be
                 executed.
+
+        Returns:
+            dict[Path, Any]: A dictionary mapping each script to its execution result.
         """
         for script in scripts:
-            self._run_script(script)
+            self.__lock_and_load_script(script)
 
-    def _execute_scripts_concurrently(self, scripts: list[Path]) -> None:
+    def __execute_scripts_concurrently(self, scripts: list[Path]) -> None:
         """
         🛤 Executes a list of scripts concurrently.
 
@@ -59,57 +91,35 @@ class Scripts:
                 executed.
         """
 
-        async def _run_all_scripts_async(scripts: list[Path]) -> None:
-            await gather(*(to_thread(self._run_script, script) for script in scripts))
+        async def __run_all_scripts_async(scripts: list[Path]) -> None:
+            await gather(*(to_thread(self.__lock_and_load_script, s) for s in scripts))
 
-        run(_run_all_scripts_async(scripts))
+        run(__run_all_scripts_async(scripts))
 
-    def _run_script(self, script: Path) -> None:
-        """
-        🏃‍♂️ Runs a single script with a file lock mechanism.
-
-        Args:
-            script (Path): The path of the script to run.
-        """
+    def __lock_and_load_script(self, script: Path) -> None:
+        """🔫 Lock and load script for execution."""
         # FIXME: Log each script to a separate file, without the logs mixing up
-        lock_file = script.with_suffix(script.suffix + ".lock")
-        lock = FileLock(lock_file, timeout=0)
+        lock = FileLock(script.with_suffix(script.suffix + ".lock"), timeout=0)
 
         try:
-            if not config.env.force:
+            if not config.get("force", False):
                 logger.debug(f"🔐 Acquiring lock for '{script.name}'...")
                 with lock:
                     logger.debug(f"🔒 Lock acquired for '{script.name}'.")
-                    self._execute_with_logging(script)
+                    self.__results[script] = self.execute(script)
             else:
                 logger.warning(f"⚠ Force flag set. Skipping lock for '{script.name}'.")
-                self._execute_with_logging(script)
-        except Timeout:
+                self.__results[script] = self.execute(script)
+        except Timeout as e:
             logger.error(
                 f"Another instance of '{script.name}' is already running. "
                 "Run using --force to override."
             )
+            self.__results[script] = e
         finally:
             logger.debug(f"🔓 Releasing lock for '{script.name}'.")
 
-    def _execute_with_logging(self, script: Path) -> None:
-        """
-        ⚙ Executes the script and logs output.
-
-        Args:
-            script (Path): The script to execute.
-        """
-        success, error, details = self.execute(script)
-        if not success:
-            if config.__callback_function is not None:
-                config.__callback_function(
-                    error or Exception("A general error has occurred"),
-                    details or {},
-                )
-
-    def execute(
-        self, file_path: Path
-    ) -> tuple[bool, Exception | None, dict[str, Any] | None]:
+    def execute(self, file_path: Path) -> bool | Exception:
         """
         🏃🏾‍♂️ Runs a script and logs its output.
 
@@ -117,9 +127,7 @@ class Scripts:
             file_path (Path): The path of the script to run.
 
         Returns:
-            tuple[bool, Exception | None, dict | None]: A tuple containing a boolean
-                indicating success, an exception representing the error if any, and a
-                dictionary containing any additional details.
+            bool: True if the script executed successfully, The exception otherwise.
         """
         try:
             with open(file_path, "r") as script_file:
@@ -135,10 +143,14 @@ class Scripts:
 
             logger.info(f"🚀 Running '{file_path.name}' script...")
             with TimeCalculator.context(context=file_path.name):
-                retry(config.get("retries", 0))(exec)(script_content, globals())
-            message = f"Script '{file_path.name}' executed successfully"
-            logger.success(message)
-            return True, None, {"message": message}
+                TaskExecutor[None].wait(
+                    retry(config.get("retries", 0))(exec)(script_content, globals())
+                )
+            logger.success(f"Script '{file_path.name}' executed successfully")
+            return True
         except Exception as e:
             logger.error(f"❌ Error running '{file_path.name}' script: {e}")
-            return False, e, {"error": str(e)}
+            if config.callback_function is not None:
+                logger.info("📞 Calling callback function...")
+                config.callback_function(e)
+            return e

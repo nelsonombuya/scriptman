@@ -1,20 +1,18 @@
-from asyncio import iscoroutinefunction, run
-from functools import wraps
-from hashlib import md5
-from inspect import ismethod
-from threading import Lock
-from typing import Any, Callable, Generic, Optional, cast
-
-from loguru import logger
-
-from scriptman.core.config import config
-from scriptman.powers.generics import AsyncFunc, SyncFunc, T
-
 try:
-    from dill import dumps
+    from asyncio import iscoroutinefunction, run
+    from functools import wraps
+    from hashlib import md5
+    from inspect import ismethod
+    from threading import Lock
+    from typing import Any, Callable, Generic, Optional, cast
 
+    from dill import dumps
+    from loguru import logger
+
+    from scriptman.core.config import config
     from scriptman.powers.cache._backend import CacheBackend
     from scriptman.powers.cache.diskcache import FanoutCacheBackend
+    from scriptman.powers.generics import AsyncFunc, SyncFunc, T
 except ImportError:
     raise ImportError(
         "DiskCache backend is not installed. "
@@ -272,7 +270,7 @@ class OperationTracker(Generic[T]):
         with self.cache_manager.__active_operations_lock:
             self.cache_manager.__active_operations += 1
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, *args: Any, **kwargs: Any) -> None:
         """
         🚪 Exit the runtime context related to this object. The active operation counter
         of the cache manager is decremented by 1.

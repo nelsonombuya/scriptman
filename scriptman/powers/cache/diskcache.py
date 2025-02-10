@@ -1,14 +1,21 @@
-from abc import ABC
-from enum import Enum
-from os import remove
-from pathlib import Path
-from typing import Any, Optional
+try:
+    from abc import ABC
+    from enum import Enum
+    from os import remove
+    from pathlib import Path
+    from typing import Any, Optional
 
-from diskcache import FanoutCache
-from loguru import logger
+    from diskcache import FanoutCache
+    from loguru import logger
 
-from scriptman.core.config import config
-from scriptman.powers.cache._backend import CacheBackend
+    from scriptman.core.config import config
+    from scriptman.powers.cache._backend import CacheBackend
+except ImportError:
+    raise ImportError(
+        "DiskCache backend is not installed. "
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[cache]"
+    )
 
 """DiskCache Backends"""
 

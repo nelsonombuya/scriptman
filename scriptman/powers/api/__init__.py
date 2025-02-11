@@ -8,7 +8,7 @@ try:
     from requests import RequestException, Response
 
     from scriptman.powers.api.exceptions import APIException
-    from scriptman.powers.api.request_handlers import (
+    from scriptman.powers.api.handlers import (
         DefaultRequestHandler,
         HTTPMethod,
         RequestHandler,

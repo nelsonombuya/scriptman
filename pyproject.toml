@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.0.247"
+version = "2.0.249"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -11,7 +11,7 @@ dependencies = [
     "dynaconf>=3.2.6",
     "filelock>=3.16.1",
     "loguru>=0.7.3",
-    "pydantic>=2.10.5",
+    "pydantic>=2.10.6",
     "tomlkit>=0.13.2",
     "tqdm>=4.67.1",
     "types-tqdm>=4.67.0.20241221",
@@ -42,7 +42,7 @@ scriptman = "scriptman.core.cli:CLI.start_cli_instance"
 # Development dependency groups (used only during development)
 [tool.poetry.group.api.dependencies]
 fastapi = "^0.115.8"
-pydantic = "^2.10.5"
+pydantic = { extras = ["email"], version = "^2.10.6" }
 
 [tool.poetry.group.cache.dependencies]
 diskcache = "^5.6.3"

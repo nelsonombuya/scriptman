@@ -1,17 +1,35 @@
+from loguru import logger
+from pydantic import model_validator
+
 try:
     from datetime import datetime
     from typing import Any, Optional
+    from uuid import uuid4
 
-    from pydantic import BaseModel, Field, field_validator
+    from email_validator import EmailNotValidError
+    from pydantic import BaseModel, ConfigDict, Field, field_validator, validate_email
 
     from scriptman.powers.api.exceptions import APIException
-    from scriptman.powers.api.request import Request
 except ImportError:
     raise ImportError(
         "Pydantic is not installed. "
         "Kindly install the dependencies on your package manager using "
         "scriptman[api]."
     )
+
+
+class Request(BaseModel):
+    """
+    🚀 Represents a request object.
+
+    Attributes:
+        request_id (str): The unique identifier for the request.
+        timestamp (str): The timestamp when the request was created.
+    """
+
+    request_id: str = Field(default_factory=lambda: str(uuid4()))
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+    model_config = ConfigDict(extra="forbid")
 
 
 class Response(BaseModel):
@@ -120,3 +138,109 @@ class Response(BaseModel):
             response=exception.response,
             stacktrace=exception.stacktrace,
         )
+
+
+class BaseDataModel(BaseModel):
+    """
+    🏗️ BaseDataModel
+
+    This class extends the Pydantic BaseModel to provide additional functionality for
+    handling data models. It includes validators for converting empty string fields to
+    None and stripping whitespace from string fields.
+
+    Methods:
+        set_empty_fields_to_none(cls, values: dict) -> dict:
+            Convert empty string fields to None.
+
+        strip_fields(cls, values: dict) -> dict:
+            Strip whitespace from string fields.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def set_empty_fields_to_none(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """
+        🎨 Convert empty string fields to None.
+
+        Args:
+            values (dict): Dictionary of field values.
+
+        Returns:
+            dict: Updated dictionary with empty string fields set to None.
+        """
+        for k, v in values.items():
+            if isinstance(v, str) and not v.strip():
+                values[k] = None
+        return values
+
+    @model_validator(mode="before")
+    @classmethod
+    def strip_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """
+        🎨 Strip whitespace from string fields.
+
+        Args:
+            values (dict): Dictionary of field values.
+
+        Returns:
+            dict: Updated dictionary with whitespace stripped from string fields.
+        """
+        for k, v in values.items():
+            if isinstance(v, str):
+                values[k] = v.strip()
+        return values
+
+    @classmethod
+    def validate_and_log_email(
+        cls, email: Optional[str], entity_identifier: str, entity_type: str
+    ) -> Optional[str]:
+        """
+        📧 Validate email with centralized logging and handling.
+
+        Args:
+            email (Optional[str]): Email to validate
+            entity_identifier (str): Unique identifier for the entity (e.g., customer id)
+            entity_type (str): Type of entity (e.g., 'Customer', 'Location')
+
+        Returns:
+            Optional[str]: Validated email or None if invalid
+        """
+        try:
+            # Custom checks for email validity
+            if (
+                not email
+                or not isinstance(email, str)
+                or (isinstance(email, str) and email.strip() == "")
+            ):
+                raise EmailNotValidError
+
+            # Validate email
+            validate_email(email)
+            return email
+
+        except EmailNotValidError:
+            logger.warning(
+                f"{entity_type} {entity_identifier} has invalid email: {email}, "
+                "setting it to None."
+            )
+            return None
+
+    @model_validator(mode="before")
+    @classmethod
+    def convert_invalid_email_to_none(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """
+        📧 Validate and potentially convert email fields to None.
+        """
+        email_fields = [
+            field for field in values.keys() if str(field).lower().endswith("mail")
+        ]
+
+        for email_field in email_fields:
+            entity_identifier = values.get("No", values.get("Code", "Unknown"))
+            entity_type = cls.__name__.replace("BC", "").replace("Card", "")
+
+            values[email_field] = cls.validate_and_log_email(
+                values.get(email_field), entity_identifier, entity_type
+            )
+
+        return values

@@ -76,6 +76,15 @@ class GeneralParser(BaseParser):
         )
 
         self.parser.add_argument(
+            "-p",
+            "--publish",
+            action="store_true",
+            help="Update Scriptman Package to the next version (bump the commit version "
+            "up to the latest version + 1 (e.g., 1.0.0 -> 1.0.1)) and publish it to pypi "
+            "using poetry.",
+        )
+
+        self.parser.add_argument(
             "-v",
             "--version",
             action="version",
@@ -112,6 +121,11 @@ class GeneralParser(BaseParser):
 
         if args.update:
             config.update_package(version=args.update)
+            return 0
+
+        if args.publish:
+            config.update_package(version="next")
+            config.publish_package()
             return 0
 
         if args.lint:

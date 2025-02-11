@@ -83,7 +83,7 @@ class Config:
                 value if the key is not present.
         """
         try:
-            logger.debug(f"Retrieving config: {key}")
+            # logger.debug(f"Retrieving config: {key}") # TODO: Verbose logging
             return self.env[key]
         except KeyError:
             logger.debug(f"Config not found: {key}")
@@ -317,6 +317,12 @@ class Config:
         self._version.update_version_in_file("commit", self._version.commit)
         run(["poetry", "version", str(self._version)])  # Update Package Version
         logger.info("📦 Package updated successfully")
+
+    def publish_package(self) -> None:
+        """
+        📦 Publish the scriptman package to PyPI.
+        """
+        run(["poetry", "publish", "--build"], check=True)
 
     def lint(self) -> None:
         """

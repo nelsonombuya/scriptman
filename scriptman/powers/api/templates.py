@@ -6,8 +6,7 @@ try:
     from loguru import logger
 
     from scriptman.powers.api.exceptions import APIException
-    from scriptman.powers.api.request import Request
-    from scriptman.powers.api.response import Response
+    from scriptman.powers.api.models import Request, Response
 except ImportError:
     raise ImportError(
         "FastAPI is not installed. "

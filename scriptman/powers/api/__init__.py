@@ -126,7 +126,7 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
             Response: HTTP response object.
         """
         try:
-            logger.info(f"📤 Sending {method} request to {url}")
+            logger.info(f"📤 Sending {method.value} request to {url}")
             request_data = {"url": url, "method": method, "params": params, "body": body}
             logger.debug(f"📤 Request Details: {dumps(request_data, indent=4)}")
 

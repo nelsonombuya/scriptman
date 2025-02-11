@@ -79,7 +79,7 @@ class FanoutCacheBackend(DiskCacheBackend):
         **kwargs: Any,
     ):
         self._cache = FanoutCache(
-            __directory=directory or FanoutCacheBackend._CACHE_DIR,
+            __directory=directory or str(FanoutCacheBackend._CACHE_DIR),
             eviction_policy=eviction_policy.value,
             statistics=statistics,
             shards=shards,

@@ -1,3 +1,5 @@
+from typing import Generic, TypeVar
+
 from loguru import logger
 from pydantic import model_validator
 
@@ -140,12 +142,37 @@ class Response(BaseModel):
         )
 
 
-class BaseDataModel(BaseModel):
+# ⚙ Type variables
+RequestModelT = TypeVar("RequestModelT", bound="BaseEntityModel")
+ResponseEntityModelT = TypeVar("ResponseEntityModelT", bound="BaseEntityModel")
+
+
+class BaseRequestModel(BaseModel, Generic[RequestModelT]):
     """
-    🏗️ BaseDataModel
+    🏗️ BaseRequestModel
 
     This class extends the Pydantic BaseModel to provide additional functionality for
-    handling data models. It includes validators for converting empty string fields to
+    handling request models. It holds a generic type T for the request data, such that
+    requests can be correctly typed to their models.
+    """
+
+
+class BaseResponseModel(BaseModel, Generic[ResponseEntityModelT]):
+    """
+    🏗️ BaseResponseModel
+
+    This class extends the Pydantic BaseModel to provide additional functionality for
+    handling response models. It holds a generic type T for the response data, such that
+    responses can be correctly typed to their entities.
+    """
+
+
+class BaseEntityModel(BaseModel):
+    """
+    🏗️ BaseEntityModel
+
+    This class extends the Pydantic BaseModel to provide additional functionality for
+    handling entity models. It includes validators for converting empty string fields to
     None and stripping whitespace from string fields.
 
     Methods:

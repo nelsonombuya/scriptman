@@ -124,6 +124,7 @@ class GeneralParser(BaseParser):
             return 0
 
         if args.publish:
+            config.lint()
             config.update_package(version="next")
             config.publish_package()
             return 0

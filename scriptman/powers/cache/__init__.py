@@ -13,6 +13,7 @@ try:
     from scriptman.powers.cache._backend import CacheBackend
     from scriptman.powers.cache.diskcache import FanoutCacheBackend
     from scriptman.powers.generics import AsyncFunc, Func, SyncFunc, T
+    from scriptman.powers.time_calculator import TimeCalculator
 except ImportError:
     raise ImportError(
         "DiskCache backend is not installed. "
@@ -147,7 +148,10 @@ class CacheManager(Generic[T]):
                     if cache_manager.backend.set(
                         key=key, value=result, ttl=ttl, **kwargs
                     ):
-                        logger.info(f"✅ Stored result in cache with key: {key}")
+                        logger.info(
+                            f"✅ Stored result in cache with key: {key} with TTL of "
+                            + TimeCalculator.calculate_time_taken(0, float(ttl or 0))
+                        )
                     else:
                         logger.error(
                             f"❌ Failed to store result in cache with key: {key}"

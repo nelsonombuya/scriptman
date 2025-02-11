@@ -13,7 +13,7 @@ try:
         HTTPMethod,
         RequestHandler,
     )
-    from scriptman.powers.generics import ResponseModelT
+    from scriptman.powers.api.models import ResponseModelT
 
 except ImportError as e:
     raise ImportError(

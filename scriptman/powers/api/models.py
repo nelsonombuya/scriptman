@@ -1,15 +1,18 @@
-from typing import Generic, TypeVar
-
-from loguru import logger
-from pydantic import model_validator
-
 try:
     from datetime import datetime
-    from typing import Any, Optional
+    from typing import Any, Optional, TypeVar
     from uuid import uuid4
 
     from email_validator import EmailNotValidError
-    from pydantic import BaseModel, ConfigDict, Field, field_validator, validate_email
+    from loguru import logger
+    from pydantic import (
+        BaseModel,
+        ConfigDict,
+        Field,
+        field_validator,
+        model_validator,
+        validate_email,
+    )
 
     from scriptman.powers.api.exceptions import APIException
 except ImportError:
@@ -142,29 +145,9 @@ class Response(BaseModel):
         )
 
 
-# ⚙ Type variables
-RequestModelT = TypeVar("RequestModelT", bound="BaseEntityModel")
-ResponseEntityModelT = TypeVar("ResponseEntityModelT", bound="BaseEntityModel")
-
-
-class BaseRequestModel(BaseModel, Generic[RequestModelT]):
-    """
-    🏗️ BaseRequestModel
-
-    This class extends the Pydantic BaseModel to provide additional functionality for
-    handling request models. It holds a generic type T for the request data, such that
-    requests can be correctly typed to their models.
-    """
-
-
-class BaseResponseModel(BaseModel, Generic[ResponseEntityModelT]):
-    """
-    🏗️ BaseResponseModel
-
-    This class extends the Pydantic BaseModel to provide additional functionality for
-    handling response models. It holds a generic type T for the response data, such that
-    responses can be correctly typed to their entities.
-    """
+# ⚙ Type Variables
+ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)  # Response
+EntityModelT = TypeVar("EntityModelT", bound="BaseEntityModel")  # Response Entities
 
 
 class BaseEntityModel(BaseModel):

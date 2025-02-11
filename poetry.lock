@@ -1738,10 +1738,10 @@ h11 = ">=0.9.0,<1"
 api = ["fastapi", "pydantic", "requests", "types-requests", "uvicorn"]
 cache = ["dill", "diskcache"]
 etl = ["pandas", "pandas-stubs", "sqlalchemy"]
-scheduler = ["apscheduler"]
+scheduler = ["apscheduler", "pydantic"]
 selenium = ["requests", "selenium", "types-requests", "types-selenium", "webdriver-manager"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "916361ea2dcd6a224b0e1047331932681a2fc3bb0a8395051bf4534821ad517d"
+content-hash = "10325c5f9d4a677239df65c526462ff4cd650d3f0f6b4190aafd22496a5f6507"

@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.0.250"
+version = "2.0.251"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -20,14 +20,14 @@ dependencies = [
 [project.optional-dependencies]
 api = [
     "fastapi>=0.115.8",
-    "pydantic>=2.10.5",
+    "pydantic>=2.10.6",
     "requests>=2.32.3",
     "types-requests>=2.32.0.20241016",
     "uvicorn>=0.34.0",
 ]
 etl = ["pandas>=2.2.3", "pandas-stubs>=2.2.3.241126", "sqlalchemy>=2.0.37"]
 cache = ["dill>=0.3.9", "diskcache>=5.6.3"]
-scheduler = ["apscheduler>=3.11.0"]
+scheduler = ["apscheduler>=3.11.0", "pydantic>=2.10.6"]
 selenium = [
     "selenium>=4.28.1",
     "requests>=2.32.3",

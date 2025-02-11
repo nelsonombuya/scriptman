@@ -1,14 +1,13 @@
-from functools import wraps
-from typing import Any, Generic
-
-from loguru import logger
-from pydantic import BaseModel, field_validator
-from pydantic.config import ConfigDict
-
-from scriptman.powers.generics import AsyncFunc, SyncFunc, T
-
 try:
+    from functools import wraps
+    from typing import Any, Generic
+
     from apscheduler.triggers.base import BaseTrigger
+    from loguru import logger
+    from pydantic import BaseModel, field_validator
+    from pydantic.config import ConfigDict
+
+    from scriptman.powers.generics import Func, T
 except ImportError:
     raise ImportError(
         "APScheduler is not installed. "
@@ -36,7 +35,7 @@ class Job(BaseModel, Generic[T]):
     enabled: bool = True
     trigger: BaseTrigger
     max_instances: int = 1
-    function: AsyncFunc[T] | SyncFunc[T]
+    function: Func[T]
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("id", "name", mode="before")

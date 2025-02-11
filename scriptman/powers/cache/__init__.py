@@ -12,7 +12,7 @@ try:
     from scriptman.core.config import config
     from scriptman.powers.cache._backend import CacheBackend
     from scriptman.powers.cache.diskcache import FanoutCacheBackend
-    from scriptman.powers.generics import AsyncFunc, SyncFunc, T
+    from scriptman.powers.generics import AsyncFunc, Func, SyncFunc, T
 except ImportError:
     raise ImportError(
         "DiskCache backend is not installed. "
@@ -24,12 +24,13 @@ except ImportError:
 class CacheManager(Generic[T]):
     """Thread-safe singleton cache manager with safe backend switching capabilities"""
 
+    _active_operations: int = 0
+    _active_operations_lock: Lock = Lock()
+
     __lock: Lock = Lock()
     __backend: CacheBackend
     __initialized: bool = False
-    __active_operations: int = 0
     __backend_switch_lock: Lock = Lock()
-    __active_operations_lock: Lock = Lock()
     __instance: Optional["CacheManager[T]"] = None
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "CacheManager[T]":
@@ -72,8 +73,8 @@ class CacheManager(Generic[T]):
 
             # Wait for all active operations to complete
             while True:
-                with self.__active_operations_lock:
-                    if self.__active_operations == 0:
+                with self._active_operations_lock:
+                    if self._active_operations == 0:
                         # No active operations, safe to switch
                         self.__backend = new_backend(*backend_args, **backend_kwargs)
                         logger.info(
@@ -108,7 +109,7 @@ class CacheManager(Generic[T]):
     @staticmethod
     def cache_result(
         ttl: Optional[int] = config.get("CACHE.TTL"), **kwargs: Any
-    ) -> Callable[..., SyncFunc[T] | AsyncFunc[T]]:
+    ) -> Callable[..., Func[T]]:
         """
         📦 Decorator for caching function results. Works with both synchronous and
         asynchronous functions.
@@ -122,11 +123,11 @@ class CacheManager(Generic[T]):
                 set method when storing values.
 
         Returns:
-            Callable[..., SyncFunc[T] | AsyncFunc[T]]: Decorated function.
+            Callable[..., Func[T]]: Decorated function.
         """
         cache_manager: CacheManager[T] = CacheManager.get_instance()
 
-        def decorator(func: SyncFunc[T] | AsyncFunc[T]) -> SyncFunc[T] | AsyncFunc[T]:
+        def decorator(func: Func[T]) -> Func[T]:
             @wraps(func)
             async def async_wrapper(*f_args: Any, **f_kwargs: Any) -> T:
                 key = CacheManager.generate_callable_key(func, f_args, f_kwargs)
@@ -267,13 +268,13 @@ class OperationTracker(Generic[T]):
         🚪 Enter the runtime context related to this object. The active operation counter
         of the cache manager is incremented by 1.
         """
-        with self.cache_manager.__active_operations_lock:
-            self.cache_manager.__active_operations += 1
+        with self.cache_manager._active_operations_lock:
+            self.cache_manager._active_operations += 1
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
         """
         🚪 Exit the runtime context related to this object. The active operation counter
         of the cache manager is decremented by 1.
         """
-        with self.cache_manager.__active_operations_lock:
-            self.cache_manager.__active_operations -= 1
+        with self.cache_manager._active_operations_lock:
+            self.cache_manager._active_operations -= 1

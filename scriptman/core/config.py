@@ -287,6 +287,9 @@ class Config:
             with settings_file.open("r", encoding="utf-8") as f:
                 config_data = parse(f.read())
 
+        if isinstance(value, Path):  # Serializing Paths Correctly
+            value = str(value)
+
         config_data[param] = value
         with settings_file.open("w", encoding="utf-8") as f:
             f.write(dumps(config_data))

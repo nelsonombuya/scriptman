@@ -68,6 +68,34 @@ class Config:
         """
         return self.__callback_function
 
+    def __getitem__(self, key: str) -> Any:
+        """
+        🔍 Retrieve a configuration value from the underlying Dynaconf
+        settings.
+
+        Args:
+            key (str): The key to retrieve the value for.
+
+        Returns:
+            Any: The value associated with the given key.
+
+        Raises:
+            KeyError: If the key is not present in the configuration.
+        """
+        if value := self.get(key):
+            return value
+        raise KeyError(f"Config not found: {key}")
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """
+        💻 Set a configuration value in the underlying Dynaconf settings.
+
+        Args:
+            key (str): The key to set the value for.
+            value (Any): The value to set for the given key.
+        """
+        return self.set(key, value)
+
     def get(self, key: str, default: Any = None) -> Any:
         """
         🔍 Retrieve a configuration value from the underlying Dynaconf
@@ -114,12 +142,9 @@ class Config:
         """
         📁 Initialize directories for the scriptman package.
         """
-        for dir in [
-            Path(str(self.get("logs_dir", "logs"))),
-            Path(str(self.get("scripts_dir", "scripts"))),
-            Path(str(self.get("downloads_dir", "downloads"))),
-        ]:
-            dir.mkdir(parents=True, exist_ok=True)
+        for _, field in self._configs.model_fields.items():
+            if field.annotation is Path:
+                Path(field.default).mkdir(parents=True, exist_ok=True)
 
     def __initialize_scriptman_logging(self) -> None:
         """

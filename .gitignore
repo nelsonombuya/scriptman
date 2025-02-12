@@ -13,6 +13,7 @@ codium_*.py
 
 # Folders
 logs
+dist
 .qodo
 downloads
 __pycache__

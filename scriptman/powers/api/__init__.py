@@ -1,11 +1,11 @@
 try:
-    from abc import ABC, abstractmethod
+    from abc import ABC
     from json import dumps
     from typing import Any, Generic, Optional
 
     from loguru import logger
     from pydantic import ValidationError
-    from requests import RequestException, Response
+    from requests import RequestException, Response, request
 
     from scriptman.powers.api.exceptions import APIException
     from scriptman.powers.api.handlers import (
@@ -52,6 +52,9 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         self.headers = headers or {}
         self.default_response_model = default_response_model
         self.request_handler: RequestHandler = request_handler or DefaultRequestHandler()
+
+        # Additional Methods
+        self.raw_request = request
 
     def request(
         self,
@@ -181,7 +184,6 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         """
         data: dict[str, Any] = response.json()
         if not response_model:
-            self.handle_error_response(response)
             return data
 
         try:
@@ -189,19 +191,6 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         except ValidationError as e:
             logger.error(f"❌ Response validation failed: {e}")
             raise APIException(f"❌ Response validation failed: {e}", exception=e)
-
-    @abstractmethod
-    def handle_error_response(self, response: Response) -> None:
-        """
-        🔍 Handle errors specific to the API, based on the response.
-
-        Args:
-            response (Response): Error response from the API.
-
-        Raises:
-            APIException: Custom exception for API errors.
-        """
-        pass  # pragma: no cover
 
     @property
     def __generic__(self) -> Optional[type]:

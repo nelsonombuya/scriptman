@@ -6,7 +6,6 @@ from filelock import FileLock, Timeout
 from loguru import logger
 
 from scriptman.core.config import config
-from scriptman.powers.concurrency import TaskExecutor
 from scriptman.powers.retry import retry
 from scriptman.powers.time_calculator import TimeCalculator
 
@@ -143,9 +142,7 @@ class Scripts:
 
             logger.info(f"🚀 Running '{file_path.name}' script...")
             with TimeCalculator.context(context=file_path.name):
-                TaskExecutor[None].wait(
-                    retry(config.get("retries", 0))(exec)(script_content, globals())
-                )
+                retry(config.get("retries", 0))(exec)(script_content, globals())
             logger.success(f"Script '{file_path.name}' executed successfully")
             return True
         except Exception as e:

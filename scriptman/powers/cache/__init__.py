@@ -1,5 +1,4 @@
 try:
-    from asyncio import iscoroutinefunction, run
     from functools import wraps
     from hashlib import md5
     from inspect import ismethod
@@ -12,7 +11,7 @@ try:
     from scriptman.core.config import config
     from scriptman.powers.cache._backend import CacheBackend
     from scriptman.powers.cache.diskcache import FanoutCacheBackend
-    from scriptman.powers.generics import AsyncFunc, Func, SyncFunc, T
+    from scriptman.powers.generics import AsyncFunc, SyncFunc, T
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError:
     raise ImportError(
@@ -41,7 +40,7 @@ class CacheManager(Generic[T]):
             return cls.__instance
 
     def __init__(self, backend: CacheBackend = FanoutCacheBackend()):
-        if self.__initialized is False:
+        if not self.__initialized:
             with self.__lock:
                 self.__backend = backend
                 self.__initialized = True
@@ -109,29 +108,28 @@ class CacheManager(Generic[T]):
 
     @staticmethod
     def cache_result(
-        ttl: Optional[int] = config.get("CACHE.TTL"), **kwargs: Any
-    ) -> Callable[..., Func[T]]:
+        ttl: Optional[int] = config.get("CACHE.TTL"), **backend_kwargs: Any
+    ) -> Callable[[SyncFunc[T]], SyncFunc[T]]:
         """
-        📦 Decorator for caching function results. Works with both synchronous and
-        asynchronous functions.
+        📦 Decorator for caching function results. Works with synchronous functions.
 
         NOTE: This only works for JSON Serializable arguments and returns.
 
         Args:
             ttl (Optional[int]): The number of seconds until the key expires.
                 Defaults to None.
-            **kwargs: Additional keyword arguments to be passed to the cache backend's
-                set method when storing values.
+            **backend_kwargs: Additional keyword arguments to be passed to the cache
+                backend's set method when storing values.
 
         Returns:
-            Callable[..., Func[T]]: Decorated function.
+            Callable[..., SyncFunc[T]]: Decorated function.
         """
         cache_manager: CacheManager[T] = CacheManager.get_instance()
 
-        def decorator(func: Func[T]) -> Func[T]:
+        def decorator(func: SyncFunc[T]) -> SyncFunc[T]:
             @wraps(func)
-            async def async_wrapper(*f_args: Any, **f_kwargs: Any) -> T:
-                key = CacheManager.generate_callable_key(func, f_args, f_kwargs)
+            def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+                key = CacheManager.generate_callable_key(func, args, kwargs)
 
                 with cache_manager._track_operation():
                     if result := cache_manager.backend.get(key=key):
@@ -139,14 +137,10 @@ class CacheManager(Generic[T]):
                         return cast(T, result)
 
                     logger.warning(f"❔ Cache miss for key: {key}")
-
-                    if iscoroutinefunction(func):
-                        result = await cast(AsyncFunc[T], func)(*f_args, **f_kwargs)
-                    else:
-                        result = cast(SyncFunc[T], func)(*f_args, **f_kwargs)
+                    result = func(*args, **kwargs)
 
                     if cache_manager.backend.set(
-                        key=key, value=result, ttl=ttl, **kwargs
+                        key=key, value=result, ttl=ttl, **backend_kwargs
                     ):
                         logger.info(
                             f"✅ Stored result in cache with key: {key} with TTL of "
@@ -158,11 +152,57 @@ class CacheManager(Generic[T]):
                         )
                     return cast(T, result)
 
-            @wraps(func)
-            def sync_wrapper(*args: Any, **kwargs: Any) -> T:
-                return run(async_wrapper(*args, **kwargs))
+            return sync_wrapper
 
-            return async_wrapper if iscoroutinefunction(func) else sync_wrapper
+        return decorator
+
+    @staticmethod
+    def async_cache_result(
+        ttl: Optional[int] = config.get("CACHE.TTL"), **backend_kwargs: Any
+    ) -> Callable[[AsyncFunc[T]], AsyncFunc[T]]:
+        """
+        📦 Decorator for caching function results. Works with both asynchronous functions.
+
+        NOTE: This only works for JSON Serializable arguments and returns.
+
+        Args:
+            ttl (Optional[int]): The number of seconds until the key expires.
+                Defaults to None.
+            **backend_kwargs: Additional keyword arguments to be passed to the cache
+                backend's set method when storing values.
+
+        Returns:
+            Callable[..., AsyncFunc[T]]: Decorated function.
+        """
+        cache_manager: CacheManager[T] = CacheManager.get_instance()
+
+        def decorator(func: AsyncFunc[T]) -> AsyncFunc[T]:
+            @wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+                key = CacheManager.generate_callable_key(func, args, kwargs)
+
+                with cache_manager._track_operation():
+                    if result := cache_manager.backend.get(key=key):
+                        logger.success(f"✅ Cache hit for key: {key}")
+                        return cast(T, result)
+
+                    logger.warning(f"❔ Cache miss for key: {key}")
+                    result = await func(*args, **kwargs)
+
+                    if cache_manager.backend.set(
+                        key=key, value=result, ttl=ttl, **backend_kwargs
+                    ):
+                        logger.info(
+                            f"✅ Stored result in cache with key: {key} with TTL of "
+                            + TimeCalculator.calculate_time_taken(0, float(ttl or 0))
+                        )
+                    else:
+                        logger.error(
+                            f"❌ Failed to store result in cache with key: {key}"
+                        )
+                    return cast(T, result)
+
+            return async_wrapper
 
         return decorator
 

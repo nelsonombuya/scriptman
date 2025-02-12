@@ -30,11 +30,9 @@ class EvictionPolicy(Enum):
 class DiskCacheBackend(CacheBackend, ABC):
     """Abstract Base Class for DiskCache implementations of the cache backend."""
 
-    _cache_dir: Path = Path(config.get("CACHE.DIR", "../../../cache"))
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self._cache_dir.mkdir(parents=True, exist_ok=True)
-        super().__init__(*args, **kwargs)
+    _cache_dir: Path = Path(
+        config.get("CACHE.DIR", Path(__file__).parent.parent.parent / "cache")
+    )
 
     def get(self, key: str, retry: bool = True, **kwargs: Any) -> Any:
         return self.cache.get(key=key, retry=retry, **kwargs)
@@ -83,7 +81,7 @@ class FanoutCacheBackend(DiskCacheBackend):
         **kwargs: Any,
     ):
         self._cache = FanoutCache(
-            __directory=directory or str(FanoutCacheBackend._cache_dir),
+            directory=directory or self._cache_dir,
             eviction_policy=eviction_policy.value,
             statistics=statistics,
             shards=shards,

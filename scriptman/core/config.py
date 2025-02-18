@@ -1,13 +1,15 @@
 import sys
 from datetime import datetime
 from pathlib import Path
+from re import sub
 from subprocess import run
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, cast
 
 from dynaconf import Dynaconf
 from loguru import logger
 from pydantic import ValidationError
-from tomlkit import dumps, parse
+from tomlkit import dumps, parse, table
+from tomlkit.items import Table
 
 from scriptman.core.defaults import ConfigModel
 from scriptman.core.version import Version
@@ -48,13 +50,12 @@ class Config:
 
         self.env = Dynaconf(
             root_path=str(config.cwd),
-            settings_files=["scriptman.toml", ".secrets.toml"],
+            settings_files=["pyproject.toml", "scriptman.toml", ".secrets.toml"],
         )
-        self._configs = config
-        self._version = version
-        self.__initialize_defaults()
-        self.__initialize_directories()
-        self.__initialize_scriptman_logging()
+        self.__version = version
+        self.__prefix: str = "tool.scriptman." if config.use_pyproject else ""
+        self.__initialize_defaults(config)
+        self.__initialize_logging()
         self.__initialized = True
 
     @property
@@ -65,7 +66,7 @@ class Config:
         Returns:
             str: The version information.
         """
-        return str(self._version)
+        return str(self.__version)
 
     @property
     def callback_function(self) -> Callable[[Exception], None] | None:
@@ -77,6 +78,16 @@ class Config:
                 or None if no function has been set.
         """
         return self.__callback_function
+
+    @property
+    def current_settings(self) -> dict[str, Any]:
+        """
+        🔍 Retrieve the current configuration settings.
+
+        Returns:
+            dict[str, Any]: The current configuration settings.
+        """
+        return self.env[self.__prefix.rstrip(".")] if self.__prefix else dict(self.env)
 
     def __getitem__(self, key: str) -> Any:
         """
@@ -121,8 +132,7 @@ class Config:
                 value if the key is not present.
         """
         try:
-            # logger.debug(f"Retrieving config: {key}") # TODO: Verbose logging
-            return self.env[key]
+            return self.env[self.__prefix + key if self.__prefix else key]
         except KeyError:
             logger.debug(f"Config not found: {key}")
             return default
@@ -135,28 +145,20 @@ class Config:
             key (str): The key to set the value for.
             value (Any): The value to set for the given key.
         """
-        self.env[key] = value
+        self.env[self.__prefix + key if self.__prefix else key] = value
         logger.debug(f"Config updated: {key} = {value}")
 
-    def __initialize_defaults(self) -> None:
+    def __initialize_defaults(self, config: ConfigModel = ConfigModel()) -> None:
         """
-        🔄 Initialize configuration defaults.
+        🚀 Initialize configuration defaults only for missing values.
+        """
+        for field_name, field in config.model_fields.items():
+            try:
+                self.env[self.__prefix + field_name]  # Check if field exists
+            except KeyError:
+                self.env[self.__prefix + field_name] = field.default  # Set to default
 
-        Ensures all configuration parameters have default values.
-        """
-        for field_name, field in self._configs.model_fields.items():
-            if field_name not in self.env:
-                self.env[field_name] = field.default
-
-    def __initialize_directories(self) -> None:
-        """
-        📁 Initialize directories for the scriptman package.
-        """
-        for _, field in self._configs.model_fields.items():
-            if field.annotation is Path:
-                Path(field.default).mkdir(parents=True, exist_ok=True)
-
-    def __initialize_scriptman_logging(self) -> None:
+    def __initialize_logging(self) -> None:
         """
         📝 Initialize logging for the CLI handler.
         """
@@ -194,8 +196,9 @@ class Config:
             param (str): The parameter name to reset.
         """
         try:
-            default = self._configs.model_fields[param].default
+            default = ConfigModel.model_fields[param].default
             self.set(param, default)
+            self._remove_config_from_file(param)
             logger.info(f"Config reset: {param} = {default}")
             return True
         except KeyError:
@@ -207,8 +210,9 @@ class Config:
         🔄 Resets the configuration to its default values and removes the
         `scriptman.toml` file.
         """
-        self.__initialize_defaults()
         Path(str(self.get("cwd", "."))).joinpath("scriptman.toml").unlink(missing_ok=True)
+        self._remove_config_from_file("tool.scriptman")
+        self.__initialize_defaults(ConfigModel())
         logger.info("🔄 Configuration reset and deleted scriptman.toml file")
 
     def validate_and_update_configuration(self, param: str, value: Any) -> bool:
@@ -234,7 +238,7 @@ class Config:
             logger.error(error_message)
             return False
 
-        param = param.upper()
+        param = param.lower()
         self.set(param, validated_value)
 
         try:
@@ -261,26 +265,36 @@ class Config:
                 error message,
                 and validated value.
         """
-        if param not in self._configs.model_fields.keys():
+        if param not in ConfigModel.model_fields:
             return False, f"Invalid configuration parameter: {param}", None
 
         try:
-            current_settings = self._configs.model_dump()
-            value_type = type(current_settings[param])
+            field = ConfigModel.model_fields[param]
 
-            if value_type is bool and value.lower() in ["true", "false"]:
+            # Convert string "true"/"false" to bool if the field is boolean
+            if field.annotation is bool and isinstance(value, str):
                 value = value.lower() == "true"
-            else:
-                value = value_type(value)
 
-            current_settings.update({param: value})
-            self._configs = self._configs.model_validate(current_settings)
+            # Convert string paths to Path objects if needed
+            elif field.annotation is Path and isinstance(value, str):
+                value = Path(value)
+
+            # Handle other type conversions
+            else:
+                try:
+                    assert field.annotation is not None
+                    value = field.annotation(value)
+                except (ValueError, TypeError, AssertionError):
+                    return (
+                        False,
+                        f"Invalid type for {param}: expected {field.annotation}",
+                        None,
+                    )
             return True, None, value
         except ValidationError as e:
-            # TODO: Reformat pydantic validation errors
-            return False, f"Invalid configuration value for {param}: {e}", None
+            return False, f"Validation error for {param}: {e}", None
         except Exception as e:
-            return False, f"Invalid configuration value for {param}: {e}", None
+            return False, f"Error validating {param}: {e}", None
 
     def _save_config_to_file(self, param: str, value: Any) -> None:
         """
@@ -290,7 +304,7 @@ class Config:
             param (str): The configuration parameter.
             value (Any): The value to save.
         """
-        settings_file = Path(str(self.get("cwd", "."))).joinpath("scriptman.toml")
+        settings_file = Path(self.get("settings_file", "scriptman.toml"))
         config_data: dict[str, Any] = {}
 
         if settings_file.exists():
@@ -300,9 +314,38 @@ class Config:
         if isinstance(value, Path):  # Serializing Paths Correctly
             value = str(value)
 
-        config_data[param] = value
+        if self.get("use_pyproject", False):
+            # Update the settings on pyproject.toml under tool.scriptman
+            tool = cast(Table, config_data["tool"]) if "tool" in config_data else table()
+            scriptman_section = tool.get("scriptman", table())
+            scriptman_section[param] = value
+            tool["scriptman"] = scriptman_section
+            config_data["tool"] = tool
+        else:
+            # Write settings to scriptman.toml
+            config_data[param] = value
+
         with settings_file.open("w", encoding="utf-8") as f:
-            f.write(dumps(config_data))
+            f.write(sub(r"\n{3,}", "\n\n", dumps(config_data)))
+
+    def _remove_config_from_file(self, param: str) -> None:
+        """
+        🧹 Remove a configuration parameter from the TOML file.
+
+        Args:
+            param (str): The parameter name to remove.
+        """
+        settings_file = Path(self.get("settings_file", "scriptman.toml"))
+        config_data: dict[str, Any] = {}
+
+        if settings_file.exists():
+            with settings_file.open("r", encoding="utf-8") as f:
+                config_data = parse(f.read())
+
+            del config_data[param]
+
+            with settings_file.open("w", encoding="utf-8") as f:
+                f.write(sub(r"\n{3,}", "\n\n", dumps(config_data)))
 
     def add_callback_function(
         self, callback_function: Callable[[Exception], None]
@@ -330,10 +373,10 @@ class Config:
             if version == "latest" or version == "next":
                 major, minor, commit = [
                     int(v)
-                    for v in str(self._version.read_version_from_pyproject()).split(".")
+                    for v in str(self.__version.read_version_from_pyproject()).split(".")
                 ]
 
-                commit = self._version.get_commit_count()
+                commit = self.__version.get_commit_count()
                 commit += 1 if version == "next" else 0
             else:
                 major, minor, commit = [int(v) for v in str(version).split(".")]
@@ -343,17 +386,17 @@ class Config:
                 "Please provide a valid major.minor.commit format with all integers."
             )
 
-        self._version.major, self._version.minor, self._version.commit = (
+        self.__version.major, self.__version.minor, self.__version.commit = (
             major,
             minor,
             commit,
         )
 
         run(["poetry", "update"], check=True)  # Update Dependencies
-        self._version.update_version_in_file("major", self._version.major)
-        self._version.update_version_in_file("minor", self._version.minor)
-        self._version.update_version_in_file("commit", self._version.commit)
-        run(["poetry", "version", str(self._version)])  # Update Package Version
+        self.__version.update_version_in_file("major", self.__version.major)
+        self.__version.update_version_in_file("minor", self.__version.minor)
+        self.__version.update_version_in_file("commit", self.__version.commit)
+        run(["poetry", "version", str(self.__version)])  # Update Package Version
         logger.info("📦 Package updated successfully")
 
     def publish_package(self) -> None:

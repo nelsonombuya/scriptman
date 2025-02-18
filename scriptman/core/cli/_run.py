@@ -91,7 +91,7 @@ class RunSubParser(BaseParser):
         Returns:
             int: Exit code (0 for success, non-zero for failure)
         """
-        print(config._version.scriptman)  # Just looks cool
+        print(config.__version.scriptman)  # Just looks cool
         scripts = (
             [Path(script) for script in args.scripts]
             if args.scripts

@@ -92,7 +92,7 @@ class ConfigSubParser(BaseParser):
             return int(not config.reset_configuration(param))
 
         if args.list:
-            for param, value in config._configs.model_dump().items():
+            for param, value in config.current_settings.items():
                 print(f"\n\t- {param}: {value}")
 
         return 1

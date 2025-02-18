@@ -89,7 +89,7 @@ class GeneralParser(BaseParser):
             "--version",
             action="version",
             help="Display version",
-            version=f"Scriptman {config._version}",
+            version=f"Scriptman {config.version}",
         )
 
     def process(self, args: Namespace) -> int:

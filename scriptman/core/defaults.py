@@ -2,10 +2,22 @@ from os import getcwd
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, DirectoryPath, Field
+from pydantic import BaseModel, DirectoryPath, Field, FilePath, field_validator
 
 
 class ConfigModel(BaseModel):
+    use_pyproject: bool = Field(
+        default=not Path(getcwd()).joinpath("scriptman.toml").exists(),
+        description="Use pyproject.toml for setting and loading scriptman configurations",
+    )
+    settings_file: FilePath = Field(
+        default=(
+            Path(getcwd()).joinpath("scriptman.toml")
+            if Path(getcwd()).joinpath("scriptman.toml").exists()
+            else Path(getcwd()).joinpath("pyproject.toml")
+        ),
+        description="Path to the settings file",
+    )
     cwd: DirectoryPath = Field(
         default=Path(getcwd()),
         description="Current working directory",
@@ -54,3 +66,17 @@ class ConfigModel(BaseModel):
         ),
         description="URL to fetch Chrome download URLs",
     )
+
+    @field_validator("logs_dir", "scripts_dir", "downloads_dir", mode="before")
+    @classmethod
+    def initialize_directories(cls, value: str) -> str:
+        """
+        📁 Initialize directories for the scriptman package.
+        """
+        try:
+            path = Path(value)
+            if not path.exists():
+                path.mkdir(parents=True, exist_ok=True)
+            return value
+        except Exception as e:
+            raise ValueError(f"Failed to create directory {value}: {e}")

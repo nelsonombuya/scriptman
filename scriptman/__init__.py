@@ -21,4 +21,4 @@ __all__: list[str] = ["powers", "config"]
 # X TODO: 3. Cleaner way of starting API Endpoint
 # TODO: 4. Script aliases
 # TODO: 5. Exit from scriptman while running things on multiple threads
-# TODO: 6. Use Pyproject.TOML for Scriptman Settings [tool.scriptman]
+# X TODO: 6. Use Pyproject.TOML for Scriptman Settings [tool.scriptman]

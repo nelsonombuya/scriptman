@@ -60,6 +60,13 @@ class ConfigSubParser(BaseParser):
             "this will remove all values from the list",
         )
 
+        self.parser.add_argument(
+            "-l",
+            "--list",
+            action="store_true",
+            help="List all current configuration parameters and their values",
+        )
+
     def process(self, args: Namespace) -> int:
         """
         ⚙ Process parsed CLI arguments for the 'config' sub-command.
@@ -83,5 +90,9 @@ class ConfigSubParser(BaseParser):
         if args.reset:
             param = args.reset[0]
             return int(not config.reset_configuration(param))
+
+        if args.list:
+            for param, value in config._configs.model_dump().items():
+                print(f"\n\t- {param}: {value}")
 
         return 1

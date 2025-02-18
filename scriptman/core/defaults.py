@@ -22,10 +22,6 @@ class ConfigModel(BaseModel):
         default=Path(__file__).parent.parent / "downloads",
         description="Path to the downloads directory",
     )
-    ignore_dirs: list[str] = Field(
-        default=[],
-        description="List of folders to ignore for script execution.",
-    )
     concurrent: bool = Field(
         default=True,
         description="Enable concurrent script execution",
@@ -41,10 +37,6 @@ class ConfigModel(BaseModel):
     force: bool = Field(
         default=False,
         description="Force execution of scripts even if they are already running",
-    )
-    log_for_each_script: bool = Field(
-        default=False,
-        description="Enable logging for each script instance",
     )
     selenium_optimizations: bool = Field(
         default=True,

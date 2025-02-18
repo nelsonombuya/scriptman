@@ -4,6 +4,7 @@ from typing import Optional
 
 from loguru import logger
 
+from scriptman.core.cli._api import APISubParser
 from scriptman.core.cli._cleanup import CleanUpSubParser
 from scriptman.core.cli._config import ConfigSubParser
 from scriptman.core.cli._general import GeneralParser
@@ -55,6 +56,7 @@ class CLI:
             "config": ConfigSubParser(subparsers),
             "clean": CleanUpSubParser(subparsers),
             "general": GeneralParser(parser),
+            "api": APISubParser(subparsers),
             "run": RunSubParser(subparsers),
         }
         return parser

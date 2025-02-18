@@ -1,6 +1,7 @@
 try:
     from asyncio import iscoroutinefunction
     from contextlib import asynccontextmanager
+    from pathlib import Path
     from socket import AF_INET, SOCK_STREAM, socket
     from typing import Any, AsyncGenerator, Optional
 
@@ -149,3 +150,18 @@ class FastAPIManager:
 
         logger.info(f"📡 Starting API server at http://{final_host}:{final_port}")
         run_uvicorn_server(self.app, host=final_host, port=final_port, **kwargs)
+
+    def initialize_api_module(self) -> None:
+        """🚀 Initialize the API module."""
+        file = Path(config["cwd"] / "api" / "__init__.py")
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.touch(exist_ok=True)
+        logger.success(
+            "Successfully initialized api module. "
+            "Kindly import scriptman.powers.api.api_manager to proceed."
+        )
+
+
+# Singleton Instance
+api_manager: FastAPIManager = FastAPIManager()
+__all__: list[str] = ["api_manager"]

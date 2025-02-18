@@ -1,7 +1,7 @@
 try:
     from abc import ABC
     from json import dumps
-    from typing import Any, Callable, Generic, Optional
+    from typing import Any, Generic, Optional
 
     from loguru import logger
     from pydantic import ValidationError
@@ -14,6 +14,7 @@ try:
         HTTPMethod,
         RequestHandler,
     )
+    from scriptman.powers.api.manager import api_manager
     from scriptman.powers.api.models import ResponseModelT
 
 except ImportError as e:
@@ -30,9 +31,6 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
     - 🛡️ Type-safe response model validation
     - 🎯 Configurable request handling and logging
     """
-
-    # Class Variables
-    raw_request: Callable[..., Response] = raw_request
 
     def __init__(
         self,
@@ -56,6 +54,20 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         self.headers = headers or {}
         self.default_response_model = default_response_model
         self.request_handler: RequestHandler = request_handler or DefaultRequestHandler()
+
+    def raw_request(self, method: HTTPMethod, url: str, **kwargs: Any) -> Response:
+        """
+        📡 Send a raw HTTP request.
+
+        Args:
+            method (HTTPMethod): HTTP method.
+            url (str): Request URL.
+            **kwargs: Additional keyword arguments for the request.
+
+        Returns:
+            Response: HTTP response object.
+        """
+        return raw_request(method.value, url, **kwargs)
 
     def request(
         self,
@@ -202,3 +214,6 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
             if hasattr(self, "__orig_class__")
             else None
         )
+
+
+__all__: list[str] = ["BaseAPIClient", "api_manager"]

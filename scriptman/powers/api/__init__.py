@@ -1,11 +1,12 @@
 try:
     from abc import ABC
     from json import dumps
-    from typing import Any, Generic, Optional
+    from typing import Any, Callable, Generic, Optional
 
     from loguru import logger
     from pydantic import ValidationError
-    from requests import RequestException, Response, request
+    from requests import RequestException, Response
+    from requests import request as raw_request
 
     from scriptman.powers.api.exceptions import APIException
     from scriptman.powers.api.handlers import (
@@ -31,7 +32,7 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
     """
 
     # Class Variables
-    raw_request = request
+    raw_request: Callable[..., Response] = raw_request
 
     def __init__(
         self,

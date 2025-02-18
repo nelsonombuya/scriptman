@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.0.266"
+version = "2.0.267"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -43,6 +43,7 @@ scriptman = "scriptman.core.cli:CLI.start_cli_instance"
 [tool.poetry.group.api.dependencies]
 fastapi = "^0.115.8"
 pydantic = { extras = ["email"], version = "^2.10.6" }
+uvicorn = "^0.34.0"
 
 [tool.poetry.group.cache.dependencies]
 diskcache = "^5.6.3"

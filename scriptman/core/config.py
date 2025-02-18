@@ -58,6 +58,16 @@ class Config:
         self.__initialized = True
 
     @property
+    def version(self) -> str:
+        """
+        🎯 Retrieve the version information.
+
+        Returns:
+            str: The version information.
+        """
+        return str(self._version)
+
+    @property
     def callback_function(self) -> Callable[[Exception], None] | None:
         """
         📞 Retrieve the callback function to handle exceptions.

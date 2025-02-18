@@ -30,6 +30,9 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
     - 🎯 Configurable request handling and logging
     """
 
+    # Class Variables
+    raw_request = request
+
     def __init__(
         self,
         base_url: str,
@@ -52,9 +55,6 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         self.headers = headers or {}
         self.default_response_model = default_response_model
         self.request_handler: RequestHandler = request_handler or DefaultRequestHandler()
-
-        # Additional Methods
-        self.raw_request = request
 
     def request(
         self,

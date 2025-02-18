@@ -23,7 +23,7 @@ except ImportError:
     )
 
 
-class Request(BaseModel):
+class APIRequest(BaseModel):
     """
     🚀 Represents a request object.
 
@@ -37,7 +37,7 @@ class Request(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class Response(BaseModel):
+class APIResponse(BaseModel):
     """
     🚀 Represents a response object.
 
@@ -48,7 +48,7 @@ class Response(BaseModel):
             request and response timestamps.
         message (str): The message of the response.
         status_code (int): The status code of the response.
-        request (Request): The details of the request.
+        request (APIRequest): The details of the request.
         response (dict[str, Any]): The response data.
         stacktrace (list[dict], optional): The structured stacktrace
             information (in case an error occurred). Defaults to None.
@@ -58,7 +58,7 @@ class Response(BaseModel):
     response_time: Optional[float] = None
     message: str
     status_code: int
-    request: Request
+    request: APIRequest
     response: Optional[dict[str, Any]] = None
     stacktrace: Optional[list[dict[str, str | int | None]]] = None
 
@@ -66,7 +66,7 @@ class Response(BaseModel):
         self,
         message: str,
         status_code: int,
-        request: Request,
+        request: APIRequest,
         response: Optional[dict[str, Any]] = None,
         stacktrace: Optional[list[dict[str, str | int | None]]] = None,
     ) -> None:
@@ -126,7 +126,7 @@ class Response(BaseModel):
         return v
 
     @staticmethod
-    def from_api_exception(request: Request, exception: APIException) -> "Response":
+    def from_api_exception(request: APIRequest, exception: APIException) -> "APIResponse":
         """
         Convert an APIException to a Response object.
 
@@ -136,7 +136,7 @@ class Response(BaseModel):
         Returns:
             Response: The converted Response object.
         """
-        return Response(
+        return APIResponse(
             message=exception.message,
             status_code=exception.status_code,
             request=request,

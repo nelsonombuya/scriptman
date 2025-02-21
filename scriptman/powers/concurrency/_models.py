@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Generic, Optional
+from typing import Any, Generic, Optional, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -35,7 +35,7 @@ class TaskResult(BaseModel, Generic[T]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode="after")
-    def calculate_duration(self) -> "TaskResult[T]":
+    def calculate_duration(self) -> Self:
         """
         🌟 Duration Calculator - Automatically calculates the task duration during
         initialization if `start_time` and `end_time` are provided.
@@ -58,7 +58,7 @@ class BatchResult(BaseModel, Generic[T]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode="after")
-    def calculate_duration(self) -> "BatchResult[T]":
+    def calculate_duration(self) -> Self:
         """
         🌟 Duration Calculator - Automatically calculates the task duration
         during initialization if `start_time` and `end_time` are provided.

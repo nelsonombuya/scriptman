@@ -163,5 +163,5 @@ class FastAPIManager:
 
 
 # Singleton Instance
-api_manager: FastAPIManager = FastAPIManager()
-__all__: list[str] = ["api_manager"]
+api: FastAPIManager = FastAPIManager()
+__all__: list[str] = ["api"]

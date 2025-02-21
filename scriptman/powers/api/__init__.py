@@ -14,7 +14,7 @@ try:
         HTTPMethod,
         RequestHandler,
     )
-    from scriptman.powers.api.manager import api_manager
+    from scriptman.powers.api.manager import api
     from scriptman.powers.api.models import ResponseModelT
 
 except ImportError as e:
@@ -99,13 +99,13 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
             requests.RequestException: When request fails
         """
         response = self._send_request(self._clean_url(url), method, params, body, timeout)
+        response_model = self._get_response_model(response_model)
         data: dict[str, Any] = response.json()
 
-        if not response_model and not self.default_response_model:
-            return data
-
-        return self.validate_response(
-            response, response_model or self.default_response_model
+        return (
+            data
+            if not response_model
+            else self.validate_response(response, response_model)
         )
 
     def _clean_url(self, url: str) -> str:
@@ -179,6 +179,40 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
                 message=f"Request to {url} failed with error: {e}",
             )
 
+    def _get_response_model(
+        self, response_model: Optional[type[ResponseModelT]] = None
+    ) -> Optional[type[ResponseModelT]]:
+        """
+        🍱 Get the response model for the current request.
+
+        - If the response_model is specified, use it.
+        - If the default_response_model is specified and the generic type is provided,
+            use the default_response_model for the generic type.
+        - If the default_response_model is specified and the generic type is not provided,
+            use the default_response_model.
+        - Otherwise, return None.
+
+        Args:
+            response_model (Type[ResponseModelT], optional): The response model to use.
+
+        Returns:
+            Type[ResponseModelT]: The response model to use.
+        """
+        client_generic = self.get_generic(self)
+        response_model_generic = self.get_generic(response_model)
+        return (
+            response_model
+            if response_model
+            else (
+                # HACK: Getting the generic type from the default_response_model
+                self.default_response_model[client_generic]  # type:ignore
+                if self.default_response_model
+                and client_generic
+                and response_model_generic
+                else self.default_response_model if self.default_response_model else None
+            )
+        )
+
     def validate_response(
         self, response: Response, response_model: Optional[type[ResponseModelT]]
     ) -> ResponseModelT | dict[str, Any]:
@@ -205,15 +239,14 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
             logger.error(f"❌ Response validation failed: {e}")
             raise APIException(f"❌ Response validation failed: {e}", exception=e)
 
-    @property
-    def __generic__(self) -> Optional[type]:
+    @staticmethod
+    def get_generic(object: Any) -> Optional[type]:
         """🔍 Return the type argument of the generic client, or None."""
-        # HACK: Get the type argument of the generic class instance
-        return (
-            self.__getattribute__("__orig_class__").__getattribute__("__args__")[0]
-            if hasattr(self, "__orig_class__")
+        return (  # HACK: Get the type argument of the generic class instance
+            object.__getattribute__("__orig_class__").__getattribute__("__args__")[0]
+            if hasattr(object, "__orig_class__")
             else None
         )
 
 
-__all__: list[str] = ["BaseAPIClient", "api_manager"]
+__all__: list[str] = ["api", "BaseAPIClient"]

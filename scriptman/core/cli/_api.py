@@ -5,7 +5,7 @@ from pkgutil import iter_modules
 from loguru import logger
 
 from scriptman.core.cli._parser import BaseParser
-from scriptman.powers.api import api_manager
+from scriptman.powers.api import api
 
 
 class APISubParser(BaseParser):
@@ -52,7 +52,7 @@ class APISubParser(BaseParser):
         self.parser.add_argument(
             "--port",
             type=int,
-            default=api_manager._find_available_port(),
+            default=api._find_available_port(),
             help="Port to use. Defaults to an available port",
         )
         self.parser.add_argument(
@@ -95,7 +95,7 @@ class APISubParser(BaseParser):
             int: Exit code (0 for success, non-zero for failure)
         """
         if args.init:
-            api_manager.initialize_api_module()
+            api.initialize_api_module()
             return 0
 
         if args.modules:
@@ -105,5 +105,5 @@ class APISubParser(BaseParser):
         else:
             self.auto_import_modules("api")
 
-        api_manager.run(host=args.host, port=args.port)
+        api.run(host=args.host, port=args.port)
         return 0

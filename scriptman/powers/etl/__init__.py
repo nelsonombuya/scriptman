@@ -10,7 +10,7 @@ try:
     from scriptman.powers.concurrency import TaskExecutor
     from scriptman.powers.database._database import DatabaseHandler
     from scriptman.powers.database._exceptions import DatabaseError
-    from scriptman.powers.etl.extractor import DataExtractor
+    from scriptman.powers.etl._extractor import DataExtractor
     from scriptman.powers.generics import T
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError:
@@ -355,3 +355,6 @@ class ETL(DataFrame):
                 self.log.error(f"Database Error: {error}. Retrying using update...")
                 results.append(database_handler.execute_write_query(update_query, value))
         return all(results)
+
+
+__all__: list[str] = ["ETL", "DataExtractor"]

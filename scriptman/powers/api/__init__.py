@@ -8,14 +8,21 @@ try:
     from requests import RequestException, Response
     from requests import request as raw_request
 
-    from scriptman.powers.api.exceptions import APIException
-    from scriptman.powers.api.handlers import (
+    from scriptman.powers.api._exceptions import APIException
+    from scriptman.powers.api._handlers import (
         DefaultRequestHandler,
         HTTPMethod,
+        ODataV4RequestHandler,
+        PostOnlyRequestHandler,
         RequestHandler,
     )
-    from scriptman.powers.api.manager import api
-    from scriptman.powers.api.models import ResponseModelT
+    from scriptman.powers.api._manager import api
+    from scriptman.powers.api._models import (
+        BaseEntityModel,
+        EntityModelT,
+        ResponseModelT,
+    )
+    from scriptman.powers.api._templates import api_route
 
 except ImportError as e:
     raise ImportError(
@@ -249,4 +256,17 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         )
 
 
-__all__: list[str] = ["api", "BaseAPIClient"]
+__all__: list[str] = [
+    "api",
+    "api_route",
+    "BaseAPIClient",
+    "BaseEntityModel",
+    "EntityModelT",
+    "ResponseModelT",
+    "RequestHandler",
+    "DefaultRequestHandler",
+    "ODataV4RequestHandler",
+    "PostOnlyRequestHandler",
+    "APIException",
+    "HTTPMethod",
+]

@@ -20,6 +20,7 @@ try:
         Driver,
         SeleniumBrowser,
     )
+    from scriptman.powers.selenium._extractor import SeleniumExtractor
 except ImportError:
     raise ImportError(
         "Selenium is not installed. "
@@ -168,3 +169,13 @@ class SeleniumInstance(ABC):
         🧹 Close the WebDriver instance when the InteractionHandler instance is deleted.
         """
         self.driver.quit()
+
+
+__all__: list[str] = [
+    "Chrome",
+    "SeleniumExtractor",
+    "Driver",
+    "Browsers",
+    "SeleniumBrowser",
+    "SeleniumInstance",
+]

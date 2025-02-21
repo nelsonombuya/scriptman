@@ -10,7 +10,7 @@ try:
 
     from scriptman.core.config import config
     from scriptman.powers.cache._backend import CacheBackend
-    from scriptman.powers.cache.diskcache import FanoutCacheBackend
+    from scriptman.powers.cache._diskcache import DiskCacheBackend, FanoutCacheBackend
     from scriptman.powers.generics import AsyncFunc, SyncFunc, T
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError:
@@ -322,3 +322,12 @@ class OperationTracker(Generic[T]):
         """
         with self.cache_manager._active_operations_lock:
             self.cache_manager._active_operations -= 1
+
+
+__all__: list[str] = [
+    "CacheManager",
+    "OperationTracker",
+    "CacheBackend",
+    "DiskCacheBackend",
+    "FanoutCacheBackend",
+]

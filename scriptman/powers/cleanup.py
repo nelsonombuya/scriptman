@@ -106,7 +106,7 @@ class CleanUp:
     def diskcache_cleanup(self) -> None:
         """🧹 Clean up diskcache files."""
         try:
-            from scriptman.powers.cache.diskcache import DiskCacheBackend
+            from scriptman.powers.cache._diskcache import DiskCacheBackend
 
             DiskCacheBackend.clean_cache_dir()
         except ImportError as e:

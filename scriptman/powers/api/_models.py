@@ -14,7 +14,7 @@ try:
         validate_email,
     )
 
-    from scriptman.powers.api.exceptions import APIException
+    from scriptman.powers.api._exceptions import APIException
 except ImportError:
     raise ImportError(
         "Pydantic is not installed. "

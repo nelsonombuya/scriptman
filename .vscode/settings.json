@@ -15,10 +15,13 @@
     "driveupload",
     "icecream",
     "infobars",
+    "mariadb",
     "mypy",
+    "postgresql",
     "qodo",
     "safebrowsing",
     "scriptman",
-    "tarteaucitron"
+    "tarteaucitron",
+    "upserting"
   ]
 }

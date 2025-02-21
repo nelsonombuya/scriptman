@@ -7,7 +7,7 @@ try:
 
     from scriptman.core.config import Config
     from scriptman.powers.generics import T
-    from scriptman.powers.scheduler.models import Job
+    from scriptman.powers.scheduler._models import Job
 
 except ImportError:
     raise ImportError(
@@ -91,4 +91,5 @@ class Scheduler(Generic[T]):
 
 
 # Adding the Scheduler singleton instance to the Config class
-setattr(Config, "scheduler", Scheduler())
+object.__setattr__(Config, "scheduler", Scheduler())
+__all__: list[str] = ["Scheduler", "Job"]

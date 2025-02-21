@@ -10,7 +10,7 @@ try:
     from uvicorn import run as run_uvicorn_server
 
     from scriptman.core.config import config
-    from scriptman.powers.api.middleware import FastAPIMiddleware
+    from scriptman.powers.api._middleware import FastAPIMiddleware
     from scriptman.powers.generics import Func
 except ImportError:
     raise ImportError(

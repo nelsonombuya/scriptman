@@ -6,7 +6,7 @@ try:
 
     from pandas import DataFrame
 
-    from scriptman.powers.etl.extractor import DataExtractor
+    from scriptman.powers.etl._extractor import DataExtractor
 except ImportError:
     raise ImportError(
         "ETL is not installed. "

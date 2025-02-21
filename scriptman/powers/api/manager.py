@@ -153,7 +153,7 @@ class FastAPIManager:
 
     def initialize_api_module(self) -> None:
         """🚀 Initialize the API module."""
-        file = Path(config["cwd"] / "api" / "__init__.py")
+        file = Path(config.cwd / "api" / "__init__.py")
         file.parent.mkdir(parents=True, exist_ok=True)
         file.touch(exist_ok=True)
         logger.success(

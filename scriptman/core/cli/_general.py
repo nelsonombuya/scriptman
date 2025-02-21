@@ -112,7 +112,7 @@ class GeneralParser(BaseParser):
         """
 
         if args.reset:
-            config.reset_all_configurations()
+            config.settings.reset_all(True)
             return 0
 
         if args.cleanup:

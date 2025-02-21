@@ -37,7 +37,7 @@ class Scripts:
                 continue
 
         with TimeCalculator.context("Scriptman"):
-            if config.env.concurrent and len(scripts) > 1:
+            if config.settings.get("concurrent", True) and len(scripts) > 1:
                 self.__execute_scripts_concurrently(scripts)
             else:
                 self.__execute_scripts_sequentially(scripts)
@@ -97,11 +97,11 @@ class Scripts:
 
     def __lock_and_load_script(self, script: Path) -> None:
         """🔫 Lock and load script for execution."""
-        # FIXME: Log each script to a separate file, without the logs mixing up
+        # TODO: Log each script to a separate file, without the logs mixing up
         lock = FileLock(script.with_suffix(script.suffix + ".lock"), timeout=0)
 
         try:
-            if not config.get("force", False):
+            if not config.settings.get("force", False):
                 logger.debug(f"🔐 Acquiring lock for '{script.name}'...")
                 with lock:
                     logger.debug(f"🔒 Lock acquired for '{script.name}'.")
@@ -142,12 +142,12 @@ class Scripts:
 
             logger.info(f"🚀 Running '{file_path.name}' script...")
             with TimeCalculator.context(context=file_path.name):
-                retry(config.get("retries", 0))(exec)(script_content, globals())
+                retry(config.settings.get("retries", 0))(exec)(script_content, globals())
             logger.success(f"Script '{file_path.name}' executed successfully")
             return True
         except Exception as e:
             logger.error(f"❌ Error running '{file_path.name}' script: {e}")
-            if config.callback_function is not None:
+            if config.on_failure_callback is not None:
                 logger.info("📞 Calling callback function...")
-                config.callback_function(e)
+                config.on_failure_callback(e)
             return e

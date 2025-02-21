@@ -9,10 +9,15 @@
     "--cov-report=term-missing"
   ],
   "cSpell.words": [
+    "chromedriver",
+    "crdownload",
     "drivedownload",
     "driveupload",
+    "icecream",
+    "infobars",
     "mypy",
     "qodo",
+    "safebrowsing",
     "scriptman",
     "tarteaucitron"
   ]

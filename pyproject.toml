@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.0.270"
+version = "2.0.271"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -8,22 +8,21 @@ authors = [
     { name = "Nelson Ombuya", email = "developer@incognitouser.anonaddy.me" },
 ]
 dependencies = [
-    "dynaconf>=3.2.6",
-    "filelock>=3.16.1",
-    "loguru>=0.7.3",
-    "pydantic>=2.10.6",
-    "tomlkit>=0.13.2",
     "tqdm>=4.67.1",
+    "loguru>=0.7.3",
+    "tomlkit>=0.13.2",
+    "filelock>=3.16.1",
+    "pydantic>=2.10.6",
     "types-tqdm>=4.67.0.20241221",
 ]
 
 [project.optional-dependencies]
 api = [
-    "fastapi>=0.115.8",
-    "pydantic[email]>=2.10.6",
-    "requests>=2.32.3",
-    "types-requests>=2.32.0.20241016",
     "uvicorn>=0.34.0",
+    "fastapi>=0.115.8",
+    "requests>=2.32.3",
+    "pydantic[email]>=2.10.6",
+    "types-requests>=2.32.0.20241016",
 ]
 etl = ["pandas>=2.2.3", "pandas-stubs>=2.2.3.241126", "sqlalchemy>=2.0.37"]
 cache = ["dill>=0.3.9", "diskcache>=5.6.3"]
@@ -32,8 +31,8 @@ selenium = [
     "selenium>=4.28.1",
     "requests>=2.32.3",
     "types-selenium>=3.141.9",
-    "types-requests>=2.32.0.20241016",
     "webdriver-manager>=4.0.2",
+    "types-requests>=2.32.0.20241016",
 ]
 
 [project.scripts]
@@ -71,6 +70,7 @@ webdriver-manager = "^4.0.2"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.4"
+icecream = "^2.1.4"
 pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
 
@@ -97,7 +97,7 @@ disallow_incomplete_defs = true
 disallow_untyped_decorators = true
 
 [[tool.mypy.overrides]]
-module = ["apscheduler.*", "dynaconf.*", "diskcache.*", "dill.*"]
+module = ["apscheduler.*", "diskcache.*", "dill.*"]
 ignore_missing_imports = true
 
 [build-system]

@@ -140,7 +140,7 @@ class SeleniumInstance(ABC):
                 download to complete. Defaults to None.
         """
         download_extensions = (".tmp", ".crdownload")
-        directory = Path(str(config.env.downloads_dir))
+        directory = Path(config.settings.downloads_dir)
         files = list(directory.iterdir())
 
         if not file_name:

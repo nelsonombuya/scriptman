@@ -23,12 +23,7 @@ except ImportError:
 
 class ETL(DataFrame):
     log: Logger = logger
-    default_downloads_dir: Path = Path(
-        config.get(
-            "downloads_dir",
-            Path(__file__).parent.parent / "downloads",
-        )
-    )
+    default_downloads_dir: Path = Path(config.settings.downloads_dir)
 
     @contextmanager
     def extraction_context(self, context: str = "Code Block") -> Generator[None]:

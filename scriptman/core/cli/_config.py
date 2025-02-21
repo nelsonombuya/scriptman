@@ -76,23 +76,26 @@ class ConfigSubParser(BaseParser):
 
         Args:
             args (Namespace): Parsed CLI arguments containing the following attributes:
-
                 - set (list[str]): A list of two strings: the parameter name and value.
                 - reset (str): The parameter name to reset to its default value.
 
         Returns:
             int: Exit code (0 for success, non-zero for failure)
         """
-        if args.set:
+        result: int = 0
+        param: str = ""
+        value: str = ""
+
+        if hasattr(args, "set") and args.set:
             param, value = args.set
-            return int(not config.validate_and_update_configuration(param, value))
+            result = int(not config.validate_and_update_configuration(param, value))
 
-        if args.reset:
+        if hasattr(args, "reset") and args.reset:
             param = args.reset[0]
-            return int(not config.reset_configuration(param))
+            config.settings.reset(param, True)
 
-        if args.list:
-            for param, value in config.current_settings.items():
+        if hasattr(args, "list") and args.list:
+            for param, value in config.settings.items():
                 print(f"\n\t- {param}: {value}")
 
-        return 1
+        return result

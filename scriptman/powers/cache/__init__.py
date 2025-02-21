@@ -108,7 +108,7 @@ class CacheManager(Generic[T]):
 
     @staticmethod
     def cache_result(
-        ttl: Optional[int] = config.get("CACHE.TTL"), **backend_kwargs: Any
+        ttl: Optional[int] = config.settings.get("CACHE.TTL"), **backend_kwargs: Any
     ) -> Callable[[SyncFunc[T]], SyncFunc[T]]:
         """
         📦 Decorator for caching function results. Works with synchronous functions.
@@ -158,7 +158,7 @@ class CacheManager(Generic[T]):
 
     @staticmethod
     def async_cache_result(
-        ttl: Optional[int] = config.get("CACHE.TTL"), **backend_kwargs: Any
+        ttl: Optional[int] = config.settings.get("CACHE.TTL"), **backend_kwargs: Any
     ) -> Callable[[AsyncFunc[T]], AsyncFunc[T]]:
         """
         📦 Decorator for caching function results. Works with both asynchronous functions.

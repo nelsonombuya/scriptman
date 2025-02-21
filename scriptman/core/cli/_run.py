@@ -91,19 +91,19 @@ class RunSubParser(BaseParser):
         Returns:
             int: Exit code (0 for success, non-zero for failure)
         """
-        print(config.__version.scriptman)  # Just looks cool
+        print(config.scriptman)  # Just looks cool
         scripts = (
             [Path(script) for script in args.scripts]
             if args.scripts
-            else list(Path(config.get("scripts_dir", "scripts")).glob("*.py"))
+            else list(Path(config.settings.get("scripts_dir", ".")).glob("*.py"))
         )
 
         if not scripts:
             logger.error("❓ No scripts found in the current directory.")
             return 1
 
-        config.env.retries = args.retries if args.retries >= 0 else 0
-        config.env.force = args.force
+        config.settings.retries = args.retries if args.retries >= 0 else 0
+        config.settings.force = args.force
 
         try:
             Scripts().run_scripts(scripts)

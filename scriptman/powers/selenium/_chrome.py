@@ -39,7 +39,7 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
         except ValueError:
             self.log.debug("Setting up Chrome in Local mode...")
             cd = ChromeDownloader()
-            chrome_version = config.get("selenium_chrome_version", 126)
+            chrome_version = config.settings.get("selenium_chrome_version", 126)
             chrome_browser = cd.download(chrome_version, "browser")
             chrome_driver = cd.download(chrome_version, "driver")
             options = self._get_chrome_options(chrome_browser)
@@ -63,7 +63,7 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
         if chrome_executable_path:
             options.binary_location = chrome_executable_path.resolve().as_posix()
 
-        if config.get("selenium_optimizations", False):
+        if config.settings.get("selenium_optimizations", False):
 
             for arg in [
                 "--headless",
@@ -87,7 +87,7 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
                 "download.directory_upgrade": True,
                 "download.safebrowsing.enabled": True,
                 "download.prompt_for_download": False,
-                "download.default_directory": config.env.downloads_dir,
+                "download.default_directory": config.settings.downloads_dir,
             },
         )
 
@@ -101,11 +101,7 @@ class ChromeDownloader:
     """
 
     log: Logger = logger.bind(handler="Chrome Downloader")
-    chrome_download_dir: Path = Path(
-        config.get("downloads_dir", Path(__file__).parent.parent.parent / "downloads"),
-        "selenium",
-        "chrome",
-    )
+    chrome_download_dir: Path = Path(config.settings.downloads_dir, "selenium", "chrome")
 
     def download(self, version: int, app: Literal["driver", "browser"]) -> Path:
         """
@@ -171,7 +167,7 @@ class ChromeDownloader:
             dict: JSON data containing download URLs.
         """
         self.log.debug("Fetching Chrome download URLs...")
-        response = get(config.get("chrome_download_url"))
+        response = get(config.settings.chrome_download_url)
         response.raise_for_status()
         data: dict[str, Any] = response.json()
         return data

@@ -1,7 +1,7 @@
 try:
     from abc import ABC, abstractmethod
     from enum import Enum
-    from typing import Generic, Union
+    from typing import Generic
 
     from loguru import logger
     from selenium.webdriver import Chrome as ChromeDriver
@@ -33,13 +33,15 @@ class Browsers(Enum):
         return self.value
 
 
-Driver = Union[ChromeDriver]
-BrowserMap: dict[Browsers, type["SeleniumBrowser[Driver]"]] = {Browsers.CHROME: Chrome}
+Driver = ChromeDriver
+BrowserMap: dict[Browsers, type["SeleniumBrowser[Driver]"]] = {
+    Browsers.CHROME: Chrome,
+}
 
 
 class SeleniumBrowser(ABC, Generic[T]):
     _driver: T
-    _local_mode: bool = config.get("selenium_local_mode", True)
+    _local_mode: bool = config.settings.get("selenium_local_mode", True)
 
     def __init__(self) -> None:
         """

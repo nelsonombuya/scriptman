@@ -138,7 +138,7 @@ class DatabaseHandler(ABC):
         self,
         query: str,
         rows: list[dict[str, Any]] = [],
-        batch_size: Optional[int] = config.get("BATCH_SIZE"),
+        batch_size: Optional[int] = config.settings.get("BATCH_SIZE"),
     ) -> bool:
         """
         📃 Executes multiple SQL insert queries with the given SQL query and rows.

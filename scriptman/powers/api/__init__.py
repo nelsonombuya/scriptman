@@ -22,7 +22,7 @@ try:
         EntityModelT,
         ResponseModelT,
     )
-    from scriptman.powers.api._templates import api_route
+    from scriptman.powers.api._templates import api_route, async_api_route
 
 except ImportError as e:
     raise ImportError(
@@ -259,6 +259,7 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
 __all__: list[str] = [
     "api",
     "api_route",
+    "async_api_route",
     "BaseAPIClient",
     "BaseEntityModel",
     "EntityModelT",

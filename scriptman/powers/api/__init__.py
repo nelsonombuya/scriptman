@@ -205,17 +205,15 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         Returns:
             Type[ResponseModelT]: The response model to use.
         """
-        client_generic = self.get_generic(self)
-        response_model_generic = self.get_generic(response_model)
         return (
             response_model
             if response_model
             else (
-                # HACK: Getting the generic type from the default_response_model
-                self.default_response_model[client_generic]  # type:ignore
-                if self.default_response_model
-                and client_generic
-                and response_model_generic
+                # HACK: Getting the generic for the response model
+                self.default_response_model[self.generic]  # type:ignore
+                if self.generic
+                and self.default_response_model
+                and self.default_response_model != self.generic
                 else self.default_response_model if self.default_response_model else None
             )
         )
@@ -254,6 +252,19 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
             if hasattr(object, "__orig_class__")
             else None
         )
+
+    @property
+    def generic(self) -> Optional[type]:
+        """
+        👤 The type argument of the generic client, or None.
+
+        This can be used to access the type argument of the generic client
+        from within the client class itself.
+
+        Returns:
+            Optional[type]: The type argument of the generic client, or None.
+        """
+        return self.get_generic(self)
 
 
 __all__: list[str] = [

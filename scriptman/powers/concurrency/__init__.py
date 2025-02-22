@@ -10,6 +10,7 @@ from asyncio import (
 )
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from datetime import datetime
+from itertools import zip_longest
 from typing import Any, Coroutine, Generic, Optional, Union, cast
 from uuid import uuid4
 
@@ -188,7 +189,9 @@ class TaskExecutor(Generic[T]):
                     )
                     for future in [
                         self._process_pool.submit(func, *task_args, **task_kwargs)
-                        for task_args, task_kwargs in zip(batch_args, batch_kwargs)
+                        for task_args, task_kwargs in self._zip_args_and_kwargs(
+                            batch_args, batch_kwargs
+                        )
                     ]
                 ]
             )
@@ -244,7 +247,9 @@ class TaskExecutor(Generic[T]):
                             coroutine=func(*task_args, **task_kwargs),
                             task_id=f"{func.__name__}_{uuid4().hex[:8]}",
                         )
-                        for task_args, task_kwargs in zip(batch_args, batch_kwargs)
+                        for task_args, task_kwargs in self._zip_args_and_kwargs(
+                            batch_args, batch_kwargs
+                        )
                     ]
                 )
             else:
@@ -262,7 +267,9 @@ class TaskExecutor(Generic[T]):
                                 *task_args,
                                 **task_kwargs,
                             )
-                            for task_args, task_kwargs in zip(batch_args, batch_kwargs)
+                            for task_args, task_kwargs in self._zip_args_and_kwargs(
+                                batch_args, batch_kwargs
+                            )
                         ]
                     ]
                 )
@@ -329,6 +336,46 @@ class TaskExecutor(Generic[T]):
             return cast(T, coroutine.result())
 
         return run(coroutine)
+
+    def _zip_args_and_kwargs(
+        self,
+        args_list: list[tuple[Any, ...]],
+        kwargs_list: list[dict[str, Any]],
+    ) -> list[tuple[tuple[Any, ...], dict[str, Any]]]:
+        """
+        🤐 Combine lists of positional and keyword arguments into a single list of tuples.
+
+        Given two lists of arguments, where the first list contains tuples of
+        positional arguments and the second list contains dictionaries of keyword
+        arguments, this method returns a single list of tuples, where each tuple
+        contains a tuple of positional arguments and a dictionary of keyword
+        arguments.
+
+        The lists are zipped together using the zip_longest function, so if the
+        lists are of different lengths, the shorter list is padded with empty
+        tuples or dictionaries as necessary.
+
+        The returned list is a list of tuples, where each tuple contains a tuple
+        of positional arguments and a dictionary of keyword arguments. The tuples
+        and dictionaries are guaranteed to be of type tuple and dict, respectively,
+        even if the input lists contain empty or None values.
+
+        :param args_list: List of tuples of positional arguments.
+        :param kwargs_list: List of dictionaries of keyword arguments.
+        :return: List of tuples, where each tuple contains a tuple of positional
+            arguments and a dictionary of keyword arguments.
+        """
+        return [  # type: ignore # Issue with zip_longest return type annotation
+            (
+                args if isinstance(args, tuple) else (),
+                kwargs if isinstance(kwargs, dict) else {},
+            )
+            for args, kwargs in zip_longest(
+                args_list,
+                kwargs_list,
+                fillvalue=() if not args_list else {},
+            )
+        ]
 
 
 __all__: list[str] = ["TaskExecutor", "TaskStatus", "TaskResult", "BatchResult"]

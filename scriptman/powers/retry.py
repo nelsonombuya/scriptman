@@ -10,10 +10,10 @@ from scriptman.powers.generics import AsyncFunc, SyncFunc, T
 
 
 def retry(
-    max_retries: int = config.settings.get("RETRY.MAX_RETRIES", 1),
-    base_delay: float = config.settings.get("RETRY.BASE_DELAY", 1),
-    min_delay: float = config.settings.get("RETRY.MIN_DELAY", 1),
-    max_delay: float = config.settings.get("RETRY.MAX_DELAY", 10),
+    max_retries: int = config.settings.get("retry.max_retries", 1),
+    base_delay: float = config.settings.get("retry.base_delay", 1),
+    min_delay: float = config.settings.get("retry.min_delay", 1),
+    max_delay: float = config.settings.get("retry.max_delay", 10),
     retry_on: Optional[Union[Type[Exception], tuple[Type[Exception], ...]]] = None,
 ) -> Callable[[SyncFunc[T]], SyncFunc[T]]:
     """
@@ -62,10 +62,10 @@ def retry(
 
 
 def async_retry(
-    max_retries: int = config.settings.get("RETRY.MAX_RETRIES", 1),
-    base_delay: float = config.settings.get("RETRY.BASE_DELAY", 1),
-    min_delay: float = config.settings.get("RETRY.MIN_DELAY", 1),
-    max_delay: float = config.settings.get("RETRY.MAX_DELAY", 10),
+    max_retries: int = config.settings.get("retry.max_retries", 1),
+    base_delay: float = config.settings.get("retry.base_delay", 1),
+    min_delay: float = config.settings.get("retry.min_delay", 1),
+    max_delay: float = config.settings.get("retry.max_delay", 10),
     retry_on: Optional[Union[Type[Exception], tuple[Type[Exception], ...]]] = None,
 ) -> Callable[[AsyncFunc[T]], AsyncFunc[T]]:
     """

@@ -31,7 +31,7 @@ class DiskCacheBackend(CacheBackend, ABC):
     """Abstract Base Class for DiskCache implementations of the cache backend."""
 
     _cache_dir: Path = Path(
-        config.settings.get("CACHE.DIR", Path(__file__).parent.parent.parent / "cache")
+        config.settings.get("cache.dir", Path(__file__).parent.parent.parent / "cache")
     )
 
     def get(self, key: str, retry: bool = True, **kwargs: Any) -> Any:

@@ -8,9 +8,9 @@ from typing import Any, Callable, Optional
 from loguru import logger
 from pydantic import ValidationError
 
+from scriptman.core.config._defaults import ConfigModel
 from scriptman.core.config._manager import ConfigManager
 from scriptman.core.config._toml import TOMLConfigManager
-from scriptman.core.defaults import ConfigModel
 from scriptman.core.version import Version
 
 
@@ -99,9 +99,7 @@ class Config:
             exists, otherwise 'scriptman.toml'.
         """
         if self.cwd.joinpath("pyproject.toml").exists():
-            logger.debug("Using pyproject.toml")
             return self.cwd.joinpath("pyproject.toml")
-        logger.debug("Using scriptman.toml")
         return self.cwd.joinpath("scriptman.toml")
 
     def _get_secrets_file_path(self) -> Path:
@@ -241,4 +239,4 @@ class Config:
 
 # Singleton instance
 config: Config = Config()
-__all__ = ["config"]
+__all__ = ["config", "ConfigModel"]

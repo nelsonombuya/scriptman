@@ -158,7 +158,7 @@ class FastAPIManager:
         file.touch(exist_ok=True)
         logger.success(
             "Successfully initialized api module. "
-            "Kindly import scriptman.powers.api.api_manager to proceed."
+            "Kindly import scriptman.powers.api.api to proceed."
         )
 
 

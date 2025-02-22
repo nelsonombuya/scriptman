@@ -105,7 +105,7 @@ def api_route(func: SyncFunc[dict[str, Any]]) -> SyncFunc[dict[str, Any]]:
     return sync_wrapper
 
 
-async def async_api_route(func: AsyncFunc[dict[str, Any]]) -> AsyncFunc[dict[str, Any]]:
+def async_api_route(func: AsyncFunc[dict[str, Any]]) -> AsyncFunc[dict[str, Any]]:
     """
     🔄⚡ Decorator to wrap asynchronous API route functions with standardized
     request/response handling.

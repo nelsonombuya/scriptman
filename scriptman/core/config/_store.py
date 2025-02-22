@@ -2,11 +2,17 @@ from typing import Any
 
 from loguru import logger
 
-from scriptman.core.defaults import ConfigModel
+from scriptman.core.config._defaults import ConfigModel
 
 
 class ConfigStore:
-    """📦 Base class for storing and managing configuration values."""
+    """
+    📦 Base class for storing and managing configuration values with dot notation support.
+
+    This class provides a dictionary-like interface for storing and retrieving
+    configuration values. It allows you to access values using dot notation,
+    such as "app.settings.debug".
+    """
 
     def __init__(self) -> None:
         """
@@ -16,109 +22,142 @@ class ConfigStore:
         """
         object.__setattr__(self, "_store", {})
 
-    def __getitem__(self, key: str) -> Any:
+    def _traverse_dict(
+        self, keys: list[str], create: bool = False
+    ) -> tuple[dict[str, Any], str]:
         """
-        🔍 Retrieve a value from the configuration store.
+        Traverse the nested dictionary structure to find or create the parent of the
+        target key.
 
         Args:
-            key (str): The key to retrieve the value for.
+            keys (list[str]): List of keys to traverse.
+            create (bool): Whether to create missing dictionaries along the path
 
         Returns:
-            Any: The value associated with the given key.
+            tuple[dict, str]: Tuple of (parent_dict, last_key)
 
         Raises:
-            KeyError: If the key is not present in the configuration store.
+            KeyError: If a key along the path doesn't exist and create=False
         """
-        if value := self.get(key):
-            return value
-        raise KeyError(f"Key not found: {key}")
+        current = self._store
+        *parent_keys, last_key = keys
 
-    def __setitem__(self, key: str, value: Any) -> None:
-        """
-        ✍️ Set a configuration value in the store.
+        for key in parent_keys:
+            if create:
+                current = current.setdefault(key, {})
+            else:
+                try:
+                    current = current[key]
+                    if not isinstance(current, dict):
+                        raise KeyError(f"Path element '{key}' is not a dictionary")
+                except KeyError:
+                    raise KeyError(f"Key not found: {key}")
 
-        This method sets a configuration value in the store using the given key and value.
-
-        Args:
-            key (str): The key to set the value for.
-            value (Any): The value to set for the given key.
-        """
-        self.set(key, value)
-
-    def __delitem__(self, key: str) -> None:
-        """
-        🗑️ Delete a configuration value from the store.
-
-        This method deletes a configuration value from the store using the given key.
-
-        Args:
-            key (str): The key to delete the value for.
-
-        Raises:
-            KeyError: If the key is not present in the configuration store.
-        """
-        self.delete(key)
-
-    def __contains__(self, key: str) -> bool:
-        """
-        🔍 Check if a key exists in the configuration store.
-
-        This method checks if the given key is present in the configuration store.
-
-        Args:
-            key (str): The key to check for existence.
-
-        Returns:
-            bool: True if the key exists in the store, otherwise False.
-        """
-        return key in self._store
+        return current, last_key
 
     def get(self, key: str, default: Any = None) -> Any:
         """
-        🔍 Retrieve a value from the configuration store.
-
-        This method retrieves a value from the configuration store using the given key.
+        🔍 Retrieve a value using dot notation.
 
         Args:
-            key (str): The key to retrieve the value for.
-            default (Any): The default value to return if the key is not present in the
-                configuration store.
+            key (str): The key path (e.g., "app.settings.debug")
+            default (Any): Value to return if path doesn't exist
 
         Returns:
-            Any: The value associated with the given key or the default value if the key
-                is not present in the configuration store.
+            Any: The value at the specified path or default
         """
-        return self._store.get(key, default)
+        try:
+            keys = key.split(".")
+            if len(keys) == 1:
+                return self._store.get(key, default)
+
+            parent, last_key = self._traverse_dict(keys)
+            return parent.get(last_key, default)
+        except (KeyError, AttributeError):
+            return default
 
     def set(self, key: str, value: Any) -> None:
         """
-        ✍️ Set a value in the configuration store.
-
-        This method sets a value in the configuration store using the specified key.
+        ✍🏾 Set a value using dot notation.
 
         Args:
-            key (str): The key to set the value for.
-            value (Any): The value to set for the given key.
+            key (str): The key path (e.g., "app.settings.debug")
+            value (Any): The value to set
         """
-        self._store[key] = value
+        keys = key.split(".")
+        if len(keys) == 1:
+            self._store[key] = value
+            return
+
+        parent, last_key = self._traverse_dict(keys, create=True)
+        parent[last_key] = value
 
     def delete(self, key: str) -> None:
         """
-        🗑️ Delete a key-value pair from the configuration store.
-
-        This method deletes a key-value pair from the configuration store using the given
-        key.
+        Delete a value using dot notation.
 
         Args:
-            key (str): The key to delete the value for.
+            key (str): The key path (e.g., "app.settings.debug")
 
         Raises:
-            KeyError: If the key is not present in the configuration store.
+            KeyError: If the key path doesn't exist
         """
         try:
-            del self._store[key]
-        except KeyError:
-            logger.error(f"Key not found: {key}")
+            keys = key.split(".")
+            if len(keys) == 1:
+                del self._store[key]
+                return
+
+            parent, last_key = self._traverse_dict(keys)
+            del parent[last_key]
+        except KeyError as e:
+            logger.error(f"Error deleting key '{key}': {str(e)}")
+
+    def __contains__(self, key: str) -> bool:
+        """🔍 Check if a key exists in the configuration store using dot notation."""
+        try:
+            keys = key.split(".")
+            if len(keys) == 1:
+                return key in self._store
+
+            parent, last_key = self._traverse_dict(keys)
+            return last_key in parent
+        except (KeyError, AttributeError):
+            return False
+
+    def __getitem__(self, key: str) -> Any:
+        """🔍 Get a value using dictionary syntax with dot notation support."""
+        value = self.get(key)
+        if value is None:
+            raise KeyError(f"Key not found: {key}")
+        return value
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """✍🏾 Set a value using dictionary syntax with dot notation support."""
+        self.set(key, value)
+
+    def __delitem__(self, key: str) -> None:
+        """🚮 Delete a value using dictionary syntax with dot notation support."""
+        self.delete(key)
+
+    def __getattr__(self, name: str) -> Any:
+        """🔍 Get a value using attribute syntax."""
+        if value := self._store.get(name):
+            return value
+        raise AttributeError(f"Attribute not found: {name}")
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """✍🏾 Set a value using attribute syntax."""
+        if name == "_store":
+            object.__setattr__(self, name, value)
+        else:
+            self._store[name] = value
+
+    def __delattr__(self, name: str) -> None:
+        """🚮 Delete a value using attribute syntax."""
+        if name == "_store":
+            raise AttributeError("Cannot delete _store attribute")
+        self.delete(name)
 
     def reset(self, key: str) -> None:
         """
@@ -133,13 +172,9 @@ class ConfigStore:
         Raises:
             KeyError: If the key is not present in the configuration store.
         """
-        if field := ConfigModel.model_fields.get(key):
-            default = field.get_default()
-        else:
-            default = None
-
-        self._store[key] = default
-        logger.info(f"Config reset: {key} = {default}")
+        default = ConfigModel.get_default(key)
+        self.set(key, default)
+        logger.debug(f"Key reset: {key} = {default}")
 
     def reset_all(self) -> None:
         """
@@ -148,7 +183,8 @@ class ConfigStore:
         This method resets all key-value pairs in the configuration store to their default
         values.
         """
-        for key in self._store.keys():
+        # Create a copy of the keys to avoid modifying the dictionary while iterating
+        for key in list(self._store.keys()):
             self.reset(key)
 
     def keys(self) -> Any:
@@ -184,41 +220,3 @@ class ConfigStore:
             Any: An iterable of all the values in the configuration store.
         """
         return self._store.values()
-
-    def __getattr__(self, name: str) -> Any:
-        """
-        🔍 Retrieve a value from the configuration store.
-
-        Args:
-            key (str): The key to retrieve the value for.
-
-        Returns:
-            Any: The value associated with the given key.
-        """
-        if value := self._store.get(name):
-            return value
-        raise AttributeError(f"Key not found: {name}")
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        """
-        💻 Set a value in the configuration store.
-
-        Args:
-            key (str): The key to set the value for.
-            value (Any): The value to set for the given key.
-        """
-        if name == "_store":  # Allow setting the _store attribute directly
-            object.__setattr__(self, name, value)
-        else:  # Store other attributes in _store
-            self._store[name] = value
-
-    def __delattr__(self, name: str) -> None:
-        """
-        🗑️ Delete a value from the configuration store.
-
-        Args:
-            key (str): The key to delete the value for.
-        """
-        if name == "_store":
-            raise AttributeError("Cannot delete _store attribute")
-        self.delete(name)

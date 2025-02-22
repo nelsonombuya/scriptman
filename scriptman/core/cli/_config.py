@@ -2,7 +2,7 @@ from argparse import ArgumentParser, Namespace, _SubParsersAction
 
 from scriptman.core.cli._parser import BaseParser
 from scriptman.core.config import config
-from scriptman.core.defaults import ConfigModel
+from scriptman.core.config._defaults import ConfigModel
 
 
 class ConfigSubParser(BaseParser):

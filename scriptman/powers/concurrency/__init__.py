@@ -63,7 +63,7 @@ class TaskExecutor(Generic[T]):
         self._thread_pool = ThreadPoolExecutor(max_workers=thread_pool_size)
         self._process_pool = ProcessPoolExecutor(max_workers=process_pool_size)
 
-    async def run_in_background(
+    def run_in_background(
         self,
         func: Func[T],
         raise_on_error: bool = True,

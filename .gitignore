@@ -11,6 +11,10 @@
 desktop.ini
 codium_*.py
 
+# Files
+# Useful for when you're testing something
+__debug__.py
+
 # Folders
 logs
 dist

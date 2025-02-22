@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.0.277"
+version = "2.0.278"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -99,8 +99,6 @@ disallow_untyped_decorators = true
 [[tool.mypy.overrides]]
 module = ["apscheduler.*", "diskcache.*", "dill.*"]
 ignore_missing_imports = true
-
-[tool.scriptman]
 
 [build-system]
 requires = ["poetry-core"]

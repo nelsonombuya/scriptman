@@ -26,6 +26,8 @@ class TaskResult(BaseModel, Generic[T]):
 
     task_id: str
     status: TaskStatus = TaskStatus.PENDING
+    args: tuple[Any, ...] = ()
+    kwargs: dict[str, Any] = {}
     result: Optional[T] = None
     error: Optional[BaseException] = None
     start_time: Optional[datetime] = None

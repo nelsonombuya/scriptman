@@ -87,6 +87,8 @@ class TaskExecutor(Generic[T]):
         """
         task_id = f"background_task_{func.__name__}_{uuid4().hex[:8]}"
         coroutine = self.__create_task_result(
+            args=args,
+            kwargs=kwargs,
             task_id=task_id,
             raise_errors=raise_on_error,
             coroutine=(
@@ -94,7 +96,7 @@ class TaskExecutor(Generic[T]):
                 if iscoroutinefunction(func)
                 else wrap_future(
                     self._thread_pool.submit(
-                        cast(SyncFunc[T], func),  # Convert sync function to coroutine
+                        cast(SyncFunc[T], func),
                         *args,
                         **kwargs,
                     )
@@ -178,25 +180,29 @@ class TaskExecutor(Generic[T]):
         for i in tqdm(range(0, len(args), batch_size), desc="Processing Tasks"):
             batch_args = args[i : i + batch_size]
             batch_kwargs = kwargs[i : i + batch_size]
-
-            batch_results = await gather(
-                *[
-                    self.__create_task_result(
-                        parent_id=batch_id,
-                        raise_errors=raise_on_error,
-                        coroutine=wrap_future(future),
-                        task_id=f"{func.__name__}_{uuid4().hex[:8]}",
-                    )
-                    for future in [
-                        self._process_pool.submit(func, *task_args, **task_kwargs)
-                        for task_args, task_kwargs in self._zip_args_and_kwargs(
-                            batch_args, batch_kwargs
+            batch_tasks: list[tuple[tuple[Any, ...], dict[str, Any], Future[Any]]] = [
+                (
+                    a,
+                    kwa,
+                    wrap_future(self._process_pool.submit(func, *a, **kwa)),
+                )
+                for a, kwa in self._zip_args_and_kwargs(batch_args, batch_kwargs)
+            ]
+            tasks.extend(
+                await gather(
+                    *[
+                        self.__create_task_result(
+                            args=task_args,
+                            kwargs=task_kwargs,
+                            parent_id=batch_id,
+                            coroutine=task_future,
+                            raise_errors=raise_on_error,
+                            task_id=f"{func.__name__}_{uuid4().hex[:8]}",
                         )
+                        for task_args, task_kwargs, task_future in batch_tasks
                     ]
-                ]
+                )
             )
-            tasks.extend(batch_results)
-
         return BatchResult[T](
             tasks=tasks,
             batch_id=batch_id,
@@ -237,45 +243,39 @@ class TaskExecutor(Generic[T]):
         for i in tqdm(range(0, len(args), batch_size), desc="Processing Tasks"):
             batch_args = args[i : i + batch_size]
             batch_kwargs = kwargs[i : i + batch_size]
-
-            if iscoroutinefunction(func):
-                batch_results = await gather(
+            batch_tasks: list[
+                tuple[
+                    tuple[Any, ...],
+                    dict[str, Any],
+                    Future[Any] | Coroutine[Any, Any, Any],
+                ]
+            ] = [
+                (
+                    a,
+                    kwa,
+                    (
+                        func(*a, **kwa)
+                        if iscoroutinefunction(func)
+                        else wrap_future(self._thread_pool.submit(func, *a, **kwa))
+                    ),
+                )
+                for a, kwa in self._zip_args_and_kwargs(batch_args, batch_kwargs)
+            ]
+            tasks.extend(
+                await gather(
                     *[
                         self.__create_task_result(
+                            args=task_args,
+                            kwargs=task_kwargs,
                             parent_id=batch_id,
+                            coroutine=task_future,
                             raise_errors=raise_on_error,
-                            coroutine=func(*task_args, **task_kwargs),
                             task_id=f"{func.__name__}_{uuid4().hex[:8]}",
                         )
-                        for task_args, task_kwargs in self._zip_args_and_kwargs(
-                            batch_args, batch_kwargs
-                        )
+                        for task_args, task_kwargs, task_future in batch_tasks
                     ]
                 )
-            else:
-                batch_results = await gather(
-                    *[
-                        self.__create_task_result(
-                            parent_id=batch_id,
-                            raise_errors=raise_on_error,
-                            coroutine=wrap_future(future),
-                            task_id=f"{func.__name__}_{uuid4().hex[:8]}",
-                        )
-                        for future in [
-                            self._thread_pool.submit(
-                                cast(SyncFunc[T], func),  # Convert sync func to coroutine
-                                *task_args,
-                                **task_kwargs,
-                            )
-                            for task_args, task_kwargs in self._zip_args_and_kwargs(
-                                batch_args, batch_kwargs
-                            )
-                        ]
-                    ]
-                )
-
-            tasks.extend(batch_results)
-
+            )
         return BatchResult[T](
             batch_id=batch_id,
             tasks=tasks,
@@ -286,12 +286,19 @@ class TaskExecutor(Generic[T]):
     async def __create_task_result(
         self,
         task_id: str,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
         coroutine: Union[Future[T], Coroutine[Any, Any, T]],
         parent_id: Optional[str] = None,
         raise_errors: bool = True,
     ) -> TaskResult[T]:
         """Create a task result with proper error handling and timing."""
-        result = TaskResult[T](task_id=task_id, parent_id=parent_id)
+        result = TaskResult[T](
+            args=args,
+            kwargs=kwargs,
+            task_id=task_id,
+            parent_id=parent_id,
+        )
 
         try:
             result.status = TaskStatus.RUNNING

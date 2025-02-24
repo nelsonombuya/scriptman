@@ -184,6 +184,7 @@ class BaseEntityModel(BaseModel):
         frozen=False,  # Allow modification after creation
         str_strip_whitespace=True,  # Strip whitespace from strings
         validate_assignment=True,  # Validate on attribute assignment
+        json_encoders={Decimal: lambda v: float(v)},
     )
 
     _identifier_field: ClassVar[str | None] = None

@@ -19,6 +19,7 @@ try:
     from scriptman.powers.api._manager import api
     from scriptman.powers.api._models import (
         BaseEntityModel,
+        EntityIdentifier,
         EntityModelT,
         ResponseModelT,
     )
@@ -74,7 +75,11 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         Returns:
             Response: HTTP response object.
         """
-        return raw_request(method.value, url, **kwargs)
+        logger.info(f"📡 Sending {method.value} request to {url}")
+        response = raw_request(method.value, url, **kwargs)
+        response.raise_for_status()
+        logger.success(f"✅ {method.value} request for {url} completed successfully.")
+        return response
 
     def request(
         self,
@@ -270,15 +275,16 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
 __all__: list[str] = [
     "api",
     "api_route",
-    "async_api_route",
-    "BaseAPIClient",
-    "BaseEntityModel",
+    "HTTPMethod",
+    "APIException",
     "EntityModelT",
-    "ResponseModelT",
+    "BaseAPIClient",
     "RequestHandler",
+    "ResponseModelT",
+    "async_api_route",
+    "BaseEntityModel",
+    "EntityIdentifier",
     "DefaultRequestHandler",
     "ODataV4RequestHandler",
     "PostOnlyRequestHandler",
-    "APIException",
-    "HTTPMethod",
 ]

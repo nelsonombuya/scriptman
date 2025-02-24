@@ -306,22 +306,22 @@ class ETL(DataFrame):
                 f"Bulk Query Execution Failed: {error}. Executing single queries..."
             )
             return all(
-                TaskExecutor.wait(
-                    TaskExecutor[bool]().parallel_io_bound_task(
-                        func=database_handler.execute_write_query,
-                        args=[(query, row) for row in values],
-                    )
-                ).results
+                TaskExecutor[bool]()
+                .parallel_io_bound_task(
+                    func=database_handler.execute_write_query,
+                    args=[(query, row) for row in values],
+                )
+                .results
             )
         except DatabaseError as error:
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
             return all(
-                TaskExecutor.wait(
-                    TaskExecutor[bool]().parallel_io_bound_task(
-                        func=self._insert_or_update,
-                        args=[(database_handler, table_name, value) for value in values],
-                    )
-                ).results
+                TaskExecutor[bool]()
+                .parallel_io_bound_task(
+                    func=self._insert_or_update,
+                    args=[(database_handler, table_name, value) for value in values],
+                )
+                .results
             )
 
         return True

@@ -1,18 +1,13 @@
 try:
     from datetime import datetime
-    from typing import Any, Optional, TypeVar
+    from decimal import Decimal
+    from typing import Any, ClassVar, Optional, TypeVar, get_type_hints
     from uuid import uuid4
 
-    from email_validator import EmailNotValidError
+    from email_validator import EmailNotValidError, validate_email
     from loguru import logger
-    from pydantic import (
-        BaseModel,
-        ConfigDict,
-        Field,
-        field_validator,
-        model_validator,
-        validate_email,
-    )
+    from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+    from typing_extensions import Annotated
 
     from scriptman.powers.api._exceptions import APIException
 except ImportError:
@@ -150,107 +145,166 @@ ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)  # Response
 EntityModelT = TypeVar("EntityModelT", bound="BaseEntityModel")  # Response Entities
 
 
+class EntityIdentifierField:
+    # Marker class for entity identifier fields
+    pass
+
+
+EntityIdentifier = Annotated[str, EntityIdentifierField]
+
+
 class BaseEntityModel(BaseModel):
     """
     🏗️ BaseEntityModel
 
-    This class extends the Pydantic BaseModel to provide additional functionality for
-    handling entity models. It includes validators for converting empty string fields to
-    None and stripping whitespace from string fields.
+    An enhanced base class for entity models with built-in validation, logging, and error
+    handling. Requires inheriting classes to specify an entity identifier field for better
+    error tracking.
 
-    Methods:
-        set_empty_fields_to_none(cls, values: dict) -> dict:
-            Convert empty string fields to None.
+    Features:
+    - Automatic empty string to None conversion
+    - Whitespace stripping for string fields
+    - Email validation with logging
+    - Required entity identifier field
+    - Configurable model settings
 
-        strip_fields(cls, values: dict) -> dict:
-            Strip whitespace from string fields.
+    Example:
+        ```python
+        class Customer(BaseEntityModel):
+            customer_id: EntityIdentifier = Field(description="Unique customer id")
+            name: str
+            email: Optional[str] = None
+
+        # The customer_id field will be used in error messages and logging
+        ```
     """
+
+    model_config = ConfigDict(
+        extra="forbid",  # Forbid extra fields
+        frozen=False,  # Allow modification after creation
+        str_strip_whitespace=True,  # Strip whitespace from strings
+        validate_assignment=True,  # Validate on attribute assignment
+    )
+
+    _identifier_field: ClassVar[str | None] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_identifier_field(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """🆔 Ensures that the inheriting class has defined an entity identifier field."""
+        if cls._identifier_field is None:
+            # Find the field marked with EntityIdentifierField
+            hints = get_type_hints(cls, include_extras=True)
+            identifier_fields = [
+                field_name
+                for field_name, field_type in hints.items()
+                if EntityIdentifierField in getattr(field_type, "__metadata__", ())
+            ]
+
+            if not identifier_fields:
+                raise ValueError(
+                    f"Class {cls.__name__} must define exactly one field annotated with "
+                    "EntityIdentifier type for entity identification"
+                )
+            if len(identifier_fields) > 1:
+                raise ValueError(
+                    f"Class {cls.__name__} has multiple EntityIdentifier fields: "
+                    f"{identifier_fields}. Only one is allowed."
+                )
+
+            cls._identifier_field = identifier_fields[0]
+
+        return values
+
+    @classmethod
+    def get_identifier(cls) -> str:
+        """🆔 Returns the entity's identifier value."""
+        if cls._identifier_field is None:
+            raise RuntimeError("Entity identifier field not initialized")
+        return str(getattr(cls, cls._identifier_field))
 
     @model_validator(mode="before")
     @classmethod
     def set_empty_fields_to_none(cls, values: dict[str, Any]) -> dict[str, Any]:
-        """
-        🎨 Convert empty string fields to None.
-
-        Args:
-            values (dict): Dictionary of field values.
-
-        Returns:
-            dict: Updated dictionary with empty string fields set to None.
-        """
-        for k, v in values.items():
-            if isinstance(v, str) and not v.strip():
-                values[k] = None
-        return values
+        """🎨 Convert empty string fields to None."""
+        return {
+            k: None if isinstance(v, str) and not v.strip() else v
+            for k, v in values.items()
+        }
 
     @model_validator(mode="before")
     @classmethod
     def strip_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
-        """
-        🎨 Strip whitespace from string fields.
-
-        Args:
-            values (dict): Dictionary of field values.
-
-        Returns:
-            dict: Updated dictionary with whitespace stripped from string fields.
-        """
-        for k, v in values.items():
-            if isinstance(v, str):
-                values[k] = v.strip()
-        return values
+        """🎨 Strip whitespace from string fields."""
+        return {k: v.strip() if isinstance(v, str) else v for k, v in values.items()}
 
     @classmethod
     def validate_and_log_email(
-        cls, email: Optional[str], entity_identifier: str, entity_type: str
+        cls, email: Optional[str], entity_identifier: str, field_name: str
     ) -> Optional[str]:
         """
-        📧 Validate email with centralized logging and handling.
+        📧 Validate email with enhanced error logging.
 
         Args:
-            email (Optional[str]): Email to validate
-            entity_identifier (str): Unique identifier for the entity (e.g., customer id)
-            entity_type (str): Type of entity (e.g., 'Customer', 'Location')
+            email: Email to validate
+            entity_identifier: Identifier of the entity
+            field_name: Name of the email field being validated
 
         Returns:
-            Optional[str]: Validated email or None if invalid
+            Validated email or None if invalid
         """
+        if not email or not isinstance(email, str) or not email.strip():
+            return None
+
         try:
-            # Custom checks for email validity
-            if (
-                not email
-                or not isinstance(email, str)
-                or (isinstance(email, str) and email.strip() == "")
-            ):
-                raise EmailNotValidError
+            return validate_email(email).normalized
 
-            # Validate email
-            validate_email(email)
-            return email
-
-        except EmailNotValidError:
+        except (EmailNotValidError, ValueError) as e:
             logger.warning(
-                f"{entity_type} {entity_identifier} has invalid email: {email}, "
-                "setting it to None."
+                f"{cls.__name__} with identifier '{entity_identifier}' has invalid "
+                f"email in field '{field_name}': {email!r}. Error: {str(e)}"
             )
             return None
 
     @model_validator(mode="before")
     @classmethod
-    def convert_invalid_email_to_none(cls, values: dict[str, Any]) -> dict[str, Any]:
-        """
-        📧 Validate and potentially convert email fields to None.
-        """
+    def validate_email_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """📧 Validate all email fields in the model."""
+        entity_identifier = values.get(
+            cls._identifier_field or "identifier",
+            "unknown",  # Fallback if somehow the identifier isn't set
+        )
+
+        # Find all email fields (those ending with 'email' or 'mail')
         email_fields = [
-            field for field in values.keys() if str(field).lower().endswith("mail")
+            field
+            for field in values.keys()
+            if str(field).lower().endswith(("email", "mail"))
         ]
 
-        for email_field in email_fields:
-            entity_identifier = values.get("No", values.get("Code", "Unknown"))
-            entity_type = cls.__name__.replace("BC", "").replace("Card", "")
-
-            values[email_field] = cls.validate_and_log_email(
-                values.get(email_field), entity_identifier, entity_type
+        for field in email_fields:
+            values[field] = cls.validate_and_log_email(
+                values.get(field), entity_identifier, field
             )
 
         return values
+
+    @classmethod
+    def log_validation_error(cls, error: Exception) -> None:
+        """📃 Centralized validation error logging."""
+        logger.error(
+            f"Validation error for {cls.__class__.__name__} "
+            f"with identifier '{cls.get_identifier()}': {str(error)}"
+        )
+
+    @staticmethod
+    def serialize_decimal(value: Optional[Decimal]) -> Optional[float]:
+        return float(value) if value is not None else None
+
+    @staticmethod
+    def serialize_datetime(value: Optional[datetime], format: str) -> Optional[str]:
+        return value.strftime(format) if value is not None else None
+
+    @staticmethod
+    def round_to_dp(value: Optional[Decimal], dp: int = 2) -> Optional[Decimal]:
+        return round(value, dp) if value is not None else None

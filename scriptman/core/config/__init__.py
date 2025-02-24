@@ -3,7 +3,7 @@ from os import getcwd
 from pathlib import Path
 from subprocess import run
 from sys import stdout
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Literal, Optional
 
 from loguru import logger
 from pydantic import ValidationError
@@ -186,7 +186,10 @@ class Config:
             elif field.annotation is Path and isinstance(value, str):
                 value = Path(value)
             elif field.annotation is not None:
-                value = field.annotation(value)
+                if getattr(field.annotation, "__origin__", None) is Literal:
+                    str(value).upper()
+                else:
+                    field.annotation(value)
 
             self.__settings.set(param.lower(), value, write_to_file=True)
             logger.info(f"Config updated successfully: {param} = {value}")

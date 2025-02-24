@@ -29,7 +29,7 @@ class APIRequest(BaseModel):
 
     request_id: str = Field(default_factory=lambda: str(uuid4()))
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
 
 class APIResponse(BaseModel):
@@ -180,7 +180,7 @@ class BaseEntityModel(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",  # Forbid extra fields
+        extra="ignore",  # Ignore extra fields
         frozen=False,  # Allow modification after creation
         str_strip_whitespace=True,  # Strip whitespace from strings
         validate_assignment=True,  # Validate on attribute assignment

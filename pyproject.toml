@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.0.282"
+version = "2.0.287"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"

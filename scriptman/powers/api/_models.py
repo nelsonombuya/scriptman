@@ -217,12 +217,15 @@ class BaseEntityModel(BaseModel):
 
         return values
 
-    @classmethod
-    def get_identifier(cls) -> str:
+    def get_identifier(self) -> str:
         """🆔 Returns the entity's identifier value."""
-        if cls._identifier_field is None:
-            raise RuntimeError("Entity identifier field not initialized")
-        return str(getattr(cls, cls._identifier_field))
+        identifier_field = self._identifier_field or "<unknown_identifier>"
+        if self._identifier_field is None:
+            logger.warning(
+                f"Entity {self.__class__.__name__} has no identifier field. "
+                "This is likely due to the model not being initialized correctly."
+            )
+        return str(getattr(self, identifier_field, "<unknown_identifier_value>"))
 
     @model_validator(mode="before")
     @classmethod
@@ -290,12 +293,11 @@ class BaseEntityModel(BaseModel):
 
         return values
 
-    @classmethod
-    def log_validation_error(cls, error: Exception) -> None:
+    def log_validation_error(self, error: Exception) -> None:
         """📃 Centralized validation error logging."""
         logger.error(
-            f"Validation error for {cls.__class__.__name__} "
-            f"with identifier '{cls.get_identifier()}': {str(error)}"
+            f"Validation error for {self.__class__.__name__} "
+            f"with identifier '{self.get_identifier()}': {str(error)}"
         )
 
     @staticmethod
@@ -309,3 +311,33 @@ class BaseEntityModel(BaseModel):
     @staticmethod
     def round_to_dp(value: Optional[Decimal], dp: int = 2) -> Optional[Decimal]:
         return round(value, dp) if value is not None else None
+
+    @model_validator(mode="after")
+    def log_validation_errors(self, data: Any) -> Any:
+        """🔄 Log any validation errors that occur during model initialization."""
+        try:
+            return data
+        except Exception as e:
+            self.log_validation_error(e)
+            raise
+
+    def __init__(self, **data: Any) -> None:
+        """🚀 Override init to catch and log validation errors."""
+        try:
+            super().__init__(**data)
+        except Exception as e:
+            # Create a temporary instance to get the identifier for logging
+            identifier_field = self._identifier_field or "identifier"
+            identifier_value = data.get(identifier_field, "unknown")
+            temp_data: dict[str, Any] = {identifier_field: identifier_value}
+            temp_instance: BaseEntityModel = self.model_construct(**temp_data)
+            temp_instance.log_validation_error(e)
+            raise e
+
+    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        """🔄 Override model_dump to catch and log serialization errors."""
+        try:
+            return super().model_dump(*args, **kwargs)
+        except Exception as e:
+            self.log_validation_error(e)
+            raise

@@ -25,7 +25,7 @@ api = [
     "types-requests>=2.32.0.20241016",
 ]
 cache = ["dill>=0.3.9", "diskcache>=5.6.3"]
-db = ["sqlalchemy>=2.0.37"]
+db = ["sqlalchemy>=2.0.37", "pandas>=2.2.3", "pandas-stubs>=2.2.3.241126"]
 etl = ["pandas>=2.2.3", "pandas-stubs>=2.2.3.241126", "sqlalchemy>=2.0.37"]
 scheduler = ["apscheduler>=3.11.0", "pydantic>=2.10.6"]
 selenium = [
@@ -51,6 +51,8 @@ dill = "^0.3.9"
 
 [tool.poetry.group.db.dependencies]
 sqlalchemy = "^2.0.38"
+pandas = "^2.2.3"
+pandas-stubs = "^2.2.3.241126"
 
 [tool.poetry.group.etl.dependencies]
 pandas = "^2.2.3"

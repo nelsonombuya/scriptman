@@ -14,7 +14,7 @@ except ImportError:
     raise ImportError(
         "Pandas is not installed. "
         "Kindly install the dependencies on your package manager using "
-        "scriptman[etl]."
+        "scriptman[etl] or scriptman[db]."
     )
 
 

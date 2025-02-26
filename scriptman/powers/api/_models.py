@@ -312,15 +312,6 @@ class BaseEntityModel(BaseModel):
     def round_to_dp(value: Optional[Decimal], dp: int = 2) -> Optional[Decimal]:
         return round(value, dp) if value is not None else None
 
-    @model_validator(mode="after")
-    def log_validation_errors(self, data: Any) -> Any:
-        """🔄 Log any validation errors that occur during model initialization."""
-        try:
-            return data
-        except Exception as e:
-            self.log_validation_error(e)
-            raise
-
     def __init__(self, **data: Any) -> None:
         """🚀 Override init to catch and log validation errors."""
         try:

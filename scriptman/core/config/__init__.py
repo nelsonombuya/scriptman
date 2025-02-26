@@ -144,7 +144,7 @@ class Config:
             level=log_level,
             rotation="1 day",
             compression="zip",
-            retention="30 days",
+            retention="7 days",
             format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
         )
 

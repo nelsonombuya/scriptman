@@ -16,6 +16,7 @@ except ImportError:
         "Kindly install the dependencies on your package manager using "
         "scriptman[etl] or scriptman[db]."
     )
+# TODO: Split this into multiple files to handle DataFrame Dependency
 
 
 class DatabaseHandler(ABC):
@@ -212,7 +213,7 @@ class DatabaseHandler(ABC):
             if keys:
                 column_definitions += f", PRIMARY KEY ({', '.join(keys)})"
 
-            query = f'CREATE TABLE "{table_name}" ({column_definitions})'
+            query = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({column_definitions})'
             result = self.execute_write_query(query)
             if result:
                 self.log.info(f'Table "{table_name}" created')

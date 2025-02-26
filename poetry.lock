@@ -529,7 +529,7 @@ version = "3.1.1"
 description = "Lightweight in-process concurrent programming"
 optional = false
 python-versions = ">=3.7"
-groups = ["main", "etl"]
+groups = ["main", "db"]
 markers = "python_version < \"3.14\" and (platform_machine == \"aarch64\" or platform_machine == \"ppc64le\" or platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"win32\" or platform_machine == \"WIN32\")"
 files = [
     {file = "greenlet-3.1.1-cp310-cp310-macosx_11_0_universal2.whl", hash = "sha256:0bbae94a29c9e5c7e4a2b7f0aae5c17e8e90acbfd3bf6270eeba60c39fce3563"},
@@ -1362,7 +1362,7 @@ version = "2.0.38"
 description = "Database Abstraction Library"
 optional = false
 python-versions = ">=3.7"
-groups = ["main", "etl"]
+groups = ["main", "db"]
 files = [
     {file = "SQLAlchemy-2.0.38-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:5e1d9e429028ce04f187a9f522818386c8b076723cdbe9345708384f49ebcec6"},
     {file = "SQLAlchemy-2.0.38-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:b87a90f14c68c925817423b0424381f0e16d80fc9a1a1046ef202ab25b19a444"},
@@ -1601,7 +1601,7 @@ version = "4.12.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
 optional = false
 python-versions = ">=3.8"
-groups = ["main", "api", "etl", "lint", "selenium"]
+groups = ["main", "api", "db", "lint", "selenium"]
 files = [
     {file = "typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"},
     {file = "typing_extensions-4.12.2.tar.gz", hash = "sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8"},
@@ -1746,6 +1746,7 @@ h11 = ">=0.9.0,<1"
 [extras]
 api = ["fastapi", "pydantic", "requests", "types-requests", "uvicorn"]
 cache = ["dill", "diskcache"]
+db = ["sqlalchemy"]
 etl = ["pandas", "pandas-stubs", "sqlalchemy"]
 scheduler = ["apscheduler", "pydantic"]
 selenium = ["requests", "selenium", "types-requests", "types-selenium", "webdriver-manager"]
@@ -1753,4 +1754,4 @@ selenium = ["requests", "selenium", "types-requests", "types-selenium", "webdriv
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "5c3b1f985646e4f43835e1ca3e3f9cb4b0e5368d6de912a0860feb4f8196448b"
+content-hash = "1b3dc8f43da2ba8b87fdb4bf318ddd6487ebb7bb4ab625a6c66d69bdb7a8b24d"

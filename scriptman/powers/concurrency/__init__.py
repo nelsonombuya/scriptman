@@ -223,6 +223,110 @@ class TaskExecutor(Generic[T]):
             end_time=datetime.now(),
         )
 
+    def parallel_hybrid_task(
+        self,
+        func: SyncFunc[T],
+        args: list[tuple[Any, ...]] = [],
+        kwargs: list[dict[str, Any]] = [],
+        chunk_size: int = 10,
+        raise_on_error: bool = True,
+    ) -> BatchResult[T]:
+        """
+        🔄🌐 Process tasks using a hybrid approach of multiprocessing and threading.
+
+        This method chunks the tasks and distributes them across multiple processes,
+        while each process uses threading to handle I/O operations efficiently.
+
+        Best for mixed workloads that involve both CPU and I/O operations.
+
+        Args:
+            func: The function to execute (must be picklable)
+            args: List of argument tuples for each task
+            kwargs: List of keyword argument dicts for each task
+            chunk_size: Number of tasks to group per process
+            raise_on_error: Whether to raise an exception if any task fails
+
+        Returns:
+            BatchResult[T]: Results of all processed tasks
+        """
+        assert not iscoroutinefunction(func), "Hybrid tasks should be synchronous."
+        batch_id = self._generate_task_id("parallel_hybrid", func.__name__)
+        start_time = datetime.now()
+
+        # Prepare task chunks
+        task_pairs = list(self._zip_args_and_kwargs(args, kwargs))
+        chunks = [
+            task_pairs[i : i + chunk_size] for i in range(0, len(task_pairs), chunk_size)
+        ]
+
+        # Process chunks in parallel using ProcessPoolExecutor
+        futures = []
+        for chunk in tqdm(
+            chunks,
+            desc="Processing hybrid tasks",
+            unit="chunk",
+        ):
+            task_id = self._generate_task_id(func.__name__, uuid4().hex[:8])
+            # Process each chunk in a separate process
+            bound_func = partial(
+                self._process_chunk,
+                func,
+                chunk,
+                task_id,
+                batch_id,
+            )
+            futures.append(self._process_pool.submit(bound_func))
+
+        results = []
+        for future in futures:
+            try:
+                # Each future returns a list of TaskResults
+                chunk_results = future.result()
+                results.extend(chunk_results)
+            except Exception as e:
+                if raise_on_error:
+                    raise
+                results.append(
+                    TaskResult(
+                        error=e,
+                        parent_id=batch_id,
+                        status=TaskStatus.FAILED,
+                        task_id=self._generate_task_id("failed", func.__name__),
+                    )
+                )
+
+        return BatchResult[T](
+            tasks=results,
+            batch_id=batch_id,
+            start_time=start_time,
+            end_time=datetime.now(),
+        )
+
+    def _process_chunk(
+        self,
+        func: SyncFunc[T],
+        chunk: list[tuple[tuple[Any, ...], dict[str, Any]]],
+        task_id: str,
+        batch_id: str,
+    ) -> list[TaskResult[T]]:
+        """Process a chunk of tasks using threading within a process"""
+        # Create a thread pool specific to this process
+        with ThreadPoolExecutor() as thread_pool:
+            futures = []
+            for args_tuple, kwargs_dict in chunk:
+                subtask_id = self._generate_task_id(func.__name__, uuid4().hex[:8])
+                bound_func = partial(
+                    self._execute_task,
+                    func,
+                    args_tuple,
+                    kwargs_dict,
+                    subtask_id,
+                    batch_id,
+                )
+                futures.append(thread_pool.submit(bound_func))
+
+            return [future.result() for future in futures]
+
     def _execute_task(
         self,
         func: Func[T],

@@ -1,7 +1,7 @@
 try:
     from datetime import datetime
     from decimal import Decimal
-    from typing import Any, ClassVar, Optional, TypeVar, get_type_hints
+    from typing import Any, ClassVar, Optional, TypeVar, cast, get_type_hints
     from uuid import uuid4
 
     from email_validator import EmailNotValidError, validate_email
@@ -222,10 +222,10 @@ class BaseEntityModel(BaseModel):
         identifier_field = self._identifier_field or "<unknown_identifier>"
         if self._identifier_field is None:
             logger.warning(
-                f"Entity {self.__class__.__name__} has no identifier field. "
+                f"🔍 Entity {self.__class__.__name__} has no identifier field. "
                 "This is likely due to the model not being initialized correctly."
             )
-        return str(getattr(self, identifier_field, "<unknown_identifier_value>"))
+        return str(getattr(self, identifier_field, "<unknown_identifier>"))
 
     @model_validator(mode="before")
     @classmethod
@@ -317,18 +317,17 @@ class BaseEntityModel(BaseModel):
         try:
             super().__init__(**data)
         except Exception as e:
-            # Create a temporary instance to get the identifier for logging
-            identifier_field = self._identifier_field or "identifier"
-            identifier_value = data.get(identifier_field, "unknown")
-            temp_data: dict[str, Any] = {identifier_field: identifier_value}
-            temp_instance: BaseEntityModel = self.model_construct(**temp_data)
-            temp_instance.log_validation_error(e)
-            raise e
-
-    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        """🔄 Override model_dump to catch and log serialization errors."""
-        try:
-            return super().model_dump(*args, **kwargs)
-        except Exception as e:
             self.log_validation_error(e)
-            raise
+
+    def model_serialize(self, **kwargs: Any) -> dict[str, Any]:
+        """🔄 Serialize the model to a dictionary.
+
+        Args:
+            **kwargs: Keyword arguments to pass to the model_dump_json method.
+
+        Returns:
+            dict[str, Any]: The serialized model as a dictionary.
+        """
+        from json import loads
+
+        return cast(dict[str, Any], loads(self.model_dump_json(**kwargs)))

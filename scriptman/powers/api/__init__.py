@@ -80,6 +80,7 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         response = raw_request(method.value, url, **kwargs)
         response.raise_for_status()
         logger.success(f"✅ {method.value} request for {url} completed successfully.")
+        logger.debug(f"📤 Response Details: {dumps(response.json(), indent=4)}")
         return response
 
     def request(

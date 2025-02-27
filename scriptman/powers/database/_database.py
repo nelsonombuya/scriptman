@@ -173,7 +173,11 @@ class DatabaseHandler(ABC):
             "FROM information_schema.tables "
             f'WHERE table_name = "{table_name}"'
         )
-        return bool(self.execute_read_query(query))
+        try:
+            return bool(self.execute_read_query(query))
+        except Exception as e:
+            self.log.error(f'Table "{table_name}" not found: {e}')
+            return False
 
     def table_has_records(self, table_name: str) -> bool:
         """

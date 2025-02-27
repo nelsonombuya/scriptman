@@ -296,6 +296,22 @@ class CacheManager(Generic[T]):
         name = getattr(func, "__qualname__", type(func).__name__)
         return f"{module}.{name}"
 
+    def get(self, key: str, **backend_kwargs: Any) -> Any:
+        """🔍 Get a value from the cache."""
+        return self.backend.get(key, **backend_kwargs)
+
+    def set(
+        self,
+        key: str,
+        value: Any,
+        ttl: Optional[int] = None,
+        **backend_kwargs: Any,
+    ) -> bool:
+        """🔍 Set a value in the cache."""
+        if "ttl" in backend_kwargs:
+            backend_kwargs.pop("ttl")  # Remove the ttl from the backend kwargs
+        return self.backend.set(key, value, ttl, **backend_kwargs)
+
 
 class OperationTracker(Generic[T]):
     def __init__(self, cache_manager: CacheManager[T]) -> None:

@@ -318,6 +318,7 @@ class BaseEntityModel(BaseModel):
             super().__init__(**data)
         except Exception as e:
             self.log_validation_error(e)
+            raise e
 
     def model_serialize(self, **kwargs: Any) -> dict[str, Any]:
         """🔄 Serialize the model to a dictionary.

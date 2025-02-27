@@ -76,6 +76,7 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
             Response: HTTP response object.
         """
         logger.info(f"📡 Sending {method.value} request to {url}")
+        logger.debug(f"📡 Request Details: {dumps(kwargs, indent=4)}")
         response = raw_request(method.value, url, **kwargs)
         response.raise_for_status()
         logger.success(f"✅ {method.value} request for {url} completed successfully.")

@@ -157,47 +157,6 @@ class CacheManager(Generic[T]):
         return decorator
 
     @staticmethod
-    def store_result(**backend_kwargs: Any) -> Callable[[SyncFunc[T]], SyncFunc[T]]:
-        """
-        🛍️ Decorator for storing function results. Works with synchronous functions.
-
-        NOTE: This only works for JSON Serializable arguments and returns.
-
-        Args:
-            **backend_kwargs: Additional keyword arguments to be passed to the cache
-                backend's set method when storing values.
-
-        Returns:
-            Callable[..., SyncFunc[T]]: Decorated function.
-        """
-        backend: CacheBackend = FanoutCacheBackend(
-            directory=config.settings.get(
-                "cache.store_dir", FanoutCacheBackend._cache_dir.parent / "store"
-            )
-        )
-
-        def decorator(func: SyncFunc[T]) -> SyncFunc[T]:
-            @wraps(func)
-            def sync_wrapper(*args: Any, **kwargs: Any) -> T:
-                key = CacheManager.generate_callable_key(func, args, kwargs)
-                if result := backend.get(key=key):
-                    logger.success(f"✅ Cache hit for key: {key}")
-                    return cast(T, result)
-
-                logger.warning(f"❔ Cache miss for key: {key}")
-                result = func(*args, **kwargs)
-
-                if backend.set(key=key, value=result, ttl=None, **backend_kwargs):
-                    logger.info(f"✅ Stored result in store with key: {key}")
-                else:
-                    logger.error(f"❌ Failed to store result with key: {key}")
-                return cast(T, result)
-
-            return sync_wrapper
-
-        return decorator
-
-    @staticmethod
     def async_cache_result(
         ttl: Optional[int] = config.settings.get("cache.ttl"), **backend_kwargs: Any
     ) -> Callable[[AsyncFunc[T]], AsyncFunc[T]]:
@@ -242,50 +201,6 @@ class CacheManager(Generic[T]):
                             f"❌ Failed to store result in cache with key: {key}"
                         )
                     return cast(T, result)
-
-            return async_wrapper
-
-        return decorator
-
-    @staticmethod
-    def async_store_result(
-        **backend_kwargs: Any,
-    ) -> Callable[[AsyncFunc[T]], AsyncFunc[T]]:
-        """
-        🛍️ Decorator for storing function results. Works with asynchronous functions.
-
-        NOTE: This only works for JSON Serializable arguments and returns.
-
-        Args:
-            **backend_kwargs: Additional keyword arguments to be passed to the cache
-                backend's set method when storing values.
-
-        Returns:
-            Callable[..., AsyncFunc[T]]: Decorated function.
-        """
-        backend: CacheBackend = FanoutCacheBackend(
-            directory=config.settings.get(
-                "cache.store_dir", FanoutCacheBackend._cache_dir.parent / "store"
-            )
-        )
-
-        def decorator(func: AsyncFunc[T]) -> AsyncFunc[T]:
-            @wraps(func)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> T:
-                key = CacheManager.generate_callable_key(func, args, kwargs)
-                if result := await backend.get(key=key):
-                    logger.success(f"✅ Cache hit for key: {key}")
-                    return cast(T, result)
-
-                logger.warning(f"❔ Cache miss for key: {key}")
-                result = await func(*args, **kwargs)
-
-                if backend.set(key=key, value=result, ttl=None, **backend_kwargs):
-                    logger.info(f"✅ Stored result in store with key: {key}")
-                else:
-                    logger.error(f"❌ Failed to store result with key: {key}")
-
-                return cast(T, result)
 
             return async_wrapper
 

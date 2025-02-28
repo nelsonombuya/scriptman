@@ -160,12 +160,9 @@ class Config:
     def on_failure_callback(self) -> Optional[Callable[[Exception], None]]:
         return self.__on_failure_callback
 
-    def add_on_failure_callback_function(
-        self, callback_function: Callable[[Exception], None]
-    ) -> None:
-        if not callable(callback_function):
-            raise ValueError("Callback function must be callable")
-        self.__on_failure_callback = callback_function
+    def add_on_failure_callback_function(self, func: Callable[[Exception], None]) -> None:
+        self.__on_failure_callback = func
+        logger.debug(f"Added on failure callback function: {func.__name__}")
 
     def validate_and_update_configuration(self, param: str, value: Any) -> bool:
         """

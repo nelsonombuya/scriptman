@@ -28,13 +28,14 @@ class FastAPIManager:
 
     _initialized: bool = False
     _app: Optional[FastAPI] = None
+    _routers: list[APIRouter] = []
     _startup_handlers: list[Func[None]] = []
     _shutdown_handlers: list[Func[None]] = []
     _instance: Optional["FastAPIManager"] = None
 
-    def __new__(cls) -> "FastAPIManager":
+    def __new__(cls, *args: Any, **kwargs: Any) -> "FastAPIManager":
         if cls._instance is None:
-            cls._instance = super(FastAPIManager, cls).__new__(cls)
+            cls._instance = super(FastAPIManager, cls).__new__(cls, *args, **kwargs)
         return cls._instance
 
     def __init__(self) -> None:
@@ -104,7 +105,7 @@ class FastAPIManager:
         return self._app
 
     @asynccontextmanager
-    async def lifespan(self, app: FastAPI) -> AsyncGenerator[None]:
+    async def lifespan(self, app: FastAPI) -> AsyncGenerator[None, None]:
         """
         Manage the application lifespan, executing startup and shutdown handlers.
 

@@ -72,7 +72,7 @@ class TimeCalculator:
 
     @contextmanager
     @staticmethod
-    def context(context: str = "Code Block") -> Generator[None]:
+    def context(context: str = "Code Block") -> Generator[None, None, None]:
         """
         A context manager to calculate and display the time taken within a context.
         """

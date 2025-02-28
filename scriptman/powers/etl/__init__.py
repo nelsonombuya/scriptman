@@ -26,7 +26,9 @@ class ETL(DataFrame):
     default_downloads_dir: Path = Path(config.settings.downloads_dir)
 
     @contextmanager
-    def extraction_context(self, context: str = "Code Block") -> Generator[None]:
+    def extraction_context(
+        self, context: str = "Code Block"
+    ) -> Generator[None, None, None]:
         """
         📂 A context manager for data extraction processes, logging the start, completion,
         and details of the extracted data.

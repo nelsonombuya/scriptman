@@ -93,7 +93,7 @@ class APISubParser(BaseParser):
             from runpy import run_path
             from sys import path as sys_path
 
-            api_file_path = Path(config.cwd) / args.file
+            api_file_path = Path(config.cwd) / config.secrets.get("api.file", args.file)
 
             if str(api_file_path.parent) not in sys_path:
                 sys_path.insert(0, str(api_file_path.parent))

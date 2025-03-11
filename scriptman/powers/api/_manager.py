@@ -41,8 +41,8 @@ class FastAPIManager:
 
     def __init__(self) -> None:
         if not self._initialized:
-            self._port = config.settings.get("api.port", self._find_available_port())
-            self._host = config.settings.get("api.host", "0.0.0.0")
+            self._port = config.secrets.get("api.port", self._find_available_port())
+            self._host = config.secrets.get("api.host", "0.0.0.0")
             self._configured = False
             self._initialized = True
 

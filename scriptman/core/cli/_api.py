@@ -83,9 +83,9 @@ class APISubParser(BaseParser):
             int: Exit code (0 for success, non-zero for failure)
         """
         if args.init:
-            config.settings.set("api.host", args.host)
-            config.settings.set("api.port", args.port)
-            config.settings.set("api.file", args.file)
+            config.secrets.set("api.host", args.host)
+            config.secrets.set("api.port", args.port)
+            config.secrets.set("api.file", args.file)
             api.initialize_api_module(args.file)
 
         if args.start:

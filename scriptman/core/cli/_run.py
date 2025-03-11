@@ -3,9 +3,9 @@ from pathlib import Path
 
 from loguru import logger
 
+from scriptman.core._scripts import Scripts
 from scriptman.core.cli._parser import BaseParser
 from scriptman.core.config import config
-from scriptman.core.scripts import Scripts
 
 
 class RunSubParser(BaseParser):

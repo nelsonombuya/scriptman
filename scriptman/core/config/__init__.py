@@ -8,10 +8,10 @@ from typing import Any, Callable, Literal, Optional
 from loguru import logger
 from pydantic import ValidationError
 
+from scriptman.core._version import Version
 from scriptman.core.config._defaults import ConfigModel
 from scriptman.core.config._manager import ConfigManager
 from scriptman.core.config._toml import TOMLConfigManager
-from scriptman.core.version import Version
 
 
 class Config:

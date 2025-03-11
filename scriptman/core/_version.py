@@ -23,7 +23,7 @@ class Version(BaseModel):
 
     @property
     def scriptman(self) -> str:
-        scriptman_file = Path(__file__).parent / "logo.txt"
+        scriptman_file = Path(__file__).parent / "_logo.txt"
         if not scriptman_file.exists():
             return f"Scriptman v{self}"
         with scriptman_file.open("r", encoding="utf-8") as f:

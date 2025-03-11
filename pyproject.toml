@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.0.300"
+version = "2.1.302"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -12,8 +12,8 @@ dependencies = [
     "loguru>=0.7.3",
     "tomlkit>=0.13.2",
     "filelock>=3.16.1",
-    "pydantic[email]>=2.10.6,<3.0.0",
     "types-tqdm>=4.67.0.20241221",
+    "pydantic[email]>=2.10.6,<3.0.0",
 ]
 
 [project.optional-dependencies]

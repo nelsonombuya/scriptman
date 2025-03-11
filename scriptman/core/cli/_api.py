@@ -58,6 +58,11 @@ class APISubParser(BaseParser):
             action="store_true",
             help="Start the API server",
         )
+        self.parser.add_argument(
+            "--file",
+            default="api.py",
+            help="Custom API file path to use. Defaults to api.py",
+        )
 
     def process(self, args: Namespace) -> int:
         """
@@ -78,14 +83,17 @@ class APISubParser(BaseParser):
             int: Exit code (0 for success, non-zero for failure)
         """
         if args.init:
-            api.initialize_api_module()
+            config.settings.set("api.host", args.host)
+            config.settings.set("api.port", args.port)
+            config.settings.set("api.file", args.file)
+            api.initialize_api_module(args.file)
 
         if args.start:
             from pathlib import Path
             from runpy import run_path
             from sys import path as sys_path
 
-            api_file_path = Path(config.cwd) / "api.py"
+            api_file_path = Path(config.cwd) / args.file
 
             if str(api_file_path.parent) not in sys_path:
                 sys_path.insert(0, str(api_file_path.parent))

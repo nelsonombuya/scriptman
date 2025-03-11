@@ -41,8 +41,8 @@ class FastAPIManager:
 
     def __init__(self) -> None:
         if not self._initialized:
-            self._port = self._find_available_port()
-            self._host = "0.0.0.0"
+            self._port = config.settings.get("api.port", self._find_available_port())
+            self._host = config.settings.get("api.host", "0.0.0.0")
             self._configured = False
             self._initialized = True
 
@@ -178,20 +178,31 @@ class FastAPIManager:
             port: Override the configured port
             **kwargs: Additional uvicorn configuration options
         """
-        final_host = host or self._host
-        final_port = port or self._port
+        final_host = self._host = host or self._host
+        final_port = self._port = port or self._port
 
         logger.info(f"📡 Starting API server at http://{final_host}:{final_port}")
         run_uvicorn_server(self.app, host=final_host, port=final_port, **kwargs)
 
-    def initialize_api_module(self) -> None:
+    def initialize_api_module(self, file_path: str = "api.py") -> None:
         """🚀 Initialize the API module."""
-        file = Path(config.cwd / "api.py")
+        file = Path(config.cwd / file_path)
         file.parent.mkdir(parents=True, exist_ok=True)
-        file.touch(exist_ok=True)
+
+        if not file.exists():
+            file.write_text(
+                "# Basic FastAPI server setup\n"
+                "# Import the API manager from scriptman\n"
+                "from scriptman.powers.api import api\n"
+                "\n"
+                "# Start the API server with default configuration\n"
+                "# You can customize the host/port by calling api.configure() first\n"
+                "api.run()"
+            )
+
         logger.success(
             "\n"
-            "✨ API module initialized successfully at api.py\n"
+            f"✨ API module initialized successfully at {file_path}\n"
             "\n"
             "Quick Start:\n"
             "  from scriptman.powers.api import api\n"

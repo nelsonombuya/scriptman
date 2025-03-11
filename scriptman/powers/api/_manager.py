@@ -136,7 +136,12 @@ class FastAPIManager:
         self._shutdown_handlers.append(handler)
 
     def run(
-        self, host: Optional[str] = None, port: Optional[int] = None, **kwargs: Any
+        self,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        reload: bool = False,
+        workers: Optional[int] = None,
+        **kwargs: Any,
     ) -> None:
         """
         Run the FastAPI application using uvicorn.
@@ -150,7 +155,14 @@ class FastAPIManager:
         final_port = port or self._port
 
         logger.info(f"📡 Starting API server at http://{final_host}:{final_port}")
-        run_uvicorn_server(self.app, host=final_host, port=final_port, **kwargs)
+        run_uvicorn_server(
+            "scriptman.powers.api._manager:api.app" if reload else self.app,
+            host=final_host,
+            port=final_port,
+            workers=workers,
+            reload=reload,
+            **kwargs,
+        )
 
     def initialize_api_module(self) -> None:
         """🚀 Initialize the API module."""
@@ -158,8 +170,23 @@ class FastAPIManager:
         file.parent.mkdir(parents=True, exist_ok=True)
         file.touch(exist_ok=True)
         logger.success(
-            "Successfully initialized api module. "
-            "Kindly import scriptman.powers.api.api to proceed."
+            "\n"
+            "✨ API module initialized successfully at api/__init__.py\n"
+            "\n"
+            "Quick Start:\n"
+            "  from scriptman.powers.api import api\n"
+            "  api.run()\n"
+            "\n"
+            "Available Commands:\n"
+            "  scriptman api --init     Initialize API module\n"
+            "  scriptman api --start    Start the API server\n"
+            "  scriptman api --reload   Enable auto-reload mode\n"
+            "\n"
+            "API Configuration:\n"
+            "  api.configure()          Set API options\n"
+            "  api.add_router()         Add route handlers\n"
+            "  api.add_startup_handler()   Add startup hooks\n"
+            "  api.add_shutdown_handler()  Add shutdown hooks\n"
         )
 
 

@@ -8,21 +8,5 @@
     "--doctest-modules",
     "--cov-report=term-missing"
   ],
-  "cSpell.words": [
-    "chromedriver",
-    "crdownload",
-    "drivedownload",
-    "driveupload",
-    "fillvalue",
-    "icecream",
-    "infobars",
-    "mariadb",
-    "mypy",
-    "postgresql",
-    "qodo",
-    "safebrowsing",
-    "scriptman",
-    "tarteaucitron",
-    "upserting"
-  ]
+  "cSpell.words": ["scriptman", "Scriptman"]
 }

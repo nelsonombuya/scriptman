@@ -105,6 +105,12 @@ disallow_untyped_decorators = true
 module = ["apscheduler.*", "diskcache.*", "dill.*"]
 ignore_missing_imports = true
 
+[tool.scriptman]
+logs_dir = ".logs"
+
+[tool.scriptman.cache]
+dir = ".cache"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

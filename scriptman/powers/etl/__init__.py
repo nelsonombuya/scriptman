@@ -23,7 +23,7 @@ except ImportError:
 
 class ETL(DataFrame):
     log: Logger = logger
-    default_downloads_dir: Path = Path(config.settings.downloads_dir)
+    downloads_dir: Path = Path(config.settings.downloads_dir)
 
     @contextmanager
     def extraction_context(
@@ -70,7 +70,7 @@ class ETL(DataFrame):
         Args:
             file_name (str): The name of the CSV file to extract from.
             directory (Optional[Path], optional): The directory to search for the CSV
-                file. Defaults to the environment variable DOWNLOADS_DIRECTORY.
+                file. Defaults to the environment variable downloads_dir.
 
         Raises:
             FileNotFoundError: If no files matched the pattern.
@@ -84,7 +84,7 @@ class ETL(DataFrame):
             - Warning: If no records were extracted.
         """
 
-        files = self.default_downloads_dir.glob(f"{file_name}.csv")
+        files = self.downloads_dir.glob(f"{file_name}.csv")
         if not files:
             raise FileNotFoundError(f"No files matched the pattern: {file_name}.csv")
 
@@ -101,7 +101,7 @@ class ETL(DataFrame):
         Args:
             file_name (str): The name of the JSON file to extract from.
             directory (Optional[Path], optional): The directory to search for the JSON
-                file. Defaults to the environment variable DOWNLOADS_DIRECTORY.
+                file. Defaults to the environment variable downloads_dir.
 
         Raises:
             FileNotFoundError: If no files matched the pattern.
@@ -115,7 +115,7 @@ class ETL(DataFrame):
             - Warning: If no records were extracted.
         """
 
-        files = self.default_downloads_dir.glob(f"{file_name}.json")
+        files = self.downloads_dir.glob(f"{file_name}.json")
         if not files:
             raise FileNotFoundError(f"No files matched the pattern: {file_name}.json")
 
@@ -183,7 +183,7 @@ class ETL(DataFrame):
         Args:
             file_name (str): The name of the file to save.
             directory (Path, optional): The directory to save the file in. Defaults to the
-                DOWNLOADS_DIRECTORY.
+                downloads_dir in the config.
 
         Returns:
             Path: The path to the saved file.
@@ -196,8 +196,8 @@ class ETL(DataFrame):
             self.log.warning("Dataset is empty!")
             raise ValueError("Dataset is empty!")
 
-        self.default_downloads_dir.mkdir(parents=True, exist_ok=True)
-        file_path = self.default_downloads_dir / f"{file_name}.json"
+        self.downloads_dir.mkdir(parents=True, exist_ok=True)
+        file_path = self.downloads_dir / f"{file_name}.json"
         self.to_json(file_path, orient="records")
         self.log.success(f"Data saved to {file_path}")
         return file_path
@@ -209,7 +209,7 @@ class ETL(DataFrame):
         Args:
             file_name (str): The name of the file to save.
             directory (Path, optional): The directory to save the file in. Defaults to the
-                DOWNLOADS_DIRECTORY.
+                downloads_dir in the config.
 
         Returns:
             Path: The path to the saved file.
@@ -222,8 +222,8 @@ class ETL(DataFrame):
             self.log.warning("Dataset is empty!")
             raise ValueError("Dataset is empty!")
 
-        self.default_downloads_dir.mkdir(parents=True, exist_ok=True)
-        file_path = self.default_downloads_dir / f"{file_name}.csv"
+        self.downloads_dir.mkdir(parents=True, exist_ok=True)
+        file_path = self.downloads_dir / f"{file_name}.csv"
         self.to_csv(file_path, index=False)
         self.log.success(f"Data saved to {file_path}")
         return file_path

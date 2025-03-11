@@ -101,7 +101,7 @@ class ChromeDownloader:
     """
 
     log: Logger = logger.bind(handler="Chrome Downloader")
-    chrome_download_dir: Path = Path(config.settings.downloads_dir, "selenium", "chrome")
+    chrome_download_dir: Path = Path(config.settings.downloads_dir, ".selenium", "chrome")
 
     def download(self, version: int, app: Literal["driver", "browser"]) -> Path:
         """

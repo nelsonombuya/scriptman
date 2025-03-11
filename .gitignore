@@ -16,14 +16,14 @@ codium_*.py
 __debug__.py
 
 # Folders
-logs
 dist
 .qodo
-downloads
+.logs
+.cache
+.selenium
+.downloads
 __pycache__
 .mypy_cache
 pytest_cache
-scriptman/cache
 .tmp.driveupload
-scriptman/selenium
 .tmp.drivedownload

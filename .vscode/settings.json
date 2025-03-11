@@ -8,5 +8,15 @@
     "--doctest-modules",
     "--cov-report=term-missing"
   ],
-  "cSpell.words": ["scriptman", "Scriptman"]
+  "cSpell.words": [
+    "crdownload",
+    "drivedownload",
+    "driveupload",
+    "infobars",
+    "mypy",
+    "qodo",
+    "safebrowsing",
+    "scriptman",
+    "Scriptman"
+  ]
 }

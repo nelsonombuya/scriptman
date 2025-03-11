@@ -31,7 +31,7 @@ class ConfigModel(BaseModel):
         description="Path to the scripts directory",
     )
     downloads_dir: DirectoryPath = Field(
-        default=Path(__file__).parent.parent / "downloads",
+        default=Path(__file__).parent.parent / ".downloads",
         description="Path to the downloads directory",
     )
     concurrent: bool = Field(

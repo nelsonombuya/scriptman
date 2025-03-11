@@ -1792,4 +1792,4 @@ selenium = ["requests", "selenium", "types-requests", "types-selenium", "webdriv
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "2c7207837a078b867de18b234e3f3e0ded30236965517ae512b36be6992c380b"
+content-hash = "66f66aceeb8c546b22d05d3d4e9c570ab4a39d2faf4933550a0f1693b094501b"

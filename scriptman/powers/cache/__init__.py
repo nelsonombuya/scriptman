@@ -108,7 +108,9 @@ class CacheManager(Generic[T]):
 
     @staticmethod
     def cache_result(
-        ttl: Optional[int] = config.settings.get("cache.ttl"), **backend_kwargs: Any
+        ttl: Optional[int] = config.settings.get("cache.ttl"),
+        exclude_none: bool = False,
+        **backend_kwargs: Any,
     ) -> Callable[[SyncFunc[T]], SyncFunc[T]]:
         """
         📦 Decorator for caching function results. Works with synchronous functions.
@@ -118,6 +120,8 @@ class CacheManager(Generic[T]):
         Args:
             ttl (Optional[int]): The number of seconds until the key expires.
                 Defaults to None.
+            exclude_none (bool): If set to True, then None values will not be cached.
+                Defaults to False.
             **backend_kwargs: Additional keyword arguments to be passed to the cache
                 backend's set method when storing values.
 
@@ -139,6 +143,10 @@ class CacheManager(Generic[T]):
                     logger.warning(f"❔ Cache miss for key: {key}")
                     result = func(*args, **kwargs)
 
+                    if exclude_none and result is None:
+                        logger.warning(f"❔ Skipping cache for key {key}: result is None")
+                        return cast(T, result)
+
                     if cache_manager.backend.set(
                         key=key, value=result, ttl=ttl, **backend_kwargs
                     ):
@@ -158,7 +166,9 @@ class CacheManager(Generic[T]):
 
     @staticmethod
     def async_cache_result(
-        ttl: Optional[int] = config.settings.get("cache.ttl"), **backend_kwargs: Any
+        ttl: Optional[int] = config.settings.get("cache.ttl"),
+        exclude_none: bool = False,
+        **backend_kwargs: Any,
     ) -> Callable[[AsyncFunc[T]], AsyncFunc[T]]:
         """
         📦 Decorator for caching function results. Works with both asynchronous functions.
@@ -168,6 +178,8 @@ class CacheManager(Generic[T]):
         Args:
             ttl (Optional[int]): The number of seconds until the key expires.
                 Defaults to None.
+            exclude_none (bool): If set to True, then None values will not be cached.
+                Defaults to False.
             **backend_kwargs: Additional keyword arguments to be passed to the cache
                 backend's set method when storing values.
 
@@ -188,6 +200,10 @@ class CacheManager(Generic[T]):
 
                     logger.warning(f"❔ Cache miss for key: {key}")
                     result = await func(*args, **kwargs)
+
+                    if exclude_none and result is None:
+                        logger.warning(f"❔ Skipping cache for key {key}: result is None")
+                        return cast(T, result)
 
                     if cache_manager.backend.set(
                         key=key, value=result, ttl=ttl, **backend_kwargs

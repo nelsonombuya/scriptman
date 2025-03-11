@@ -75,6 +75,10 @@ class TOMLConfigManager(ConfigManager[dict[str, Any]]):
         try:
             data = self.file_handler.read(self.file_path)
 
+            # Pickle Path objects
+            if isinstance(value, (Path,)):
+                value = str(value)
+
             if self.section:
                 section_data = self.get_section_data(data)
                 section_data[key] = value

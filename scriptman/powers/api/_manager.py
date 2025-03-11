@@ -3,7 +3,7 @@ try:
     from contextlib import asynccontextmanager
     from pathlib import Path
     from socket import AF_INET, SOCK_STREAM, socket
-    from typing import Any, AsyncGenerator, Optional
+    from typing import Any, AsyncGenerator, Callable, Optional, cast
 
     from fastapi import APIRouter, FastAPI
     from loguru import logger
@@ -11,7 +11,8 @@ try:
 
     from scriptman.core.config import config
     from scriptman.powers.api._middleware import FastAPIMiddleware
-    from scriptman.powers.generics import Func
+    from scriptman.powers.api._templates import api_route, async_api_route
+    from scriptman.powers.generics import AsyncFunc, Func, SyncFunc
 except ImportError:
     raise ImportError(
         "FastAPI is not installed. "
@@ -58,6 +59,37 @@ class FastAPIManager:
         raise RuntimeError(
             f"Could not find an available port after {max_attempts} attempts"
         )
+
+    def route(
+        self, path: str, methods: list[str] = ["GET"], **kwargs: Any
+    ) -> Callable[[Func[dict[str, Any]]], Func[dict[str, Any]]]:
+        """
+        Decorator for adding routes directly to the API.
+
+        Args:
+            path: URL path for the route
+            methods: HTTP methods to support
+            **kwargs: Additional FastAPI route options
+        """
+
+        def decorator(func: Func[dict[str, Any]]) -> Func[dict[str, Any]]:
+            template_func: AsyncFunc[dict[str, Any]] | SyncFunc[dict[str, Any]]
+
+            if iscoroutinefunction(func):
+                template_func = async_api_route(cast(AsyncFunc[dict[str, Any]], func))
+            else:
+                template_func = api_route(cast(SyncFunc[dict[str, Any]], func))
+
+            self.app.add_api_route(
+                endpoint=template_func,
+                methods=methods,
+                path=path,
+                **kwargs,
+            )
+
+            return func
+
+        return decorator
 
     def configure(
         self,
@@ -136,12 +168,7 @@ class FastAPIManager:
         self._shutdown_handlers.append(handler)
 
     def run(
-        self,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        reload: bool = False,
-        workers: Optional[int] = None,
-        **kwargs: Any,
+        self, host: Optional[str] = None, port: Optional[int] = None, **kwargs: Any
     ) -> None:
         """
         Run the FastAPI application using uvicorn.
@@ -155,38 +182,31 @@ class FastAPIManager:
         final_port = port or self._port
 
         logger.info(f"📡 Starting API server at http://{final_host}:{final_port}")
-        run_uvicorn_server(
-            "scriptman.powers.api._manager:api.app" if reload else self.app,
-            host=final_host,
-            port=final_port,
-            workers=workers,
-            reload=reload,
-            **kwargs,
-        )
+        run_uvicorn_server(self.app, host=final_host, port=final_port, **kwargs)
 
     def initialize_api_module(self) -> None:
         """🚀 Initialize the API module."""
-        file = Path(config.cwd / "api" / "__init__.py")
+        file = Path(config.cwd / "api.py")
         file.parent.mkdir(parents=True, exist_ok=True)
         file.touch(exist_ok=True)
         logger.success(
             "\n"
-            "✨ API module initialized successfully at api/__init__.py\n"
+            "✨ API module initialized successfully at api.py\n"
             "\n"
             "Quick Start:\n"
             "  from scriptman.powers.api import api\n"
             "  api.run()\n"
             "\n"
             "Available Commands:\n"
-            "  scriptman api --init     Initialize API module\n"
             "  scriptman api --start    Start the API server\n"
-            "  scriptman api --reload   Enable auto-reload mode\n"
             "\n"
             "API Configuration:\n"
-            "  api.configure()          Set API options\n"
-            "  api.add_router()         Add route handlers\n"
-            "  api.add_startup_handler()   Add startup hooks\n"
-            "  api.add_shutdown_handler()  Add shutdown hooks\n"
+            "  api.configure()              Set API options\n"
+            "  api.add_router()             Add route handlers\n"
+            "  api.route()                  Add route handlers\n"
+            "  api.add_startup_handler()    Add startup hooks\n"
+            "  api.add_shutdown_handler()   Add shutdown hooks\n"
+            "  api.run()                    Start the API server\n"
         )
 
 

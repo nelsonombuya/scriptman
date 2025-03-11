@@ -1,6 +1,7 @@
 from argparse import ArgumentParser, Namespace, _SubParsersAction
 
 from scriptman.core.cli._parser import BaseParser
+from scriptman.core.config import config
 from scriptman.powers.api import api
 
 
@@ -57,18 +58,6 @@ class APISubParser(BaseParser):
             action="store_true",
             help="Start the API server",
         )
-        self.parser.add_argument(
-            "--reload",
-            default=False,
-            action="store_true",
-            help="Enable auto-reload mode to watch for file changes",
-        )
-        self.parser.add_argument(
-            "--workers",
-            type=int,
-            default=None,
-            help="Number of workers to use. Defaults to None",
-        )
 
     def process(self, args: Namespace) -> int:
         """
@@ -84,8 +73,6 @@ class APISubParser(BaseParser):
                 - host (str): Host to bind to.
                 - port (int): Port to use.
                 - start (bool): Start the API server.
-                - reload (bool): Enable auto-reload mode to watch for file changes.
-                - workers (int): Number of workers to use.
 
         Returns:
             int: Exit code (0 for success, non-zero for failure)
@@ -94,11 +81,15 @@ class APISubParser(BaseParser):
             api.initialize_api_module()
 
         if args.start:
-            api.run(
-                host=args.host,
-                port=args.port,
-                reload=args.reload,
-                workers=args.workers,
-            )
+            from pathlib import Path
+            from runpy import run_path
+            from sys import path as sys_path
+
+            api_file_path = Path(config.cwd) / "api.py"
+
+            if str(api_file_path.parent) not in sys_path:
+                sys_path.insert(0, str(api_file_path.parent))
+
+            run_path(str(api_file_path), run_name="__main__")
 
         return 0

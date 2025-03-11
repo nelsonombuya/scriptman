@@ -1,6 +1,7 @@
 from asyncio import gather, run, to_thread
 from pathlib import Path
-from re import MULTILINE, sub
+from runpy import run_path
+from sys import path as sys_path
 
 from filelock import FileLock, Timeout
 from loguru import logger
@@ -126,23 +127,17 @@ class Scripts:
             file_path (Path): The path of the script to run.
 
         Returns:
-            bool: True if the script executed successfully, The exception otherwise.
+            bool: True if the script executed successfully, or the exception otherwise.
         """
         try:
-            with open(file_path, "r") as script_file:
-                script_content = script_file.read()
-
-            # Replace 'if __name__ == "__main__":' with the module name
-            script_content = sub(
-                r'^if __name__ == "__main__":',
-                f'if __name__ == "{__name__}":',
-                script_content,
-                flags=MULTILINE,
-            )
+            script_dir = str(file_path.parent)
+            if script_dir not in sys_path:
+                sys_path.insert(0, script_dir)
 
             logger.info(f"🚀 Running '{file_path.name}' script...")
             with TimeCalculator.context(context=file_path.name):
-                retry(config.settings.get("retries", 0))(exec)(script_content, globals())
+                retries = config.settings.get("retries", 0)
+                retry(retries)(run_path)(str(file_path), run_name="__main__")
             logger.success(f"Script '{file_path.name}' executed successfully")
             return True
         except Exception as e:

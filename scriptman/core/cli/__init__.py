@@ -1,5 +1,6 @@
 import sys
 from argparse import ArgumentParser
+from traceback import format_exc
 from typing import Optional
 
 from loguru import logger
@@ -78,5 +79,6 @@ class CLI:
         try:
             return self.commands.get(args.action, self.commands["general"]).process(args)
         except Exception as e:
-            logger.error(f"❌ CLI execution error: {e}")
+            logger.error(f"❌ CLI execution error: {e.__class__.__name__}: {e}")
+            logger.debug(f"🔍 Stacktrace:\n{format_exc()}")
             return 1

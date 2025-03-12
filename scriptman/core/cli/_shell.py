@@ -45,6 +45,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 VENV_ACTIVATE_SCRIPT="$SCRIPT_DIR/{venv_name}/bin/activate"
 VENV_DEACTIVATE_SCRIPT="$SCRIPT_DIR/{venv_name}/bin/deactivate"
 if [ -f "$VENV_ACTIVATE_SCRIPT" ]; then
+    echo "Activating virtual environment..."
     source "$VENV_ACTIVATE_SCRIPT"
 else
     echo "Virtual environment not found at $VENV_ACTIVATE_SCRIPT"
@@ -54,25 +55,27 @@ fi
 scriptman "$@"
 
 if [ -f "$VENV_DEACTIVATE_SCRIPT" ]; then
+    echo "Deactivating virtual environment..."
     source "$VENV_DEACTIVATE_SCRIPT"
 fi
 """
 
     POWERSHELL_TEMPLATE = """
-$SCRIPT_DIR = $PSScriptRoot
-$VENV_ACTIVATE_SCRIPT = "$SCRIPT_DIR\\{venv_name}\\Scripts\\Activate.ps1"
-$VENV_SCRIPT_EXE = "$SCRIPT_DIR\\{venv_name}\\Scripts\\scriptman.exe"
+$ROOT_DIR = $PSScriptRoot
+$VENV_ACTIVATE_SCRIPT = "$ROOT_DIR\\{venv_name}\\Scripts\\Activate.ps1"
 
-if (Test-Path $VENV_ACTIVATE_SCRIPT) {
+if (Test-Path $VENV_ACTIVATE_SCRIPT) {{
     Write-Host "Activating virtual environment..."
     & $VENV_ACTIVATE_SCRIPT
-} else {
+}} else {{
     Write-Error "Virtual environment not found at $VENV_ACTIVATE_SCRIPT"
     exit 1
-}
+}}
 
-# Call the scriptman entry point from the virtual environment
-& $VENV_SCRIPT_EXE $args
+scriptman $args
+
+Write-Host "Deactivating virtual environment..."
+deactivate
 """
 
     @classmethod

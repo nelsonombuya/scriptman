@@ -107,6 +107,7 @@ ignore_missing_imports = true
 
 [tool.scriptman]
 logs_dir = ".logs"
+log_level = "DEBUG"
 
 [tool.scriptman.cache]
 dir = ".cache"

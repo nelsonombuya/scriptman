@@ -66,6 +66,10 @@ class ConfigModel(BaseModel):
         ),
         description="URL to fetch Chrome download URLs",
     )
+    relative_venv_path: str = Field(
+        default=".venv",
+        description="Path to the virtual environment relative to the project root",
+    )
 
     @field_validator("logs_dir", "scripts_dir", "downloads_dir", mode="before")
     @classmethod

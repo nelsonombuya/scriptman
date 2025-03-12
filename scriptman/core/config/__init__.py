@@ -236,6 +236,20 @@ class Config:
         run(["black", "."], check=True)
         run(["mypy", "."], check=True)
 
+    def create_secrets_file(self) -> None:
+        """📝 Create a .secrets.toml file in the current working directory."""
+        secrets_file = self.cwd.joinpath(".secrets.toml")
+        if not secrets_file.exists():
+            secrets_file.write_text("[secrets]\n# Add your secrets here\n")
+            logger.success(f"✨ Created .secrets.toml file at {secrets_file}")
+
+    def add_secrets_to_gitignore(self) -> None:
+        """📝 Add the .secrets.toml file to the .gitignore file."""
+        gitignore_file = self.cwd.joinpath(".gitignore")
+        if "*.secrets.*" not in gitignore_file.read_text().splitlines():
+            gitignore_file.write_text("*.secrets.*\n")
+            logger.success(f"✨ Added *.secrets.* to .gitignore at {gitignore_file}")
+
 
 # Singleton instance
 config: Config = Config()

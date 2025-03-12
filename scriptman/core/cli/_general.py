@@ -110,7 +110,6 @@ class GeneralParser(BaseParser):
         Returns:
             int: Exit code (0 for success, non-zero for failure)
         """
-
         if args.reset:
             config.settings.reset_all(True)
             return 0

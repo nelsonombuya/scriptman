@@ -7,7 +7,7 @@
 *.rdb
 *.zip
 *.coverage
-.secrets.*
+*.secrets.*
 desktop.ini
 codium_*.py
 

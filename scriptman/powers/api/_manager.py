@@ -21,7 +21,7 @@ except ImportError:
     )
 
 
-class FastAPIManager:
+class APIManager:
     """
     🎯 Singleton manager for FastAPI application instance.
     Provides centralized configuration and startup management.
@@ -30,13 +30,13 @@ class FastAPIManager:
     _initialized: bool = False
     _app: Optional[FastAPI] = None
     _routers: list[APIRouter] = []
+    _instance: Optional["APIManager"] = None
     _startup_handlers: list[Func[None]] = []
     _shutdown_handlers: list[Func[None]] = []
-    _instance: Optional["FastAPIManager"] = None
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> "FastAPIManager":
+    def __new__(cls, *args: Any, **kwargs: Any) -> "APIManager":
         if cls._instance is None:
-            cls._instance = super(FastAPIManager, cls).__new__(cls, *args, **kwargs)
+            cls._instance = super(APIManager, cls).__new__(cls, *args, **kwargs)
         return cls._instance
 
     def __init__(self) -> None:
@@ -99,7 +99,7 @@ class FastAPIManager:
         host: str = "0.0.0.0",
         port: Optional[int] = None,
         **kwargs: Any,
-    ) -> "FastAPIManager":
+    ) -> "APIManager":
         """
         Configure the FastAPI application with custom settings.
 
@@ -222,5 +222,5 @@ class FastAPIManager:
 
 
 # Singleton Instance
-api: FastAPIManager = FastAPIManager()
+api: APIManager = APIManager()
 __all__: list[str] = ["api"]

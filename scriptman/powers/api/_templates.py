@@ -4,6 +4,7 @@ try:
     from typing import Any
 
     from fastapi import status
+    from fastapi.responses import JSONResponse
     from loguru import logger
 
     from scriptman.powers.api._exceptions import APIException
@@ -81,7 +82,7 @@ def create_error_response(request: APIRequest, e: Exception) -> dict[str, Any]:
     return APIResponse.from_api_exception(request, e).model_dump()
 
 
-def api_route(func: SyncFunc[dict[str, Any]]) -> SyncFunc[dict[str, Any]]:
+def api_route(func: SyncFunc[dict[str, Any]]) -> SyncFunc[JSONResponse]:
     """
     🔄 Decorator to wrap synchronous API route functions with standardized
     request/response handling.
@@ -94,18 +95,20 @@ def api_route(func: SyncFunc[dict[str, Any]]) -> SyncFunc[dict[str, Any]]:
     """
 
     @wraps(func)
-    def sync_wrapper(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         request = APIRequest()
         try:
-            response = func(*args, **kwargs)
-            return create_successful_response(request=request, response=response)
+            result = func(*args, **kwargs)
+            response = create_successful_response(request=request, response=result)
+            return JSONResponse(content=response, status_code=response["status_code"])
         except Exception as e:
-            return create_error_response(request=request, e=e)
+            response = create_error_response(request=request, e=e)
+            return JSONResponse(content=response, status_code=response["status_code"])
 
     return sync_wrapper
 
 
-def async_api_route(func: AsyncFunc[dict[str, Any]]) -> AsyncFunc[dict[str, Any]]:
+def async_api_route(func: AsyncFunc[dict[str, Any]]) -> AsyncFunc[JSONResponse]:
     """
     🔄⚡ Decorator to wrap asynchronous API route functions with standardized
     request/response handling.
@@ -118,12 +121,14 @@ def async_api_route(func: AsyncFunc[dict[str, Any]]) -> AsyncFunc[dict[str, Any]
     """
 
     @wraps(func)
-    async def async_wrapper(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         request = APIRequest()
         try:
-            response = await func(*args, **kwargs)
-            return create_successful_response(request=request, response=response)
+            result = await func(*args, **kwargs)
+            response = create_successful_response(request=request, response=result)
+            return JSONResponse(content=response, status_code=response["status_code"])
         except Exception as e:
-            return create_error_response(request=request, e=e)
+            response = create_error_response(request=request, e=e)
+            return JSONResponse(content=response, status_code=response["status_code"])
 
     return async_wrapper

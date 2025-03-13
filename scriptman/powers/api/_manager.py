@@ -6,6 +6,7 @@ try:
     from typing import Any, AsyncGenerator, Callable, Optional, cast
 
     from fastapi import APIRouter, FastAPI
+    from fastapi.responses import JSONResponse
     from loguru import logger
     from uvicorn import run as run_uvicorn_server
 
@@ -62,7 +63,7 @@ class APIManager:
 
     def route(
         self, path: str, methods: list[str] = ["GET"], **kwargs: Any
-    ) -> Callable[[Func[dict[str, Any]]], Func[dict[str, Any]]]:
+    ) -> Callable[[Func[dict[str, Any]]], Func[JSONResponse]]:
         """
         Decorator for adding routes directly to the API.
 
@@ -72,8 +73,8 @@ class APIManager:
             **kwargs: Additional FastAPI route options
         """
 
-        def decorator(func: Func[dict[str, Any]]) -> Func[dict[str, Any]]:
-            template_func: AsyncFunc[dict[str, Any]] | SyncFunc[dict[str, Any]]
+        def decorator(func: Func[dict[str, Any]]) -> Func[JSONResponse]:
+            template_func: AsyncFunc[JSONResponse] | SyncFunc[JSONResponse]
 
             if iscoroutinefunction(func):
                 template_func = async_api_route(cast(AsyncFunc[dict[str, Any]], func))
@@ -87,7 +88,7 @@ class APIManager:
                 **kwargs,
             )
 
-            return func
+            return template_func
 
         return decorator
 

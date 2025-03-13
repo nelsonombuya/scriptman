@@ -308,6 +308,24 @@ class ProjectSubParser(BaseParser):
         if is_poetry:
             logger.info("🧩 Poetry detected, updating dependencies...")
             try:
+                lock_result = subprocess.run(
+                    ["poetry", "lock"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    check=True,
+                    cwd=config.cwd,
+                )
+                logger.info(lock_result.stdout.strip())
+                install_result = subprocess.run(
+                    ["poetry", "install"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    check=True,
+                    cwd=config.cwd,
+                )
+                logger.info(install_result.stdout.strip())
                 update_result = subprocess.run(
                     ["poetry", "update"],
                     stdout=subprocess.PIPE,

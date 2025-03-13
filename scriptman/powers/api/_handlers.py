@@ -93,13 +93,18 @@ class ODataV4RequestHandler(DefaultRequestHandler):
         json: Optional[dict[str, Any]] = None,
         timeout: Optional[int] = None,
     ) -> Response:
+        # Convert all params to OData v4 format
+        if params:
+            for key, value in params.items():
+                if not key.startswith("$"):
+                    params[f"${key}"] = value
+                    del params[key]
+
         return request(
             url=url,
             method=method.value,
             headers=headers,
-            params=(
-                {f"${key}": value for key, value in params.items()} if params else None
-            ),
+            params=params,
             json=json,
             timeout=timeout,
         )

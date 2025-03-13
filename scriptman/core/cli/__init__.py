@@ -11,6 +11,7 @@ from scriptman.core.cli._config import ConfigSubParser
 from scriptman.core.cli._general import GeneralParser
 from scriptman.core.cli._init import InitSubParser
 from scriptman.core.cli._parser import BaseParser
+from scriptman.core.cli._project import ProjectSubParser
 from scriptman.core.cli._run import RunSubParser
 
 
@@ -55,6 +56,7 @@ class CLI:
 
         # Sub-Parsers
         self.commands: dict[str, BaseParser] = {
+            "project": ProjectSubParser(subparsers),
             "config": ConfigSubParser(subparsers),
             "clean": CleanUpSubParser(subparsers),
             "init": InitSubParser(subparsers),

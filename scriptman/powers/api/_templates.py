@@ -7,8 +7,8 @@ try:
     from fastapi.responses import JSONResponse
     from loguru import logger
 
-    from scriptman.powers.api._exceptions import APIException
     from scriptman.powers.api._models import APIRequest, APIResponse
+    from scriptman.powers.api.exceptions import APIException
     from scriptman.powers.generics import AsyncFunc, SyncFunc
 except ImportError:
     raise ImportError(

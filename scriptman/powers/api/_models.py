@@ -9,7 +9,7 @@ try:
     from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
     from typing_extensions import Annotated
 
-    from scriptman.powers.api._exceptions import APIException
+    from scriptman.powers.api.exceptions import APIException
 except ImportError:
     raise ImportError(
         "Pydantic is not installed. "

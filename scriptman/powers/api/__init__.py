@@ -8,7 +8,7 @@ try:
     from requests import RequestException, Response
     from requests import request as raw_request
 
-    from scriptman.powers.api._exceptions import APIException
+    from scriptman.powers.api import exceptions
     from scriptman.powers.api._handlers import (
         DefaultRequestHandler,
         HTTPMethod,
@@ -178,7 +178,7 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
             response_data = e.response.json() if e.response else None
             logger.debug(f"📤 Response Details: {dumps(response_data, indent=4)}")
 
-            raise APIException(
+            raise exceptions.APIException(
                 exception=e,
                 message=f"Request to {url} failed with error: {e}",
                 response=e.response.json() if e.response else None,
@@ -187,7 +187,7 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
 
         except Exception as e:
             logger.error(f"🔥 Request to {url} failed with error: {e}")
-            raise APIException(
+            raise exceptions.APIException(
                 exception=e,
                 status_code=500,
                 message=f"Request to {url} failed with error: {e}",
@@ -239,7 +239,7 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
             ResponseModelT: Parsed and validated response data.
 
         Raises:
-            APIException: If validation fails.
+            exceptions.APIException: If validation fails.
         """
         data: dict[str, Any] = response.json()
         if not response_model:
@@ -249,7 +249,14 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
             return response_model.model_validate(data)
         except ValidationError as e:
             logger.error(f"❌ Response validation failed: {e}")
-            raise APIException(f"❌ Response validation failed: {e}", exception=e)
+            raise exceptions.ValidationError(
+                f"❌ Response validation failed: {e}",
+                exception=e,
+                errors={
+                    str(i): {"loc": e["loc"], "msg": e["msg"], "input": e["input"]}
+                    for i, e in enumerate(e.errors())
+                },
+            )
 
     @staticmethod
     def get_generic(object: Any) -> Optional[type]:
@@ -278,7 +285,7 @@ __all__: list[str] = [
     "api",
     "api_route",
     "HTTPMethod",
-    "APIException",
+    "exceptions",
     "EntityModelT",
     "BaseAPIClient",
     "RequestHandler",

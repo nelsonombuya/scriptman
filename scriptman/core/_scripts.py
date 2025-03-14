@@ -129,7 +129,12 @@ class Scripts:
         log_file_name = f"{script_file_path.name}_{timestamp}.log"
         log_file_path = Path(config.settings.logs_dir) / log_file_name
         log_file_path.parent.mkdir(parents=True, exist_ok=True)
-        return logger.add(log_file_path, rotation="10 MB", compression="zip")
+        return logger.add(
+            log_file_path,
+            rotation="10 MB",
+            compression="zip",
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
+        )
 
     def execute(self, file_path: Path) -> bool | Exception:
         """

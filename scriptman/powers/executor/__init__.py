@@ -8,8 +8,8 @@ from uuid import uuid4
 
 from tqdm import tqdm
 
+from scriptman.powers.executor._models import BatchResult, TaskResult, TaskStatus
 from scriptman.powers.generics import AsyncFunc, Func, SyncFunc, T
-from scriptman.powers.task._models import BatchResult, TaskResult, TaskStatus
 
 
 class TaskExecutor(Generic[T]):

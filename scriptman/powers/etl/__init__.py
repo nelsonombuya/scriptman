@@ -12,8 +12,8 @@ try:
     from scriptman.powers.database._exceptions import DatabaseError
     from scriptman.powers.etl._database import ETLDatabase, ETLDatabaseInterface
     from scriptman.powers.etl._extractor import DataExtractor
+    from scriptman.powers.executor import TaskExecutor
     from scriptman.powers.generics import T
-    from scriptman.powers.task import TaskExecutor
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError:
     raise ImportError(

@@ -5,7 +5,6 @@ try:
     from apscheduler.schedulers.base import BaseScheduler
     from loguru import logger
 
-    from scriptman.core.config import Config
     from scriptman.powers.generics import T
     from scriptman.powers.scheduler._models import Job
 
@@ -90,6 +89,6 @@ class Scheduler(Generic[T]):
         self.__scheduler.shutdown()
 
 
-# Adding the Scheduler singleton instance to the Config class
-object.__setattr__(Config, "scheduler", Scheduler())
-__all__: list[str] = ["Scheduler", "Job"]
+# Creating the singleton instance
+scheduler = Scheduler()
+__all__: list[str] = ["Scheduler", "Job", "scheduler"]

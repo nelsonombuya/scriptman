@@ -12,6 +12,7 @@
     "crdownload",
     "drivedownload",
     "driveupload",
+    "fillvalue",
     "infobars",
     "mariadb",
     "mypy",

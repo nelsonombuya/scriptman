@@ -1,5 +1,7 @@
 try:
     from contextlib import contextmanager
+    from functools import partial
+    from json import load
     from pathlib import Path
     from typing import Any, Generator, Literal, Optional
 
@@ -8,8 +10,8 @@ try:
 
     from scriptman.core.config import config
     from scriptman.powers.concurrency import TaskExecutor
-    from scriptman.powers.database._database import DatabaseHandler
     from scriptman.powers.database._exceptions import DatabaseError
+    from scriptman.powers.etl._database import ETLDatabase, ETLDatabaseInterface
     from scriptman.powers.etl._extractor import DataExtractor
     from scriptman.powers.generics import T
     from scriptman.powers.time_calculator import TimeCalculator
@@ -52,10 +54,10 @@ class ETL(DataFrame):
                 yield
         finally:
             self.log.success(f"Data extraction from {context} complete.")
-            num_records = len(self.data)
+            num_records = len(self)
             if num_records > 0:
                 self.log.debug(f"Number of records extracted: {num_records}")
-                self.log.debug(f"Extracted data: {self.data}")
+                self.log.debug(f"Extracted data: {self}")
             else:
                 self.log.warning("No records were extracted.")
 
@@ -68,7 +70,7 @@ class ETL(DataFrame):
         📃 Extract data from a CSV file.
 
         Args:
-            file_name (str): The name of the CSV file to extract from.
+            file_name (str): The name or pattern of the CSV file to extract from.
             directory (Optional[Path], optional): The directory to search for the CSV
                 file. Defaults to the environment variable downloads_dir.
 
@@ -83,8 +85,8 @@ class ETL(DataFrame):
             - Debug: The number of records and extracted data if records are found.
             - Warning: If no records were extracted.
         """
-
-        files = self.downloads_dir.glob(f"{file_name}.csv")
+        directory = directory or self.downloads_dir
+        files = directory.glob(f"{file_name}.csv")
         if not files:
             raise FileNotFoundError(f"No files matched the pattern: {file_name}.csv")
 
@@ -114,8 +116,8 @@ class ETL(DataFrame):
             - Debug: The number of records and extracted data if records are found.
             - Warning: If no records were extracted.
         """
-
-        files = self.downloads_dir.glob(f"{file_name}.json")
+        directory = directory or self.downloads_dir
+        files = directory.glob(f"{file_name}.json")
         if not files:
             raise FileNotFoundError(f"No files matched the pattern: {file_name}.json")
 
@@ -123,15 +125,13 @@ class ETL(DataFrame):
             json_file = next(files)
             self.log.info(f"Found JSON File at {json_file}...")
             with open(json_file, "r", encoding="utf-8") as file:
-                from json import load
-
                 data = load(file)
-            self = ETL(DataFrame(data))
+            self = ETL(data)
         return self
 
     def from_db(
         self,
-        database_handler: DatabaseHandler,
+        database_handler: ETLDatabaseInterface,
         query: str,
         params: dict[str, Any],
     ) -> "ETL":
@@ -139,7 +139,7 @@ class ETL(DataFrame):
         📂 Extract data from a database using a provided query.
 
         Args:
-            database_handler (DatabaseHandler): The handler to manage the database
+            database_handler (ETLDatabaseInterface): The handler to manage the database
                 connection.
             query (str): The SQL query to execute for data extraction.
             params (dict[str, Any]): A dictionary of parameters to use in the query.
@@ -196,8 +196,9 @@ class ETL(DataFrame):
             self.log.warning("Dataset is empty!")
             raise ValueError("Dataset is empty!")
 
-        self.downloads_dir.mkdir(parents=True, exist_ok=True)
-        file_path = self.downloads_dir / f"{file_name}.json"
+        directory = directory or self.downloads_dir
+        directory.mkdir(parents=True, exist_ok=True)
+        file_path = directory / f"{file_name}.json"
         self.to_json(file_path, orient="records")
         self.log.success(f"Data saved to {file_path}")
         return file_path
@@ -222,15 +223,16 @@ class ETL(DataFrame):
             self.log.warning("Dataset is empty!")
             raise ValueError("Dataset is empty!")
 
-        self.downloads_dir.mkdir(parents=True, exist_ok=True)
-        file_path = self.downloads_dir / f"{file_name}.csv"
+        directory = directory or self.downloads_dir
+        directory.mkdir(parents=True, exist_ok=True)
+        file_path = directory / f"{file_name}.csv"
         self.to_csv(file_path, index=False)
         self.log.success(f"Data saved to {file_path}")
         return file_path
 
     def to_db(
         self,
-        database_handler: DatabaseHandler,
+        database_handler: ETLDatabaseInterface,
         table_name: str,
         batch_execute: bool = True,
         force_nvarchar: bool = False,
@@ -245,8 +247,8 @@ class ETL(DataFrame):
         ensure that the indices are defined in the dataset using the `set_index` method.
 
         Args:
-            database_handler (DatabaseHandler): The database handler to use for executing
-                queries.
+            database_handler (ETLDatabaseInterface): The database handler to use for
+                executing queries.
             table_name (str): The name of the table to load the data into.
             batch_execute (bool, optional): Whether to execute queries in batches.
                 Defaults to True.
@@ -264,18 +266,20 @@ class ETL(DataFrame):
         Returns:
             bool: True if the data was loaded successfully.
         """
+        # Wrap the handler with ETLDatabase for extended functionality
+        db = ETLDatabase(database_handler)
 
         if self.empty:
             self.log.warning("Dataset is empty!")
             raise ValueError("Dataset is empty!")
 
-        table_exists: bool = database_handler.table_exists(table_name)
+        table_exists: bool = db.table_exists(table_name)
 
         if method == "truncate" and table_exists:
-            database_handler.truncate_table(table_name)
+            db.truncate_table(table_name)
 
         if method == "replace" and table_exists:
-            database_handler.drop_table(table_name)
+            db.drop_table(table_name)
 
         if (method == "upsert" or method == "update") and self.index.empty:
             message = (
@@ -287,41 +291,45 @@ class ETL(DataFrame):
 
         if not table_exists:
             self.log.warning(f'Table "{table_name}" does not exist. Creating table...')
-            database_handler.create_table(
+            db.create_table(
                 table_name=table_name,
                 keys=self.data.index.names,
-                columns=database_handler.get_table_data_types(self, force_nvarchar),
+                columns=db.get_table_data_types(self, force_nvarchar),
             )
 
         query, values = {
-            "insert": database_handler.generate_prepared_insert_query,
-            "update": database_handler.generate_prepared_update_query,
-            "upsert": database_handler.generate_prepared_upsert_query,
-        }.get(method, database_handler.generate_prepared_upsert_query)(table_name, self)
+            "insert": db.generate_prepared_insert_query,
+            "update": db.generate_prepared_update_query,
+            "upsert": db.generate_prepared_upsert_query,
+        }.get(method, db.generate_prepared_upsert_query)(table_name, self)
 
         try:
             if not batch_execute:
                 raise ValueError("Bulk Execute is disabled.")
-            database_handler.execute_write_batch_query(query, values, batch_size)
+            db.execute_write_batch_query(query, values, batch_size)
         except (MemoryError, ValueError) as error:
-            self.log.warning(
-                f"Bulk Query Execution Failed: {error}. Executing single queries..."
-            )
+            if not batch_execute:
+                self.log.info("Bulk Execute is disabled. Executing single queries...")
+            else:
+                self.log.warning(f"Bulk Execution Failed: {error}")
+                self.log.warning("Executing single queries...")
+
             return all(
                 TaskExecutor[bool]()
                 .parallel_io_bound_task(
-                    func=database_handler.execute_write_query,
+                    func=db.execute_write_query,
                     args=[(query, row) for row in values],
                 )
                 .results
             )
         except DatabaseError as error:
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
+            partial_func = partial(self._insert_or_update, db, table_name)
             return all(
                 TaskExecutor[bool]()
                 .parallel_io_bound_task(
-                    func=self._insert_or_update,
-                    args=[(database_handler, table_name, value) for value in values],
+                    func=lambda record: partial_func(record),
+                    args=[(record,) for record in values],
                 )
                 .results
             )
@@ -329,7 +337,7 @@ class ETL(DataFrame):
         return True
 
     def _insert_or_update(
-        self, database_handler: DatabaseHandler, table_name: str, record: dict[str, Any]
+        self, database_handler: ETLDatabase, table_name: str, record: dict[str, Any]
     ) -> bool:
         """
         ✍🏾 Private method to insert/update a single record into the database.
@@ -359,4 +367,4 @@ class ETL(DataFrame):
         return all(results)
 
 
-__all__: list[str] = ["ETL", "DataExtractor"]
+__all__: list[str] = ["ETL", "DataExtractor", "ETLDatabaseInterface"]

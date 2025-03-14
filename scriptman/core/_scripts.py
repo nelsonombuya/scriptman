@@ -34,7 +34,7 @@ class Scripts:
         """
         for script in scripts:
             if not script.is_file():
-                logger.warning(f"⚠ Skipping '{script.name}'. Not a valid file.")
+                logger.warning(f"⚠ Skipping '{script}'. Not a valid file.")
                 scripts.remove(script)
                 continue
 
@@ -44,11 +44,14 @@ class Scripts:
             else:
                 self.__execute_scripts_sequentially(scripts)
 
-            logger.info(
-                f"✅ Finished running "
-                f"{len(scripts)} script{'s' if len(scripts) > 1 else ''}: \n\t- "
-                + "\n\t- ".join([self.__format_result(script) for script in scripts])
-            )
+            if len(scripts) > 0:
+                logger.info(
+                    f"✅ Finished running "
+                    f"{len(scripts)} script{'s' if len(scripts) > 1 else ''}: \n\t- "
+                    + "\n\t- ".join([self.__format_result(script) for script in scripts])
+                )
+            else:
+                logger.warning("🔍 No scripts to run")
 
     def __format_result(self, script: Path) -> str:
         """

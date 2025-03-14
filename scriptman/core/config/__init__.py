@@ -1,4 +1,3 @@
-from datetime import datetime
 from os import getcwd
 from pathlib import Path
 from subprocess import run
@@ -126,7 +125,6 @@ class Config:
         """📝 Initialize logging for the CLI handler."""
         logger.remove()  # FIXME: Logging before the handler is removed
         log_level = str(self.settings.get("log_level", "INFO"))
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
         # Console Handler
         logger.add(
@@ -140,11 +138,11 @@ class Config:
 
         # File Handler
         logger.add(
-            Path(str(self.settings.get("logs_dir", "logs"))) / f"{timestamp}.log",
+            Path(str(self.settings.get("logs_dir", "logs"))) / "scriptman.log",
             level=log_level,
             rotation="1 day",
             compression="zip",
-            retention="7 days",
+            retention="2 weeks",
             format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
         )
 

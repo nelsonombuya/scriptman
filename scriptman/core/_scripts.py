@@ -1,4 +1,5 @@
 from asyncio import gather, run, to_thread
+from datetime import datetime
 from pathlib import Path
 from runpy import run_path
 from sys import path as sys_path
@@ -98,7 +99,6 @@ class Scripts:
 
     def __lock_and_load_script(self, script: Path) -> None:
         """🔫 Lock and load script for execution."""
-        # TODO: Log each script to a separate file, without the logs mixing up
         lock = FileLock(script.with_suffix(script.suffix + ".lock"), timeout=0)
 
         try:
@@ -118,6 +118,15 @@ class Scripts:
             self.__results[script] = e
         finally:
             logger.debug(f"🔓 Releasing lock for '{script.name}'.")
+            lock.release()
+
+    def __create_log_file(self, script_file_path: Path) -> int:
+        """🔍 Create a log file for a script."""
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        log_file_name = f"{script_file_path.name}_{timestamp}.log"
+        log_file_path = Path(config.settings.logs_dir) / log_file_name
+        log_file_path.parent.mkdir(parents=True, exist_ok=True)
+        return logger.add(log_file_path, rotation="10 MB", compression="zip")
 
     def execute(self, file_path: Path) -> bool | Exception:
         """
@@ -129,8 +138,10 @@ class Scripts:
         Returns:
             bool: True if the script executed successfully, or the exception otherwise.
         """
+        script_dir = str(file_path.parent)
+        log_handler = self.__create_log_file(file_path)
+
         try:
-            script_dir = str(file_path.parent)
             if script_dir not in sys_path:
                 sys_path.insert(0, script_dir)
 
@@ -138,7 +149,7 @@ class Scripts:
             with TimeCalculator.context(context=file_path.name):
                 retries = config.settings.get("retries", 0)
                 retry(retries)(run_path)(str(file_path), run_name="__main__")
-            logger.success(f"Script '{file_path.name}' executed successfully")
+            logger.success(f"✅ Script '{file_path.name}' executed successfully")
             return True
         except Exception as e:
             logger.error(f"❌ Error running '{file_path.name}' script: {e}")
@@ -146,3 +157,5 @@ class Scripts:
                 logger.info("📞 Calling callback function...")
                 config.on_failure_callback(e)
             return e
+        finally:
+            logger.remove(log_handler)

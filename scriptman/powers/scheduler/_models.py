@@ -1,13 +1,13 @@
 try:
     from functools import wraps
-    from typing import Any, Generic
+    from typing import Any
 
     from apscheduler.triggers.base import BaseTrigger
     from loguru import logger
     from pydantic import BaseModel, field_validator
     from pydantic.config import ConfigDict
 
-    from scriptman.powers.generics import Func, T
+    from scriptman.powers.generics import Func
 except ImportError:
     raise ImportError(
         "APScheduler is not installed. "
@@ -16,15 +16,15 @@ except ImportError:
     )
 
 
-class Job(BaseModel, Generic[T]):
+class Job(BaseModel):
     """
     🚀 Represents a job object.
 
     Attributes:
         id (str): The unique identifier for the job.
-        func (AsyncFunc[T] | SyncFunc[T]): The function to be executed by the job.
-        trigger (BaseTrigger): The trigger object for the job.
         name (str): The name of the job.
+        function (AsyncFunc[Any] | SyncFunc[Any]): The function to be executed by the job.
+        trigger (BaseTrigger): The trigger object for the job.
         max_instances (int, optional): The maximum number of instances allowed for the
             job. Defaults to 1.
         enabled (bool, optional): Whether the job is enabled. Defaults to True.
@@ -32,10 +32,10 @@ class Job(BaseModel, Generic[T]):
 
     id: str
     name: str
+    function: Func[Any]
     enabled: bool = True
     trigger: BaseTrigger
     max_instances: int = 1
-    function: Func[T]
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("id", "name", mode="before")

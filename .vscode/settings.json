@@ -8,19 +8,5 @@
     "--doctest-modules",
     "--cov-report=term-missing"
   ],
-  "cSpell.words": [
-    "crdownload",
-    "drivedownload",
-    "driveupload",
-    "fillvalue",
-    "infobars",
-    "mariadb",
-    "mypy",
-    "mysql",
-    "postgresql",
-    "qodo",
-    "safebrowsing",
-    "scriptman",
-    "Scriptman"
-  ]
+  "cSpell.words": ["scriptman", "Scriptman"]
 }

@@ -20,7 +20,6 @@ try:
         Driver,
         SeleniumBrowser,
     )
-    from scriptman.powers.selenium._extractor import SeleniumExtractor
 except ImportError:
     raise ImportError(
         "Selenium is not installed. "
@@ -173,7 +172,6 @@ class SeleniumInstance(ABC):
 
 __all__: list[str] = [
     "Chrome",
-    "SeleniumExtractor",
     "Driver",
     "Browsers",
     "SeleniumBrowser",

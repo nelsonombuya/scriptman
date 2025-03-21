@@ -6,9 +6,9 @@
 *.aof
 *.rdb
 *.zip
+*.lock
 *.coverage
 *.secrets.*
-poetry.lock
 desktop.ini
 codium_*.py
 

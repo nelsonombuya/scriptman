@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.3.343"
+version = "2.3.345"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -104,7 +104,7 @@ disallow_incomplete_defs = true
 disallow_untyped_decorators = true
 
 [[tool.mypy.overrides]]
-module = ["apscheduler.*", "diskcache.*", "dill.*"]
+module = ["apscheduler.*", "diskcache.*", "dill.*", "pyodbc.*"]
 ignore_missing_imports = true
 
 [tool.scriptman]

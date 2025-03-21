@@ -4,8 +4,8 @@ try:
     from pathlib import Path
     from typing import Any, Callable, Generator, Literal, Optional
 
-    from loguru import Logger, logger
-    from pandas import DataFrame
+    from loguru import logger
+    from pandas import DataFrame, MultiIndex
 
     from scriptman.powers.database._exceptions import DatabaseError
     from scriptman.powers.etl._database import ETLDatabase, ETLDatabaseInterface
@@ -24,8 +24,6 @@ ETL_TYPES = DataFrame | list[dict[str, Any]] | list[tuple[Any, ...]]
 class ETL:
     """🔍 Data processing utility for Extract, Transform, Load operations."""
 
-    log: Logger = logger
-
     def __init__(self, data: Optional[ETL_TYPES] = None) -> None:
         """
         🚀 Initialize ETL with optional data.
@@ -36,9 +34,7 @@ class ETL:
         """
         # Delegate DataFrame properties and methods
         self._data = DataFrame(data) if data is not None else DataFrame()
-        self.__getitem__ = self._data.__getitem__
         self.set_index = self._data.set_index
-        self.__len__ = self._data.__len__
         self.columns = self._data.columns
         self.empty = self._data.empty
         self.index = self._data.index
@@ -52,12 +48,36 @@ class ETL:
         """📊 Access the underlying DataFrame."""
         return self._data
 
+    def __getitem__(self, key: Any) -> Any:
+        """🔍 Get an item from the DataFrame."""
+        return self._data[key]
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        """🔍 Set an item in the DataFrame."""
+        self._data[key] = value
+
+    def __delitem__(self, key: Any) -> None:
+        """🔍 Delete an item from the DataFrame."""
+        del self._data[key]
+
+    def __contains__(self, key: Any) -> bool:
+        """🔍 Check if an item is in the DataFrame."""
+        return key in self._data
+
+    def __len__(self) -> int:
+        """🔍 Get the length of the DataFrame."""
+        return len(self._data)
+
+    def __repr__(self) -> str:
+        """🔍 Get the representation of the DataFrame."""
+        return repr(self._data)
+
     """
     🔍 Context managers
     """
 
-    @contextmanager
     @classmethod
+    @contextmanager
     def timed_context(
         cls,
         context: str = "Code Block",
@@ -82,12 +102,13 @@ class ETL:
             - Debug: The number of records and data details if records are found.
             - Warning: If no records were found (for extraction operations).
         """
-        operation_str = f"{operation} from {context}" if operation else context
+        preposition = "from" if operation in {"extraction", "transformation"} else "to"
+        operation_str = f"{operation} {preposition} {context}" if operation else context
         exception: Optional[Exception] = None
 
         try:
             with TimeCalculator.context(context):
-                cls.log.info(f"Data {operation_str} started...")
+                logger.info(f"Data {operation_str} started...")
                 yield
         except Exception as error:
             exception = error
@@ -99,19 +120,16 @@ class ETL:
             if operation == "extraction":
                 num_records = len(cls()) if isinstance(cls, type) else len(cls)
                 if num_records > 0:
-                    cls.log.debug(f"Number of records extracted: {num_records}")
-                    cls.log.debug(f"Extracted data: {cls}")
+                    logger.debug(f"Number of records extracted: {num_records}")
+                    logger.debug(f"Extracted data: {cls}")
                 else:
-                    cls.log.warning("No records were extracted.")
+                    logger.warning("No records were extracted.")
 
             elif operation == "transformation":
-                cls.log.debug(f"Transformed data: {cls}")
-
-            elif operation == "loading":
-                cls.log.success(f"Data loaded to {operation_str}.")
+                logger.debug(f"Transformed data: {cls}")
 
             else:
-                cls.log.success(f"Data {operation_str} complete.")
+                logger.success(f"Data {operation_str} complete.")
 
     """
     🔍 Extraction Methods
@@ -148,7 +166,7 @@ class ETL:
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
         with cls.timed_context("CSV", "extraction"):
             if file_path.exists():
-                cls.log.info(f"Found CSV File at {file_path}...")
+                logger.info(f"Found CSV File at {file_path}...")
                 return cls(read_csv(file_path))
             raise FileNotFoundError(f"No file found at: {file_path}")
 
@@ -176,7 +194,7 @@ class ETL:
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
         with cls.timed_context("JSON", "extraction"):
             if file_path.exists():
-                cls.log.info(f"Found JSON File at {file_path}...")
+                logger.info(f"Found JSON File at {file_path}...")
                 with open(file_path, "r", encoding="utf-8") as file:
                     data = load(file)
                 return cls(data)
@@ -208,18 +226,22 @@ class ETL:
             return cls(db.execute_read_query(query, params))
 
     @classmethod
-    def from_extractor(cls, extractor: Callable[[], ETL_TYPES]) -> "ETL":
+    def from_extractor(
+        cls, extractor: Callable[..., ETL_TYPES], *args: Any, **kwargs: Any
+    ) -> "ETL":
         """
         ⚙ Extract data using a custom extractor function.
 
         Args:
             extractor: A function that implements the extraction logic
+            *args: Additional arguments to pass to the extractor function
+            **kwargs: Additional keyword arguments to pass to the extractor function
 
         Returns:
             ETL: The extracted data as an ETL object
         """
         with cls.timed_context(extractor.__name__, "extraction"):
-            return cls(extractor())
+            return cls(extractor(*args, **kwargs))
 
     """
     🔍 Transformation methods
@@ -239,6 +261,97 @@ class ETL:
         """
         with self.timed_context(context, "transformation"):
             return ETL(transformer(self._data))
+
+    def merge(
+        self,
+        right: "ETL | DataFrame",
+        how: Literal["inner", "left", "right", "outer", "cross"] = "inner",
+        on: Optional[str | list[str]] = None,
+        left_on: Optional[str | list[str]] = None,
+        right_on: Optional[str | list[str]] = None,
+        left_index: bool = False,
+        right_index: bool = False,
+        suffixes: tuple[str, str] = ("_x", "_y"),
+        **kwargs: Any,
+    ) -> "ETL":
+        """
+        🔀 Merge the ETL object with another ETL object or DataFrame.
+
+        This method wraps pandas' DataFrame.merge functionality to combine two datasets.
+
+        Args:
+            right (ETL | DataFrame): The right ETL object or DataFrame to merge with.
+            how (Literal["inner", "left", "right", "outer", "cross"]): Type of merge to
+                perform. Defaults to "inner".
+            on (Optional[str | list[str]]): Column(s) to join on if column names are the
+                same in both datasets. Defaults to None.
+            left_on (Optional[str | list[str]]): Column(s) from the left dataset to join
+                on. Defaults to None.
+            right_on (Optional[str | list[str]]): Column(s) from the right dataset to join
+                on. Defaults to None.
+            left_index (bool): Use the index from the left dataset as join key. Defaults
+                to False.
+            right_index (bool): Use the index from the right dataset as join key. Defaults
+                to False.
+            suffixes (tuple[str, str]): Suffixes to use for overlapping column names.
+                Defaults to ("_x", "_y").
+            **kwargs: Additional arguments to pass to pandas' merge function.
+
+        Returns:
+            ETL: A new ETL object with the merged data.
+        """
+        with self.timed_context("Merge", "transformation"):
+            return ETL(
+                self._data.merge(
+                    right.data if isinstance(right, ETL) else right,
+                    on=on,
+                    how=how,
+                    left_on=left_on,
+                    right_on=right_on,
+                    suffixes=suffixes,
+                    left_index=left_index,
+                    right_index=right_index,
+                    **kwargs,
+                )
+            )
+
+    def concat(
+        self, other: "ETL | DataFrame | list[ETL | DataFrame]", **kwargs: Any
+    ) -> "ETL":
+        """
+        🔗 Concatenate this ETL object with other ETL objects or DataFrames.
+
+        This method wraps pandas' concat functionality to combine datasets by stacking
+        them.
+
+        Args:
+            other: The ETL object(s) or DataFrame(s) to concatenate with this one.
+            axis: The axis to concatenate along (0 for rows/vertically, 1 for
+                columns/horizontally). Defaults to 0.
+            ignore_index: If True, do not use the index values on the concatenation axis.
+                Defaults to False.
+            **kwargs: Additional arguments to pass to pandas' concat function.
+
+        Returns:
+            ETL: A new ETL object with the concatenated data.
+        """
+        from pandas import concat
+
+        with self.timed_context("Concatenation", "transformation"):
+            if "axis" not in kwargs:
+                kwargs["axis"] = 0
+
+            if "ignore_index" not in kwargs:
+                kwargs["ignore_index"] = False
+
+            if isinstance(other, (ETL, DataFrame)):
+                others = [other]
+            else:
+                others = other
+
+            df_list = [self._data] + [_.data if isinstance(_, ETL) else _ for _ in others]
+            result = concat(df_list, **kwargs)
+            return ETL(result)
 
     def filter(self, condition: Any, context: str = "Filtering Code Block") -> "ETL":
         """
@@ -304,6 +417,102 @@ class ETL:
 
             return ETL(result)
 
+    def pop_nested_column(self, column: str, drop: bool = True) -> "ETL":
+        """
+        📊 Extract a nested list column into a new ETL object.
+
+        This method takes a column containing nested lists (of strings, dicts, tuples,
+            etc.) and creates a new ETL object with the nested data expanded into rows,
+            preserving the original index values as columns for each row.
+
+        Args:
+            column (str): The name of the column containing nested data to extract.
+            drop (bool, optional): Whether to drop the original column from the
+                DataFrame. Defaults to True.
+
+        Returns:
+            ETL: A new ETL object with the extracted and normalized nested data.
+
+        Raises:
+            ValueError: If the column doesn't exist or contains invalid data.
+
+        Example:
+            If your DataFrame has indices ['country_id', 'id'] and a column
+            'skilledTrades' with lists of strings, calling
+            `etl.pop_nested_column('skilledTrades')` will create a new ETL object with
+            columns ['country_id', 'id', 'skilledTrades_value'] where each nested item
+            becomes a separate row.
+
+            For lists of tuples or lists of lists, each element in the tuple or list
+            becomes a separate column with positional naming (e.g., 'column_0',
+            'column_1', etc.).
+        """
+        with self.timed_context(f"Pop nested column: {column}", "transformation"):
+            if column not in self._data.columns:
+                raise ValueError(f"Column '{column}' not found in DataFrame")
+
+            # Get index columns - if no index is set, use the DataFrame's default index
+            if self._data.index.name is None and not isinstance(
+                self._data.index, MultiIndex
+            ):
+                index_cols: list[str] = []
+                has_named_index: bool = False
+            else:
+                index_cols = (
+                    self._data.index.names
+                    if isinstance(self._data.index, MultiIndex)
+                    else [self._data.index.name]
+                )
+                has_named_index = True
+
+            # Create a list to store the expanded rows
+            expanded_rows: list[dict[str, Any]] = []
+
+            # Iterate through each row in the DataFrame
+            for idx, row in self._data.iterrows():
+                if not isinstance(row[column], (list, tuple)) or not row[column]:
+                    continue  # Skip rows with empty or non-list/tuple values
+
+                # Get the index values for this row
+                if has_named_index:
+                    if isinstance(idx, (tuple, list)):
+                        idx_values = {name: val for name, val in zip(index_cols, idx)}
+                    else:
+                        idx_values = {index_cols[0]: idx}
+                else:
+                    idx_values = {}
+
+                # Process each item in the nested list
+                for item in row[column]:
+                    if isinstance(item, dict):
+                        # For dictionaries, flatten with prefix to avoid key collisions
+                        nested_row = idx_values.copy()
+                        for k, v in item.items():
+                            # If the key exists in the index, prefix it to avoid collision
+                            if k in idx_values:
+                                nested_row[f"{column}_{k}"] = v
+                            else:
+                                nested_row[f"{column}_{k}"] = v
+                        expanded_rows.append(nested_row)
+                    elif isinstance(item, (tuple, list)):
+                        # For tuples, create positionally named columns
+                        nested_row = idx_values.copy()
+                        for i, element in enumerate(item):
+                            nested_row[f"{column}_{i}"] = element
+                        expanded_rows.append(nested_row)
+                    else:
+                        # For primitives (strings, numbers, etc.)
+                        expanded_row = idx_values.copy()
+                        expanded_row[f"{column}_value"] = item
+                        expanded_rows.append(expanded_row)
+
+            # Remove the original column from the main DataFrame
+            if drop:
+                self._data = self._data.drop(columns=[column])
+
+            # Return a new ETL object with the expanded data
+            return ETL(expanded_rows)
+
     """
     🔍 Loading methods
     """
@@ -330,21 +539,23 @@ class ETL:
         """
         with self.timed_context("CSV", "loading"):
             if self.empty:
-                self.log.warning("Dataset is empty!")
+                logger.warning("Dataset is empty!")
                 raise ValueError("Dataset is empty!")
 
             file_path = Path(file_path) if isinstance(file_path, str) else file_path
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            self._data.to_csv(file_path, index=False)
-            self.log.success(f"Data saved to {file_path}")
+            self._data.reset_index().to_csv(file_path, index=False)
+            logger.success(f"Data saved to {file_path}")
             return file_path
 
-    def to_json_file(self, file_path: str | Path) -> Path:
+    def to_json_file(self, file_path: str | Path, indent: int = 2) -> Path:
         """
         📃 Saves the data to a JSON file using the given file path.
 
         Args:
             file_path (str | Path): The path to the file to save the data to.
+            indent (int, optional): The number of spaces to indent the JSON file.
+                Defaults to 2.
 
         Returns:
             ETL: The ETL object with the data saved to the file.
@@ -355,13 +566,13 @@ class ETL:
         """
         with self.timed_context("JSON", "loading"):
             if self.empty:
-                self.log.warning("Dataset is empty!")
+                logger.warning("Dataset is empty!")
                 raise ValueError("Dataset is empty!")
 
             file_path = Path(file_path) if isinstance(file_path, str) else file_path
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            self._data.to_json(file_path, orient="records")
-            self.log.success(f"Data saved to {file_path}")
+            self._data.reset_index().to_json(file_path, orient="records", indent=indent)
+            logger.success(f"Data saved to {file_path}")
             return file_path
 
     def to_db(
@@ -401,10 +612,11 @@ class ETL:
         """
         # Wrap the handler with ETLDatabase for extended functionality
         db = ETLDatabase(db)
+        data = self._data.reset_index()
         table_exists: bool = db.table_exists(table_name)
 
         if self.empty:
-            self.log.warning("Dataset is empty!")
+            logger.warning("Dataset is empty!")
             raise ValueError("Dataset is empty!")
 
         if method == "truncate" and table_exists:
@@ -418,22 +630,22 @@ class ETL:
                 "Dataset has no index! "
                 "Please set the index using the `set_index` method."
             )
-            self.log.error(message)
+            logger.error(message)
             raise ValueError(message)
 
         if not table_exists:
-            self.log.warning(f'Table "{table_name}" does not exist. Creating table...')
+            logger.warning(f'Table "{table_name}" does not exist. Creating table...')
             db.create_table(
                 table_name=table_name,
-                keys=self._data.index.names,
-                columns=db.get_table_data_types(self._data, force_nvarchar),
+                keys=data.index.names,
+                columns=db.get_table_data_types(data, force_nvarchar),
             )
 
         query, values = {
             "insert": db.generate_prepared_insert_query,
             "update": db.generate_prepared_update_query,
             "upsert": db.generate_prepared_upsert_query,
-        }.get(method, db.generate_prepared_upsert_query)(table_name, self._data)
+        }.get(method, db.generate_prepared_upsert_query)(table_name, data)
 
         try:
             if not batch_execute:
@@ -442,10 +654,10 @@ class ETL:
 
         except (MemoryError, ValueError) as error:
             if not batch_execute:
-                self.log.info("Bulk Execute is disabled. Executing single queries...")
+                logger.info("Bulk Execute is disabled. Executing single queries...")
             else:
-                self.log.warning(f"Bulk Execution Failed: {error}")
-                self.log.warning("Executing single queries...")
+                logger.warning(f"Bulk Execution Failed: {error}")
+                logger.warning("Executing single queries...")
 
             return all(
                 TaskExecutor[bool]()
@@ -457,7 +669,7 @@ class ETL:
             )
 
         except DatabaseError as error:
-            self.log.error(f"Database Error: {error}. Retrying using insert/update...")
+            logger.error(f"Database Error: {error}. Retrying using insert/update...")
             partial_func = partial(self._insert_or_update, db, table_name)
             return all(
                 TaskExecutor[bool]()
@@ -494,7 +706,7 @@ class ETL:
             try:
                 results.append(database_handler.execute_write_query(insert_query, value))
             except DatabaseError as error:
-                self.log.error(f"Database Error: {error}. Retrying using update...")
+                logger.error(f"Database Error: {error}. Retrying using update...")
                 results.append(database_handler.execute_write_query(update_query, value))
         return all(results)
 

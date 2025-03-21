@@ -8,5 +8,14 @@
     "--doctest-modules",
     "--cov-report=term-missing"
   ],
-  "cSpell.words": ["scriptman", "Scriptman"]
+  "cSpell.words": [
+    "dataframes",
+    "DUMPFILE",
+    "executemany",
+    "mariadb",
+    "mysql",
+    "postgresql",
+    "scriptman",
+    "Scriptman"
+  ]
 }

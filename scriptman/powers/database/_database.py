@@ -1,29 +1,43 @@
 from abc import ABC, abstractmethod
 from re import IGNORECASE, match, search, sub
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from loguru import logger
 from tqdm import tqdm
 
 from scriptman.core.config import config
-from scriptman.powers.database._config import DatabaseConfig
 from scriptman.powers.time_calculator import TimeCalculator
 
 
 class DatabaseHandler(ABC):
-    def __init__(self, config: DatabaseConfig) -> None:
+    def __init__(
+        self,
+        driver: str,
+        server: str,
+        database: str,
+        username: str,
+        password: str,
+        port: Optional[int] = None,
+    ) -> None:
         """
         🚀 Initializes the DatabaseHandler class.
 
         Args:
-            connection_string (str): The connection string for the database.
+            driver (str): The driver for the database.
+            server (str): The server for the database.
+            database (str): The database for the database.
+            username (str): The username for the database.
+            password (str): The password for the database.
+            port (Optional[int], optional): The port for the database. Defaults to None.
         """
         super().__init__()
-        self.config = config
-        self.log = logger.bind(
-            database=self.database_name,
-            handler=self.__class__.__name__,
-        )
+        self.port = port
+        self.driver = driver
+        self.server = server
+        self.database = database
+        self.username = username
+        self.password = password
+        self.log = logger.bind(database=self.database, handler=self.__class__.__name__)
 
     @property
     def database_name(self) -> str:
@@ -33,7 +47,7 @@ class DatabaseHandler(ABC):
         Returns:
             str: The name of the database.
         """
-        return self.config.database
+        return self.database
 
     @property
     @abstractmethod
@@ -350,6 +364,269 @@ class DatabaseHandler(ABC):
             for column_name in tqdm(column_names, desc="Converting placeholders"):
                 query = sub(r"\?", f":{column_name}", query, count=1)
             return query, result
+
+    def convert_named_placeholders_to_query(
+        self, query: str, params: dict[str, Any]
+    ) -> tuple[str, tuple[Any, ...]]:
+        """
+        Converts a SQL query with named placeholders (:name) into a query with question
+        mark placeholders (?) and corresponding tuple of values.
+
+        This is particularly useful when converting named parameter queries into a format
+        suitable for drivers that use question mark placeholders (like pyodbc).
+
+        Args:
+            query (str): The SQL query with named placeholders (e.g., :name, :age)
+            params (dict[str, Any]): Dictionary of parameter names and their values
+
+        Returns:
+            tuple[str, tuple[Any, ...]]: A tuple containing:
+                - The query with ? placeholders
+                - A tuple of values in the order of appearance
+
+        Example:
+            query = "SELECT * FROM users "
+                    "WHERE name = :name "
+                    "OR nickname = :name "
+                    "AND age = :age"
+            params = {"name": "John", "age": 25}
+
+            Returns: ("SELECT * FROM users WHERE name = ? OR nickname = ? AND age = ?",
+                    ("John", "John", 25))
+        """
+        # Find all named parameters in the query
+        param_names = []
+        current_pos = 0
+        converted_query = query
+
+        while True:
+            # Find the next named parameter
+            pos = converted_query.find(":", current_pos)
+            if pos == -1:
+                break
+
+            # Extract parameter name
+            end_pos = pos + 1
+            while end_pos < len(converted_query) and (
+                converted_query[end_pos].isalnum() or converted_query[end_pos] == "_"
+            ):
+                end_pos += 1
+
+            param_name = converted_query[pos + 1 : end_pos]
+            param_names.append(param_name)
+
+            current_pos = end_pos
+
+        # Replace named parameters with question marks
+        for param_name in param_names:
+            converted_query = converted_query.replace(f":{param_name}", "?")
+
+        # Create tuple of values in order of appearance
+        values = tuple(params[param_name] for param_name in param_names)
+        return converted_query, values
+
+    def convert_named_placeholders_to_bulk_query(
+        self, query: str, params_list: list[dict[str, Any]]
+    ) -> tuple[str, list[tuple[Any, ...]]]:
+        """
+        Converts a SQL query with named placeholders into a query with question mark
+        placeholders and a list of value tuples for bulk execution.
+
+        This is particularly useful when converting named parameter queries into a format
+        suitable for batch operations with drivers that use question mark placeholders.
+
+        Args:
+            query (str): The SQL query with named placeholders (e.g., :name, :age)
+            params_list (list[dict[str, Any]]): List of parameter dictionaries, each
+                containing parameter names and their values
+
+        Returns:
+            tuple[str, list[tuple[Any, ...]]]: A tuple containing:
+                - The query with ? placeholders
+                - A list of value tuples in the order of appearance for each row
+
+        Example:
+            query = "INSERT INTO users (name, age) VALUES (:name, :age)"
+            params_list = [
+                {"name": "John", "age": 25},
+                {"name": "Jane", "age": 30}
+            ]
+
+            Returns: (
+                "INSERT INTO users (name, age) VALUES (?, ?)",
+                [
+                    ("John", 25),
+                    ("Jane", 30)
+                ]
+            )
+
+        Raises:
+            ValueError: If any dictionary in params_list is missing required parameters
+        """
+        if not params_list:
+            return query, []
+
+        # Get the converted query and parameter order from the first set of params
+        converted_query, _ = self.convert_named_placeholders_to_query(
+            query, params_list[0]
+        )
+
+        # Extract parameter names in order of appearance
+        param_names = []
+        current_pos = 0
+        original_query = query
+
+        while True:
+            pos = original_query.find(":", current_pos)
+            if pos == -1:
+                break
+
+            end_pos = pos + 1
+            while end_pos < len(original_query) and (
+                original_query[end_pos].isalnum() or original_query[end_pos] == "_"
+            ):
+                end_pos += 1
+
+            param_name = original_query[pos + 1 : end_pos]
+            param_names.append(param_name)
+            current_pos = end_pos
+
+        # Create list of value tuples
+        values_list = []
+        for params in tqdm(params_list, desc="Converting parameters"):
+            # Verify all required parameters are present
+            missing_params = set(param_names) - set(params.keys())
+            if missing_params:
+                raise ValueError(
+                    f"Missing required parameters in one or more rows: {missing_params}"
+                )
+
+            # Create tuple of values in the correct order
+            values = tuple(params[param_name] for param_name in param_names)
+            values_list.append(values)
+
+        return converted_query, values_list
+
+    def validate_query_parameterization(
+        self, query: str
+    ) -> tuple[bool, Literal["named", "question_mark", "none"]]:
+        """
+        Validates the parameterization style of a SQL query and performs additional
+        safety checks.
+
+        Args:
+            query (str): The SQL query to validate
+
+        Returns:
+            tuple[bool, Literal["named", "question_mark", "none"]]: A tuple containing:
+                - Boolean indicating if the query is parameterized
+                - Literal indicating the parameter style ('named', 'question_mark', or
+                    'none')
+
+        Raises:
+            ValueError: If the query contains mixed parameter styles or other validation
+                errors
+        """
+        # Initialize counters and collections
+        string_literal = False
+        string_delimiter = ""
+        named_params = set()
+        question_marks = 0
+        current_pos = 0
+
+        while current_pos < len(query):
+            char = query[current_pos]
+
+            # Handle string literals to avoid false positives
+            if char in ["'", '"']:
+                if not string_literal:
+                    string_literal = True
+                    string_delimiter = char
+                elif char == string_delimiter:
+                    string_literal = False
+                current_pos += 1
+                continue
+
+            # Skip contents within string literals
+            if string_literal:
+                current_pos += 1
+                continue
+
+            # Check for named parameters
+            if char == ":":
+                # Validate it's actually a parameter and not just a colon
+                if current_pos + 1 < len(query) and (
+                    query[current_pos + 1].isalnum() or query[current_pos + 1] == "_"
+                ):
+                    end_pos = current_pos + 1
+                    while end_pos < len(query) and (
+                        query[end_pos].isalnum() or query[end_pos] == "_"
+                    ):
+                        end_pos += 1
+                    param_name = query[current_pos + 1 : end_pos]
+                    named_params.add(param_name)
+                    current_pos = end_pos
+                    continue
+
+            # Check for question marks
+            if char == "?":
+                question_marks += 1
+
+            current_pos += 1
+
+        # Perform validation checks
+        has_named = bool(named_params)
+        has_question_marks = bool(question_marks)
+
+        # Check for mixed parameter styles
+        if has_named and has_question_marks:
+            raise ValueError(
+                "Mixed parameter styles detected. Query contains both named parameters "
+                f"({named_params}) and question marks ({question_marks} found)"
+            )
+
+        # Check for potential SQL injection vulnerabilities
+        dangerous_patterns = [
+            "EXEC ",
+            "EXECUTE ",
+            "sp_",
+            "xp_",  # Stored procedures
+            "INTO OUTFILE",
+            "INTO DUMPFILE",  # File operations
+            "--",
+            "/*",
+            "*/",  # Comments that might be used maliciously
+            ";",  # Multiple statement execution
+        ]
+
+        for pattern in dangerous_patterns:
+            if pattern.lower() in query.lower():
+                raise ValueError(
+                    f"Potentially unsafe SQL pattern detected: '{pattern}'. "
+                    "Please use parameterized queries for any user input"
+                )
+
+        # Validate unclosed string literals
+        if string_literal:
+            raise ValueError("Query contains unclosed string literal")
+
+        # Determine parameterization style
+        if has_named:
+            return True, "named"
+        elif has_question_marks:
+            return True, "question_mark"
+        else:
+            # Additional check for queries that should be parameterized
+            potentially_unsafe = any(
+                operator in query.upper()
+                for operator in ["LIKE", "IN", "=", "<", ">", "<=", ">=", "<>"]
+            )
+            if potentially_unsafe:
+                self.log.warning(
+                    "Query contains comparison operators but no parameters. "
+                    "Consider using parameterized queries for better security"
+                )
+            return False, "none"
 
     def __del__(self) -> None:
         """

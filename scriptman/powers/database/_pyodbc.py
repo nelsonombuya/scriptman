@@ -14,7 +14,7 @@ except ImportError:
     raise ImportError(
         "pyodbc is not installed. "
         "Kindly install the dependencies on your package manager using "
-        "scriptman[db_pyodbc]."
+        "scriptman[pyodbc]."
     )
 
 
@@ -45,7 +45,14 @@ class PyODBCHandler(DatabaseHandler):
             max_pool_size (Optional[int], optional): The maximum size of the connection
                 pool. Defaults to None.
         """
-        super().__init__(driver, server, database, username, password, port)
+        super().__init__(
+            port=port,
+            driver=driver,
+            server=server,
+            database=database,
+            username=username,
+            password=password,
+        )
         self._max_pool_size = max_pool_size
         self._initialize_pool()
 

@@ -15,9 +15,9 @@ class DatabaseHandler(ABC):
         driver: str,
         server: str,
         database: str,
-        username: str,
-        password: str,
         port: Optional[int] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
     ) -> None:
         """
         🚀 Initializes the DatabaseHandler class.
@@ -26,9 +26,11 @@ class DatabaseHandler(ABC):
             driver (str): The driver for the database.
             server (str): The server for the database.
             database (str): The database for the database.
-            username (str): The username for the database.
-            password (str): The password for the database.
             port (Optional[int], optional): The port for the database. Defaults to None.
+            username (Optional[str], optional): The username for the database. Defaults
+                to None.
+            password (Optional[str], optional): The password for the database. Defaults
+                to None.
         """
         super().__init__()
         self.port = port

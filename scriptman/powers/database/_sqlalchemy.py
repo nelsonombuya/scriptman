@@ -12,19 +12,21 @@ except ImportError:
     raise ImportError(
         "SQLAlchemy is not installed. "
         "Kindly install the dependencies on your package manager using "
-        "scriptman[db_sqlalchemy]."
+        "scriptman[sqlalchemy]."
     )
 
 
 class SQLAlchemyHandler(DatabaseHandler):
     def __init__(
         self,
+        protocol: str,
         driver: str,
         server: str,
         database: str,
-        username: str,
-        password: str,
         port: Optional[int] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        windows_auth: bool = False,
     ) -> None:
         """
         🚀 Initializes the SQLAlchemyHandler class.
@@ -33,13 +35,33 @@ class SQLAlchemyHandler(DatabaseHandler):
             driver (str): The driver for the database.
             server (str): The server for the database.
             database (str): The database for the database.
-            username (str): The username for the database.
-            password (str): The password for the database.
             port (Optional[int], optional): The port for the database. Defaults to None.
+            username (Optional[str], optional): The username for the database. Defaults
+                to None.
+            password (Optional[str], optional): The password for the database. Defaults
+                to None.
+            windows_auth (bool, optional): Whether to use Windows authentication. Defaults
+                to False.
         """
-        super().__init__(driver, server, database, username, password, port)
+        super().__init__(
+            port=port,
+            driver=driver,
+            server=server,
+            database=database,
+            username=username,
+            password=password,
+        )
+        self._windows_auth = windows_auth
+        self._protocol = protocol
         self._engine: Engine
         self.connect()
+
+    @property
+    def windows_auth(self) -> bool:
+        """
+        🔑 Returns whether Windows authentication is enabled.
+        """
+        return self._windows_auth
 
     @property
     def database_type(self) -> str:
@@ -59,11 +81,18 @@ class SQLAlchemyHandler(DatabaseHandler):
         Returns:
             str: The connection string for the database.
         """
+        from urllib.parse import quote_plus
+
+        server = f"{self.server}{f':{self.port}' if self.port is not None else ''}"
+        trusted_connection = "&Trusted_Connection=yes" if self.windows_auth else ""
+        credentials = (
+            f"{self.username}:{quote_plus(self.password)}@"
+            if self.username and self.password and not self.windows_auth
+            else ""
+        )
         return (
-            f"{self.driver}://"
-            f"{self.username}:{self.password}@"
-            f"{self.server}{f':{self.port}' if self.port is not None else ''}/"
-            f"{self.database}"
+            f"{self._protocol}://{credentials}{server}/{self.database}?"
+            f"driver={self.driver}{trusted_connection}"
         )
 
     def connect(self) -> bool:

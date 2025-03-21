@@ -8,6 +8,7 @@
 *.zip
 *.coverage
 *.secrets.*
+poetry.lock
 desktop.ini
 codium_*.py
 

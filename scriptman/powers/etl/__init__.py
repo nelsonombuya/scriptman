@@ -368,6 +368,44 @@ class ETL:
         with self.timed_context(context, "transformation"):
             return ETL(self._data[condition])
 
+    def flatten_all_nested_columns(self, separator: str = "_") -> "ETL":
+        """
+        🔍 Flatten all the columns in the dataframe that contain nested dictionaries.
+
+        This method identifies all columns containing nested dictionaries and flattens
+        them into separate columns. The new column names are created by combining the
+        original column name with the nested keys, separated by the specified separator.
+
+        Args:
+            separator (str, optional): The separator to use between the original column
+                name and nested keys. Defaults to "_".
+
+        Returns:
+            ETL: A new ETL object with all nested dictionary columns flattened.
+
+        Example:
+            If your DataFrame has columns 'metadata' and 'settings' with nested
+            dictionaries, calling `etl.flatten_all_nested_columns()` will flatten both
+            columns in one operation.
+        """
+        with self.timed_context("Flatten Nested Dictionaries", "transformation"):
+            # Identify columns with dictionary values
+            dict_columns = []
+            for col in self._data.columns:
+                if self._data[col].apply(lambda x: isinstance(x, dict)).any():
+                    dict_columns.append(col)
+
+            # No dictionary columns found
+            if not dict_columns:
+                return ETL(self._data)
+
+            # Flatten each dictionary column
+            result = self._data.copy()
+            for col in dict_columns:
+                result = ETL(result).flatten(col, separator).data
+
+            return ETL(result)
+
     def flatten(self, column: str, separator: str = "_") -> "ETL":
         """
         🔍 Flatten a nested dictionary column into separate columns.
@@ -512,6 +550,54 @@ class ETL:
 
             # Return a new ETL object with the expanded data
             return ETL(expanded_rows)
+
+    def get_nested_list_columns(self, pop: bool = False) -> dict[str, "ETL"]:
+        """
+        🔍 Get all columns that contain lists of dictionaries and return them as ETL
+        instances.
+
+        Args:
+            pop (bool, optional): If True, removes the nested list columns from the
+                original DataFrame. Defaults to False.
+
+        Returns:
+            dict[str, ETL]: A dictionary where keys are column names and values are ETL
+                instances containing the nested list of dictionaries.
+
+        Example:
+            If your DataFrame has columns 'users' and 'settings' where 'users' contains:
+            [{'id': 1, 'name': 'John'}, {'id': 2, 'name': 'Jane'}]
+
+            # Without popping (maintains original DataFrame):
+            nested_cols = etl.get_nested_list_columns()
+            # Returns: {'users': ETL([{'id': 1, ...}]), 'settings': ETL([...])}
+            # etl still contains both 'users' and 'settings' columns
+
+            # With popping (removes columns from original DataFrame):
+            nested_cols = etl.get_nested_list_columns(pop=True)
+            # Returns: {'users': ETL([{'id': 1, ...}]), 'settings': ETL([...])}
+            # etl no longer contains 'users' and 'settings' columns
+        """
+        nested_columns: dict[str, "ETL"] = {}
+        columns_to_drop: list[str] = []
+
+        for col in self._data.columns:
+            s = self._data[col].dropna().iloc[0] if not self._data[col].empty else None
+            if not isinstance(s, (list, tuple)):
+                continue
+
+            if s and all(isinstance(item, dict) for item in s):
+                all_dicts = []
+                for item_list in self._data[col].dropna():
+                    all_dicts.extend(item_list)
+
+                nested_columns[col] = ETL(all_dicts)
+                columns_to_drop.append(col)
+
+        if pop and columns_to_drop:
+            self._data = self._data.drop(columns=columns_to_drop)
+
+        return nested_columns
 
     """
     🔍 Loading methods

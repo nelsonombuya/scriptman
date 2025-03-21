@@ -10,8 +10,11 @@
   ],
   "cSpell.words": [
     "dataframes",
+    "dropna",
     "DUMPFILE",
     "executemany",
+    "iloc",
+    "iterrows",
     "mariadb",
     "mysql",
     "postgresql",

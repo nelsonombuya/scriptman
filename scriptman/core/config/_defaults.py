@@ -22,6 +22,10 @@ class ConfigModel(BaseModel):
         default=Path(getcwd()),
         description="Current working directory",
     )
+    root_dir: DirectoryPath = Field(
+        default=Path(__file__).parent.parent,
+        description="Root directory",
+    )
     logs_dir: DirectoryPath = Field(
         default=Path(__file__).parent.parent / "logs",
         description="Path to the logs directory",

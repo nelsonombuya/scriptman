@@ -150,11 +150,13 @@ class Scripts:
         log_handler = self.__create_log_file(file_path)
 
         try:
-            if config.settings.cwd not in sys_path:
-                sys_path.insert(0, config.settings.cwd)
-
             if script_dir not in sys_path:
+                logger.info(f"🔍 Adding '{script_dir}' to sys_path...")
                 sys_path.insert(0, script_dir)
+
+            if config.settings.root_dir not in sys_path:
+                logger.info(f"🔍 Adding '{config.settings.root_dir}' to sys_path...")
+                sys_path.insert(0, config.settings.root_dir)
 
             logger.info(f"🚀 Running '{file_path.name}' script...")
             with TimeCalculator.context(context=file_path.name):
@@ -167,6 +169,11 @@ class Scripts:
             if config.on_failure_callback is not None:
                 logger.info("📞 Calling callback function...")
                 config.on_failure_callback(e)
+            if isinstance(e, ImportError):
+                logger.warning(
+                    "🔍 If experiencing import errors, "
+                    "try adding root_dir to the config file using scriptman config."
+                )
             return e
         finally:
             logger.remove(log_handler)

@@ -8,7 +8,8 @@ try:
     from pandas import DataFrame, MultiIndex
 
     from scriptman.powers.database._exceptions import DatabaseError
-    from scriptman.powers.etl._database import ETLDatabase, ETLDatabaseInterface
+    from scriptman.powers.etl._database import ETLDatabase
+    from scriptman.powers.etl._protocol import ETLDatabaseInterface
     from scriptman.powers.executor import TaskExecutor
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError:

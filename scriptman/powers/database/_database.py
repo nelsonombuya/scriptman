@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from re import IGNORECASE, match, search, sub
-from typing import Any, Literal, Optional
+from typing import Any, Iterator, Literal, Optional
 
 from loguru import logger
 from tqdm import tqdm
@@ -142,11 +142,8 @@ class DatabaseHandler(ABC):
         pass
 
     @abstractmethod
-    def execute_write_batch_query(
-        self,
-        query: str,
-        rows: list[dict[str, Any]] = [],
-        batch_size: Optional[int] = config.settings.get("BATCH_SIZE"),
+    def execute_write_bulk_query(
+        self, query: str, rows: list[dict[str, Any]] = []
     ) -> bool:
         """
         📃 Executes multiple SQL insert queries with the given SQL query and rows.
@@ -157,8 +154,31 @@ class DatabaseHandler(ABC):
         Args:
             query (str): The SQL query to execute for each row.
             rows (list[dict[str, Any]], optional): The list of rows to insert.
-            batch_size (Optional[int], optional): The number of rows to insert in each
-                batch. Defaults to the BATCH_SIZE from the environment configuration.
+
+        Returns:
+            bool: True if the queries were executed successfully, False otherwise.
+        """
+        pass
+
+    @abstractmethod
+    def execute_write_batch_query(
+        self,
+        query: str,
+        rows: Iterator[dict[str, Any]] | list[dict[str, Any]],
+        batch_size: int = config.settings.get("BATCH_SIZE", 1000),
+    ) -> bool:
+        """
+        📃 Executes multiple SQL insert queries with the given SQL query and rows.
+
+        NOTE: This method should be used for INSERT/UPDATE queries only; and is best used
+        with prepared queries.
+
+        Args:
+            query (str): The SQL query to execute for each row.
+            rows (Iterator[dict[str, Any]], list[dict[str, Any]]): The iterator of rows
+                to insert.
+            batch_size (int, optional): The number of rows to insert in each batch.
+                Defaults to the BATCH_SIZE from the environment configuration.
 
         Returns:
             bool: True if the queries were executed successfully, False otherwise.

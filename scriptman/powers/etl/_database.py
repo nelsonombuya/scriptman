@@ -1,5 +1,5 @@
 try:
-    from typing import Any, Optional, Protocol, cast
+    from typing import Any, Iterator, Optional, Protocol
 
     from pandas import DataFrame
 except ImportError:
@@ -34,11 +34,17 @@ class ETLDatabaseInterface(Protocol):
         """🔍 Execute a write query on the database"""
         ...
 
+    def execute_write_bulk_query(
+        self, query: str, rows: list[dict[str, Any]] = []
+    ) -> bool:
+        """🔍 Execute a write bulk query on the database"""
+        ...
+
     def execute_write_batch_query(
         self,
         query: str,
-        rows: list[dict[str, Any]] = [],
-        batch_size: Optional[int] = None,
+        rows: Iterator[dict[str, Any]] | list[dict[str, Any]] = [],
+        batch_size: int = 1000,
     ) -> bool:
         """🔍 Execute a write batch query on the database"""
         ...
@@ -119,40 +125,67 @@ class ETLDatabase:
             for column in df.columns
         }
 
+    def prepare_values(
+        self, df: DataFrame, force_nvarchar: bool = False
+    ) -> Iterator[dict[str, Any]]:
+        """
+        ✍🏾 Prepares the values for the given DataFrame in batches.
+
+        Args:
+            df (DataFrame): The DataFrame to prepare the values for.
+            force_nvarchar (bool): Whether to force all columns to be NVARCHAR(MAX).
+
+        Returns:
+            Iterator[dict[str, Any]]: An iterator of prepared records.
+        """
+        from math import isnan
+
+        def transform_value(value: Any) -> Any:
+            if isnan(value):
+                return None
+            if force_nvarchar:
+                return str(value)
+            return value
+
+        for record in df.reset_index().to_dict(orient="records"):
+            yield {str(k): transform_value(v) for k, v in record.items()}
+
     def generate_prepared_insert_query(
-        self, table_name: str, df: DataFrame
-    ) -> tuple[str, list[dict[str, Any]]]:
+        self, table_name: str, df: DataFrame, force_nvarchar: bool = False
+    ) -> tuple[str, Iterator[dict[str, Any]]]:
         """
         ✍🏾 Generates a prepared SQL insert query for the given table and DataFrame.
 
         Args:
             table_name (str): The name of the table to insert into.
             df (DataFrame): The DataFrame containing the data to insert.
+            force_nvarchar (bool): Whether to force all columns to be NVARCHAR(MAX).
 
         Returns:
-            tuple(str, list[dict[str, Any]]): The prepared SQL query and the list of
-                dictionaries where the keys are the column names and index names and the
-                values are the corresponding values for each row
+            tuple(str, Iterator[dict[str, Any]]): The prepared SQL query and the
+                iterator of dictionaries where the keys are the column names and the
+                values are the corresponding values for each row.
         """
         columns = ", ".join([f'"{column_name}"' for column_name in df.columns])
         placeholders = ", ".join([f":{column_name}" for column_name in df.columns])
         query = f'INSERT INTO "{table_name}" ({columns}) VALUES ({placeholders})'
-        values = cast(list[dict[str, Any]], df.reset_index().to_dict(orient="records"))
-        return query, values
+        return query, self.prepare_values(df, force_nvarchar)
 
     def generate_prepared_update_query(
-        self, table_name: str, df: DataFrame
-    ) -> tuple[str, list[dict[str, Any]]]:
+        self, table_name: str, df: DataFrame, force_nvarchar: bool = False
+    ) -> tuple[str, Iterator[dict[str, Any]]]:
         """
         ✍🏾 Generates a prepared SQL update query for the given table and DataFrame.
 
         Args:
             table_name (str): The name of the table to update.
             df (DataFrame): The DataFrame containing the data to update.
+            force_nvarchar (bool): Whether to force all columns to be NVARCHAR(MAX).
 
         Returns:
-            tuple(str, list(tuple)): The prepared SQL query and the list of values to
-                update.
+            tuple(str, Iterator[dict[str, Any]]): The prepared SQL query and the
+                iterator of dictionaries where the keys are the column names and the
+                index names and the values are the corresponding values for each row.
         """
         assert df.index.names is not None, "Index names are required"
         set_clause = ", ".join(
@@ -162,90 +195,92 @@ class ETLDatabase:
             [f'"{index_name}" = :{index_name}' for index_name in df.index.names]
         )
         query = f'UPDATE "{table_name}" SET {set_clause} WHERE {where_clause}'
-        values = cast(list[dict[str, Any]], df.reset_index().to_dict(orient="records"))
-        return query, values
+        return query, self.prepare_values(df, force_nvarchar)
 
     def generate_prepared_delete_query(
-        self, table_name: str, df: DataFrame
-    ) -> tuple[str, list[dict[str, Any]]]:
+        self, table_name: str, df: DataFrame, force_nvarchar: bool = False
+    ) -> tuple[str, Iterator[dict[str, Any]]]:
         """
         ✍🏾 Generates a prepared SQL delete query for the given table and DataFrame.
 
         Args:
             table_name (str): The name of the table to delete from.
             df (DataFrame): The DataFrame containing the data to delete.
+            force_nvarchar (bool): Whether to force all columns to be NVARCHAR(MAX).
 
         Returns:
-            tuple(str, list[dict[str, Any]]): The prepared SQL query and the list of
-                dictionaries where the keys are the column names and index names and the
-                values are the corresponding values for each row
+            tuple(str, Iterator[dict[str, Any]]): The prepared SQL query and the
+                iterator of dictionaries where the keys are the column names and the
+                values are the corresponding values for each row.
         """
         assert df.index.names is not None, "Index names are required"
         where_clause = " AND ".join(
             [f'"{index_name}" = :{index_name}' for index_name in df.index.names]
         )
         query = f'DELETE FROM "{table_name}" WHERE {where_clause}'
-        values = cast(list[dict[str, Any]], df.reset_index().to_dict(orient="records"))
-        return query, values
+        return query, self.prepare_values(df, force_nvarchar)
 
     def generate_prepared_upsert_query(
-        self, table_name: str, df: DataFrame
-    ) -> tuple[str, list[dict[str, Any]]]:
+        self, table_name: str, df: DataFrame, force_nvarchar: bool = False
+    ) -> tuple[str, Iterator[dict[str, Any]]]:
         """
         ✍🏾 Generates a prepared SQL upsert query for the given table and DataFrame.
 
         Args:
             table_name (str): The name of the table to upsert into.
             df (DataFrame): The DataFrame containing the data to upsert.
+            force_nvarchar (bool): Whether to force all columns to be NVARCHAR(MAX).
 
         Returns:
-            tuple(str, list[dict[str, Any]]): The prepared SQL query and the list of
-                dictionaries where the keys are the column names and index names and the
-                values are the corresponding values for each row
+            tuple(str, Iterator[dict[str, Any]]): The prepared SQL query and the
+                iterator of dictionaries where the keys are the column names and the
+                values are the corresponding values for each row.
         """
+        var: bool = force_nvarchar
         query: Optional[str] = None
-        values: Optional[list[dict[str, Any]]] = None
+        values: Optional[Iterator[dict[str, Any]]] = None
 
         if self.database_type in ["postgresql"]:
             # Use INSERT ... ON CONFLICT DO UPDATE for PostgreSQL
-            query, values = self.generate_prepared_insert_query(table_name, df)
+            query, values = self.generate_prepared_insert_query(table_name, df, var)
             update_clause = ", ".join([f'"{c}" = EXCLUDED."{c}"' for c in df.columns])
             constraints = ", ".join([f'"{c}"' for c in df.index.names])
             query = f"{query} ON CONFLICT ({constraints}) DO UPDATE SET {update_clause}"
 
         elif self.database_type in ["mysql", "mariadb"]:
             # Use ON DUPLICATE KEY UPDATE for MySQL and MariaDB
-            query, values = self.generate_prepared_insert_query(table_name, df)
+            query, values = self.generate_prepared_insert_query(table_name, df, var)
             update_clause = ", ".join([f'"{col}" = :{col}' for col in df.columns])
             query = f"{query} ON DUPLICATE KEY UPDATE {update_clause}"
 
         elif self.database_type in ["sqlite"]:
             # Use INSERT OR REPLACE for SQLite
-            query, values = self.generate_prepared_insert_query(table_name, df)
+            query, values = self.generate_prepared_insert_query(table_name, df, var)
             query = str(query).replace("INSERT INTO", "INSERT OR REPLACE INTO")
 
         elif self.database_type in ["mssql", "oracle"]:
             # Use MERGE for MSSQL Server and Oracle
-            query, values = self.generate_merge_query(table_name, df)
+            query, values = self.generate_merge_query(table_name, df, var)
 
         assert query is not None, "Unsupported database type"
         assert values is not None, "No values to upsert"
         return query, values
 
     def generate_merge_query(
-        self, table_name: str, df: DataFrame
-    ) -> tuple[str, list[dict[str, Any]]]:
+        self, table_name: str, df: DataFrame, force_nvarchar: bool = False
+    ) -> tuple[str, Iterator[dict[str, Any]]]:
         """
         ✍🏾 Generates a SQL MERGE INTO query using a temporary table approach.
 
         Args:
             table_name (str): The name of the table to merge into.
             df (DataFrame): The DataFrame containing the data to merge.
+            force_nvarchar (bool): Whether to force all columns to be NVARCHAR(MAX).
 
         Returns:
-            tuple(str, list[dict[str, Any]]): The prepared SQL query and the list of
-                dictionaries where the keys are the column names and index names and
-                the values are the corresponding values for each row.
+            tuple(str, Iterator[dict[str, Any]]): The prepared SQL query and the
+                iterator of dictionaries where the keys are the column names and the
+                index names and the values are the corresponding values for each row.
         """
         indices = df.index.names
         reset_df = df.reset_index()
@@ -285,9 +320,7 @@ class ETLDatabase:
         DROP TABLE "{temp_table}";
         """
 
-        # Prepare the values
-        values = cast(list[dict[str, Any]], df.reset_index().to_dict(orient="records"))
-        return query, values
+        return query, self.prepare_values(df, force_nvarchar)
 
     def execute_read_query(
         self, query: str, params: dict[str, Any] = {}
@@ -301,11 +334,17 @@ class ETLDatabase:
         """Delegate to the database handler"""
         return self.db.execute_write_query(query, params, check_affected_rows)
 
+    def execute_write_bulk_query(
+        self, query: str, rows: list[dict[str, Any]] = []
+    ) -> bool:
+        """Delegate to the database handler"""
+        return self.db.execute_write_bulk_query(query, rows)
+
     def execute_write_batch_query(
         self,
         query: str,
-        rows: list[dict[str, Any]] = [],
-        batch_size: Optional[int] = None,
+        rows: Iterator[dict[str, Any]] | list[dict[str, Any]] = [],
+        batch_size: int = 1000,
     ) -> bool:
         """Delegate to the database handler"""
         return self.db.execute_write_batch_query(query, rows, batch_size)

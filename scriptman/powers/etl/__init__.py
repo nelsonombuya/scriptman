@@ -49,16 +49,9 @@ class ETL:
         """📊 Access the underlying DataFrame."""
         return self._data
 
-    def set_index(self, keys: str, *, inplace: bool = True, **kwargs: Any) -> "ETL":
+    def set_index(self, keys: str | list[str]) -> "ETL":
         """🔍 Set the index of the DataFrame."""
-        if "inplace" in kwargs:
-            del kwargs["inplace"]
-
-        if inplace:
-            self._data.set_index(keys, inplace=True, **kwargs)
-            return self
-
-        return ETL(self._data.set_index(keys, inplace=False, **kwargs))
+        return ETL(self._data.copy().set_index(keys, inplace=True))
 
     def __getitem__(self, key: Any) -> Any:
         """🔍 Get an item from the DataFrame."""
@@ -733,9 +726,9 @@ class ETL:
         self,
         db: ETLDatabaseInterface,
         table_name: str,
+        batch_size: int = 1000,
         batch_execute: bool = True,
         force_nvarchar: bool = False,
-        batch_size: Optional[int] = None,
         method: Literal["truncate", "replace", "insert", "update", "upsert"] = "upsert",
     ) -> bool:
         """
@@ -753,7 +746,7 @@ class ETL:
             force_nvarchar (bool, optional): Whether to force the use of NVARCHAR data
                 types. Defaults to False.
             batch_size (Optional[int], optional): The number of rows to include in each
-                batch. Defaults to None.
+                batch. Defaults to 1000.
             method (Literal["truncate", "replace", "insert", "update", "upsert"]):
                 The loading method to use. Defaults to "upsert".
 
@@ -806,7 +799,6 @@ class ETL:
             f'with "{db.database_type}" database'
         )
         self.log.debug(f"Query: {query}")
-        self.log.debug(f"Values: {values[:5]}\nContaining {len(values)} rows.")
 
         try:
             if not batch_execute:

@@ -2,7 +2,7 @@ try:
     from contextlib import contextmanager
     from functools import partial
     from pathlib import Path
-    from typing import Any, Callable, Generator, Literal, Optional
+    from typing import Any, Callable, Generator, Literal, Optional, cast
 
     from loguru import logger
     from pandas import DataFrame, MultiIndex
@@ -35,8 +35,7 @@ class ETL:
                 the ETL object with.
         """
         # Delegate DataFrame properties and methods
-        self._data = DataFrame(data) if data is not None else DataFrame()
-        self.set_index = self._data.set_index
+        self._data: DataFrame = DataFrame(data) if data is not None else DataFrame()
         self.columns = self._data.columns
         self.empty = self._data.empty
         self.index = self._data.index
@@ -49,6 +48,17 @@ class ETL:
     def data(self) -> DataFrame:
         """📊 Access the underlying DataFrame."""
         return self._data
+
+    def set_index(self, keys: str, *, inplace: bool = True, **kwargs: Any) -> "ETL":
+        """🔍 Set the index of the DataFrame."""
+        if "inplace" in kwargs:
+            del kwargs["inplace"]
+
+        if inplace:
+            self._data.set_index(keys, inplace=True, **kwargs)
+            return self
+
+        return ETL(self._data.set_index(keys, inplace=False, **kwargs))
 
     def __getitem__(self, key: Any) -> Any:
         """🔍 Get an item from the DataFrame."""
@@ -141,6 +151,13 @@ class ETL:
     def from_dataframe(cls, data: DataFrame) -> "ETL":
         """
         🔍 Create an ETL object from a DataFrame.
+        """
+        return cls(data)
+
+    @classmethod
+    def from_list(cls, data: list[dict[str, Any]]) -> "ETL":
+        """
+        🔍 Create an ETL object from a list of dictionaries.
         """
         return cls(data)
 
@@ -651,6 +668,15 @@ class ETL:
         """
         return self._data
 
+    def to_list(self) -> list[dict[str, Any]]:
+        """
+        🔍 Convert the ETL object to a list of dictionaries.
+        """
+        return cast(
+            list[dict[str, Any]],
+            self._data.reset_index().to_dict(orient="records"),
+        )
+
     def to_csv_file(self, file_path: str | Path) -> Path:
         """
         📃 Saves the data to a CSV file using the given file path.
@@ -740,7 +766,6 @@ class ETL:
         """
         # Wrap the handler with ETLDatabase for extended functionality
         db = ETLDatabase(db)
-        data = self._data.reset_index()
         table_exists: bool = db.table_exists(table_name)
 
         if self.empty:
@@ -765,15 +790,23 @@ class ETL:
             self.log.warning(f'Table "{table_name}" does not exist. Creating table...')
             db.create_table(
                 table_name=table_name,
-                keys=data.index.names,
-                columns=db.get_table_data_types(data, force_nvarchar),
+                keys=self._data.index.names,
+                columns=db.get_table_data_types(self._data.reset_index(), force_nvarchar),
             )
+            method = "insert"
 
         query, values = {
             "insert": db.generate_prepared_insert_query,
             "update": db.generate_prepared_update_query,
             "upsert": db.generate_prepared_upsert_query,
-        }.get(method, db.generate_prepared_upsert_query)(table_name, data)
+        }.get(method, db.generate_prepared_upsert_query)(table_name, self._data)
+        self.log.info(
+            f"{method.capitalize()}ing data "
+            f'into "{db.database_name}"."{table_name}" '
+            f'with "{db.database_type}" database'
+        )
+        self.log.debug(f"Query: {query}")
+        self.log.debug(f"Values: {values[:5]}\nContaining {len(values)} rows.")
 
         try:
             if not batch_execute:

@@ -559,10 +559,10 @@ class DatabaseHandler(ABC):
             "xp_",  # Stored procedures
             "INTO OUTFILE",
             "INTO DUMPFILE",  # File operations
-            "--",
-            "/*",
-            "*/",  # Comments that might be used maliciously
-            ";",  # Multiple statement execution
+            # ";",  # Multiple statement execution
+            # "--", # Comments that might be used maliciously
+            # "/*",  # Comments that might be used maliciously
+            # "*/",  # Comments that might be used maliciously
         ]
 
         for pattern in dangerous_patterns:

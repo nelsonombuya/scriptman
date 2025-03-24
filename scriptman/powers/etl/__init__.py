@@ -49,9 +49,9 @@ class ETL:
         """📊 Access the underlying DataFrame."""
         return self._data
 
-    def set_index(self, keys: str | list[str]) -> "ETL":
+    def set_index(self, *args: Any, **kwargs: Any) -> "ETL":
         """🔍 Set the index of the DataFrame."""
-        return ETL(self._data.copy().set_index(keys, inplace=True))
+        return ETL(self._data.set_index(*args, **kwargs))
 
     def __getitem__(self, key: Any) -> Any:
         """🔍 Get an item from the DataFrame."""

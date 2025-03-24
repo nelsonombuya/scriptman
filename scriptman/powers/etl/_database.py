@@ -141,7 +141,7 @@ class ETLDatabase:
         from math import isnan
 
         def transform_value(value: Any) -> Any:
-            if isnan(value):
+            if isinstance(value, (float, int)) and isnan(value):
                 return None
             if force_nvarchar:
                 return str(value)

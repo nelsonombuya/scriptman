@@ -109,6 +109,7 @@ class ETLDatabase:
                 iterator of dictionaries where the keys are the column names and the
                 values are the corresponding values for each row.
         """
+        df = df.reset_index()
         columns = ", ".join([f'"{column_name}"' for column_name in df.columns])
         placeholders = ", ".join([f":{column_name}" for column_name in df.columns])
         query = f'INSERT INTO "{table_name}" ({columns}) VALUES ({placeholders})'

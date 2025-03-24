@@ -218,6 +218,15 @@ class DatabaseHandler(ABC):
                 self.log.warning(f'Table "{table_name}" already exists')
                 return True
 
+            if keys:
+                for key in keys:
+                    if key in columns and columns[key].upper() == "NVARCHAR(MAX)":
+                        columns[key] = "NVARCHAR(255)"
+                        self.log.debug(
+                            f'Converting primary key "{key}" '
+                            "from NVARCHAR(MAX) to NVARCHAR(255)"
+                        )
+
             column_definitions = ", ".join(
                 [
                     f'"{column_name}" {column_type}'

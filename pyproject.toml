@@ -109,6 +109,7 @@ module = ["apscheduler.*", "diskcache.*", "dill.*", "pyodbc.*"]
 ignore_missing_imports = true
 
 [tool.scriptman]
+root_dir = "."
 logs_dir = ".logs"
 log_level = "DEBUG"
 

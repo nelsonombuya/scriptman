@@ -207,7 +207,7 @@ class PyODBCHandler(DatabaseHandler):
             DatabaseError: If a connection to the database cannot be established.
         """
         _, parameter_style = self.validate_query_parameterization(query)
-        assert parameter_style == "named", "Named parameters are required"
+        assert parameter_style in ["named", "none"], "Named parameters are required"
         _query, _params = self.convert_named_placeholders_to_query(query, params)
 
         try:
@@ -241,7 +241,7 @@ class PyODBCHandler(DatabaseHandler):
             bool: True if the query was executed successfully, False otherwise.
         """
         _, parameter_style = self.validate_query_parameterization(query)
-        assert parameter_style == "named", "Named parameters are required"
+        assert parameter_style in ["named", "none"], "Named parameters are required"
         _query, _params = self.convert_named_placeholders_to_query(query, params)
 
         try:
@@ -284,7 +284,7 @@ class PyODBCHandler(DatabaseHandler):
             DatabaseError: If the bulk operation fails
         """
         _, parameter_style = self.validate_query_parameterization(query)
-        assert parameter_style == "named", "Named parameters are required"
+        assert parameter_style in ["named", "none"], "Named parameters are required"
         _query, _params_list = self.convert_named_placeholders_to_bulk_query(query, rows)
 
         try:

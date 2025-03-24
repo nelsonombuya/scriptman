@@ -166,19 +166,11 @@ class DatabaseHandler(ABC):
         pass
 
     def table_exists(self, table_name: str) -> bool:
-        """
-        ❓ Checks if the given table exists in the database.
-
-        Args:
-            table_name (str): The name of the table to check.
-
-        Returns:
-            bool: True if the table exists, False otherwise.
-        """
+        """❓ Checks if the given table exists in the database."""
         query = (
             "SELECT * "
             "FROM information_schema.tables "
-            f'WHERE table_name = "{table_name}"'
+            f"WHERE table_name = '{table_name}'"
         )
         try:
             return bool(self.execute_read_query(query))
@@ -187,15 +179,7 @@ class DatabaseHandler(ABC):
             return False
 
     def table_has_records(self, table_name: str) -> bool:
-        """
-        ❓ Checks if the given table has records in the database.
-
-        Args:
-            table_name (str): The name of the table to check.
-
-        Returns:
-            bool: True if the table has records, False otherwise.
-        """
+        """❓ Checks if the given table has records in the database."""
         query = f'SELECT * FROM "{table_name}" LIMIT 1'
         return bool(self.execute_read_query(query))
 
@@ -216,7 +200,7 @@ class DatabaseHandler(ABC):
         try:
             column_definitions = ", ".join(
                 [
-                    f"{column_name} {column_type}"
+                    f'"{column_name}" {column_type}'
                     for column_name, column_type in columns.items()
                 ]
             )
@@ -237,15 +221,7 @@ class DatabaseHandler(ABC):
             return False
 
     def truncate_table(self, table_name: str) -> bool:
-        """
-        🧹 Truncates the given table if it exists.
-
-        Args:
-            table_name (str): The name of the table.
-
-        Returns:
-            bool: True if the table was truncated, False otherwise.
-        """
+        """🧹 Truncates the given table if it exists."""
         try:
             result = self.execute_write_query(f'TRUNCATE TABLE "{table_name}"')
             if result:
@@ -259,15 +235,7 @@ class DatabaseHandler(ABC):
             return False
 
     def drop_table(self, table_name: str) -> bool:
-        """
-        🧹 Drops the given table if it exists.
-
-        Args:
-            table_name (str): The name of the table.
-
-        Returns:
-            bool: True if the table was dropped, False otherwise.
-        """
+        """🧹 Drops the given table if it exists."""
         try:
             result = self.execute_write_query(f'DROP TABLE IF EXISTS "{table_name}"')
             if result:
@@ -305,14 +273,14 @@ class DatabaseHandler(ABC):
 
             if query.strip().upper().startswith("UPDATE"):  # UPDATE QUERY
                 search_result = search(r"SET (.*?) WHERE", query, IGNORECASE)
-                assert search_result is not None, "Invalid UPDATE query"
+                assert search_result is not None, f"Invalid UPDATE query: {query}"
                 column_names = [
                     column.split("=")[0].strip().strip('"')
                     for column in search_result.group(1).split(",")
                 ]
 
                 search_result = search(r"WHERE (.*)", query, IGNORECASE)
-                assert search_result is not None, "Invalid UPDATE query"
+                assert search_result is not None, f"Invalid UPDATE query: {query}"
                 where_clause = search_result.group(1)
                 index_names = [
                     column.split("=")[0].strip().strip('"')
@@ -335,7 +303,7 @@ class DatabaseHandler(ABC):
                     query.strip(),
                     IGNORECASE,
                 )
-                assert match_result is not None, "Invalid INSERT INTO query"
+                assert match_result is not None, f"Invalid INSERT INTO query: {query}"
                 column_names = [
                     column.strip().strip('"')
                     for column in match_result.group(2).split(",")
@@ -351,7 +319,7 @@ class DatabaseHandler(ABC):
                 match_result = match(
                     r'DELETE FROM "([^"]+)" WHERE (.*)', query.strip(), IGNORECASE
                 )
-                assert match_result is not None, "Invalid DELETE FROM query"
+                assert match_result is not None, f"Invalid DELETE FROM query: {query}"
                 column_names = [
                     column.split("=")[0].strip().strip('"')
                     for column in match_result.group(2).split("AND")

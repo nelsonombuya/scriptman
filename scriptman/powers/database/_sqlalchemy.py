@@ -152,7 +152,7 @@ class SQLAlchemyHandler(DatabaseHandler):
             DatabaseError: If a connection to the database cannot be established.
         """
         _, parameter_style = self.validate_query_parameterization(query)
-        assert parameter_style == "named", "Named parameters are required"
+        assert parameter_style in ["named", "none"], "Named parameters are required"
 
         try:
             with self._engine.connect() as session:
@@ -190,7 +190,7 @@ class SQLAlchemyHandler(DatabaseHandler):
                 query.
         """
         _, parameter_style = self.validate_query_parameterization(query)
-        assert parameter_style == "named", "Named parameters are required"
+        assert parameter_style in ["named", "none"], "Named parameters are required"
 
         try:
             with self._engine.begin() as session:
@@ -232,7 +232,7 @@ class SQLAlchemyHandler(DatabaseHandler):
             DatabaseError: If the bulk operation fails
         """
         _, parameter_style = self.validate_query_parameterization(query)
-        assert parameter_style == "named", "Named parameters are required"
+        assert parameter_style in ["named", "none"], "Named parameters are required"
 
         try:
             if not rows:

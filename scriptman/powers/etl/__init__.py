@@ -24,6 +24,8 @@ ETL_TYPES = DataFrame | list[dict[str, Any]] | list[tuple[Any, ...]]
 class ETL:
     """🔍 Data processing utility for Extract, Transform, Load operations."""
 
+    log = logger
+
     def __init__(self, data: Optional[ETL_TYPES] = None) -> None:
         """
         🚀 Initialize ETL with optional data.
@@ -108,28 +110,28 @@ class ETL:
 
         try:
             with TimeCalculator.context(context):
-                logger.info(f"Data {operation_str} started...")
+                cls.log.info(f"Data {operation_str} started...")
                 yield
         except Exception as error:
             exception = error
         finally:
             if exception:
-                logger.error(f"Error during {operation_str}: {exception}")
+                cls.log.error(f"Error during {operation_str}: {exception}")
                 raise exception
 
             if operation == "extraction":
                 num_records = len(cls()) if isinstance(cls, type) else len(cls)
                 if num_records > 0:
-                    logger.debug(f"Number of records extracted: {num_records}")
-                    logger.debug(f"Extracted data: {cls}")
+                    cls.log.debug(f"Number of records extracted: {num_records}")
+                    cls.log.debug(f"Extracted data: {cls}")
                 else:
-                    logger.warning("No records were extracted.")
+                    cls.log.warning("No records were extracted.")
 
             elif operation == "transformation":
-                logger.debug(f"Transformed data: {cls}")
+                cls.log.debug(f"Transformed data: {cls}")
 
             else:
-                logger.success(f"Data {operation_str} complete.")
+                cls.log.success(f"Data {operation_str} complete.")
 
     """
     🔍 Extraction Methods
@@ -166,7 +168,7 @@ class ETL:
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
         with cls.timed_context("CSV", "extraction"):
             if file_path.exists():
-                logger.info(f"Found CSV File at {file_path}...")
+                cls.log.info(f"Found CSV File at {file_path}...")
                 return cls(read_csv(file_path))
             raise FileNotFoundError(f"No file found at: {file_path}")
 
@@ -194,7 +196,7 @@ class ETL:
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
         with cls.timed_context("JSON", "extraction"):
             if file_path.exists():
-                logger.info(f"Found JSON File at {file_path}...")
+                cls.log.info(f"Found JSON File at {file_path}...")
                 with open(file_path, "r", encoding="utf-8") as file:
                     data = load(file)
                 return cls(data)
@@ -582,11 +584,21 @@ class ETL:
         columns_to_drop: list[str] = []
 
         for col in self._data.columns:
-            s = self._data[col].dropna().iloc[0] if not self._data[col].empty else None
-            if not isinstance(s, (list, tuple)):
+            # Skip empty columns or columns with all NA values
+            if self._data[col].empty or self._data[col].isna().all():
                 continue
 
-            if s and all(isinstance(item, dict) for item in s):
+            # Get first non-null value to check type
+            first_value = (
+                self._data[col].dropna().iloc[0]
+                if not self._data[col].dropna().empty
+                else None
+            )
+            if not isinstance(first_value, (list, tuple)):
+                continue
+
+            # Check if the first value contains dictionaries
+            if first_value and all(isinstance(item, dict) for item in first_value):
                 all_dicts = []
                 for item_list in self._data[col].dropna():
                     all_dicts.extend(item_list)
@@ -598,6 +610,36 @@ class ETL:
             self._data = self._data.drop(columns=columns_to_drop)
 
         return nested_columns
+
+    def to_snake_case(self) -> "ETL":
+        """
+        🐍 Converts all column names in the DataFrame to snake_case.
+
+        This method transforms column names like 'FirstName', 'first-name', 'First Name'
+        to 'first_name'.
+
+        Returns:
+            ETL: A new ETL instance with snake_case column names.
+
+        Example:
+            # Convert columns like 'FirstName', 'LastName' to 'first_name', 'last_name'
+            etl_snake = etl.to_snake_case()
+        """
+        from re import sub
+
+        def convert_to_snake_case(name: str) -> str:
+            # Replace spaces, hyphens, and other separators with underscores
+            s1 = sub(r"[\s\-\.]", "_", name)
+            # Insert underscore between camelCase transitions
+            s2 = sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
+            # Convert to lowercase
+            return s2.lower()
+
+        # Create a copy of the DataFrame with renamed columns
+        renamed_columns = {col: convert_to_snake_case(col) for col in self._data.columns}
+        new_data = self._data.rename(columns=renamed_columns)
+        self.log.info(f"Converted {len(renamed_columns)} column names to snake_case")
+        return ETL(new_data)
 
     """
     🔍 Loading methods
@@ -625,13 +667,13 @@ class ETL:
         """
         with self.timed_context("CSV", "loading"):
             if self.empty:
-                logger.warning("Dataset is empty!")
+                self.log.warning("Dataset is empty!")
                 raise ValueError("Dataset is empty!")
 
             file_path = Path(file_path) if isinstance(file_path, str) else file_path
             file_path.parent.mkdir(parents=True, exist_ok=True)
             self._data.reset_index().to_csv(file_path, index=False)
-            logger.success(f"Data saved to {file_path}")
+            self.log.success(f"Data saved to {file_path}")
             return file_path
 
     def to_json_file(self, file_path: str | Path, indent: int = 2) -> Path:
@@ -652,13 +694,13 @@ class ETL:
         """
         with self.timed_context("JSON", "loading"):
             if self.empty:
-                logger.warning("Dataset is empty!")
+                self.log.warning("Dataset is empty!")
                 raise ValueError("Dataset is empty!")
 
             file_path = Path(file_path) if isinstance(file_path, str) else file_path
             file_path.parent.mkdir(parents=True, exist_ok=True)
             self._data.reset_index().to_json(file_path, orient="records", indent=indent)
-            logger.success(f"Data saved to {file_path}")
+            self.log.success(f"Data saved to {file_path}")
             return file_path
 
     def to_db(
@@ -702,7 +744,7 @@ class ETL:
         table_exists: bool = db.table_exists(table_name)
 
         if self.empty:
-            logger.warning("Dataset is empty!")
+            self.log.warning("Dataset is empty!")
             raise ValueError("Dataset is empty!")
 
         if method == "truncate" and table_exists:
@@ -716,11 +758,11 @@ class ETL:
                 "Dataset has no index! "
                 "Please set the index using the `set_index` method."
             )
-            logger.error(message)
+            self.log.error(message)
             raise ValueError(message)
 
         if not table_exists:
-            logger.warning(f'Table "{table_name}" does not exist. Creating table...')
+            self.log.warning(f'Table "{table_name}" does not exist. Creating table...')
             db.create_table(
                 table_name=table_name,
                 keys=data.index.names,
@@ -740,10 +782,10 @@ class ETL:
 
         except (MemoryError, ValueError) as error:
             if not batch_execute:
-                logger.info("Bulk Execute is disabled. Executing single queries...")
+                self.log.info("Bulk Execute is disabled. Executing single queries...")
             else:
-                logger.warning(f"Bulk Execution Failed: {error}")
-                logger.warning("Executing single queries...")
+                self.log.warning(f"Bulk Execution Failed: {error}")
+                self.log.warning("Executing single queries...")
 
             return all(
                 TaskExecutor[bool]()
@@ -755,7 +797,7 @@ class ETL:
             )
 
         except DatabaseError as error:
-            logger.error(f"Database Error: {error}. Retrying using insert/update...")
+            self.log.error(f"Database Error: {error}. Retrying using insert/update...")
             partial_func = partial(self._insert_or_update, db, table_name)
             return all(
                 TaskExecutor[bool]()
@@ -792,7 +834,7 @@ class ETL:
             try:
                 results.append(database_handler.execute_write_query(insert_query, value))
             except DatabaseError as error:
-                logger.error(f"Database Error: {error}. Retrying using update...")
+                self.log.error(f"Database Error: {error}. Retrying using update...")
                 results.append(database_handler.execute_write_query(update_query, value))
         return all(results)
 

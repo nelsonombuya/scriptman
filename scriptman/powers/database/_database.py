@@ -168,9 +168,9 @@ class DatabaseHandler(ABC):
     def table_exists(self, table_name: str) -> bool:
         """❓ Checks if the given table exists in the database."""
         query = (
-            "SELECT * "
-            "FROM information_schema.tables "
-            f"WHERE table_name = '{table_name}'"
+            "SELECT COUNT(*) "
+            "FROM INFORMATION_SCHEMA.TABLES "
+            f"WHERE \"TABLE_NAME\" = '{table_name}'"
         )
         try:
             return bool(self.execute_read_query(query))

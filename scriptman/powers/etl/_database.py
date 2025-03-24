@@ -278,7 +278,9 @@ class ETLDatabase:
         return query, values
 
     @staticmethod
-    def transform_df_to_dict(df: DataFrame, prepare: bool = True) -> list[dict[str, Any]]:
+    def transform_df_to_dict(
+        df: DataFrame, prepare: bool = False
+    ) -> list[dict[str, Any]]:
         """
         ⛓ Transforms a pandas DataFrame into a list of dictionaries.
 
@@ -298,11 +300,16 @@ class ETLDatabase:
             with TimeCalculator.context("DataFrame to Dictionary"):
                 values = [
                     {str(key): value}
-                    for key, value in df.reset_index().to_dict(orient="records")
+                    for item in df.reset_index().to_dict(orient="records")
+                    for key, value in item.items()
                 ]
         else:
             # HACK: Ignoring the string index conversion for now
-            values = df.reset_index().to_dict(orient="records")  # type: ignore
+            from typing import cast
+
+            values = cast(
+                list[dict[str, Any]], df.reset_index().to_dict(orient="records")
+            )
 
         return values
 

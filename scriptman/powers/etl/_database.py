@@ -50,13 +50,13 @@ class ETLDatabase:
         dtype_map = {
             "int64": "INT",
             "int32": "INT",
-            "bool": "BOOLEAN",
             "float64": "FLOAT",
             "float32": "FLOAT",
             "timedelta[ns]": "TIME",
             "object": "NVARCHAR(MAX)",  # Typically for string data
             "category": "NVARCHAR(MAX)",
             "datetime64[ns]": "DATETIME",
+            "bool": "BOOLEAN" if self.database_type in ["postgresql"] else "BIT",
         }
 
         return {

@@ -793,7 +793,11 @@ class ETL:
             "insert": db.generate_prepared_insert_query,
             "update": db.generate_prepared_update_query,
             "upsert": db.generate_prepared_upsert_query,
-        }.get(method, db.generate_prepared_upsert_query)(table_name, self._data)
+        }.get(method, db.generate_prepared_upsert_query)(
+            force_nvarchar=force_nvarchar,
+            table_name=table_name,
+            df=self._data,
+        )
         self.log.info(
             f"{method.capitalize()}ing data "
             f'into "{db.database_name}"."{table_name}" '

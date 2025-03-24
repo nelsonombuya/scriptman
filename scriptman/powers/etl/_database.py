@@ -4,9 +4,9 @@ try:
     from pandas import DataFrame
 
     from scriptman.powers.etl._protocol import ETLDatabaseInterface
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "Pandas is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using scriptman[etl]."
     )
 

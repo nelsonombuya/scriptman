@@ -14,9 +14,9 @@ try:
     from scriptman.powers.api._middleware import FastAPIMiddleware
     from scriptman.powers.api._templates import api_route, async_api_route
     from scriptman.powers.generics import AsyncFunc, Func, SyncFunc
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "FastAPI is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[api]."
     )

@@ -10,9 +10,9 @@ try:
     from scriptman.core.config import config
     from scriptman.powers.database._database import DatabaseHandler
     from scriptman.powers.database._exceptions import DatabaseError
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "pyodbc is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[pyodbc]."
     )
@@ -307,7 +307,7 @@ class PyODBCHandler(DatabaseHandler):
     def execute_write_batch_query(
         self,
         query: str,
-        rows: Iterator[dict[str, Any]] | list[dict[str, Any]],
+        rows: Iterator[dict[str, Any]] | list[dict[str, Any]] = [],
         batch_size: int = config.settings.get("BATCH_SIZE", 1000),
     ) -> bool:
         """

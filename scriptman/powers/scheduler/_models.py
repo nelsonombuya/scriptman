@@ -8,9 +8,9 @@ try:
     from pydantic.config import ConfigDict
 
     from scriptman.powers.generics import Func
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "APScheduler is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[schedule]."
     )

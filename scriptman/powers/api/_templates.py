@@ -10,9 +10,9 @@ try:
     from scriptman.powers.api._models import APIRequest, APIResponse
     from scriptman.powers.api.exceptions import APIException
     from scriptman.powers.generics import AsyncFunc, SyncFunc
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "FastAPI is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies using 'scriptman[api]'."
     )
 

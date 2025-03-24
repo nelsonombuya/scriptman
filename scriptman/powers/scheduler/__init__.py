@@ -9,9 +9,9 @@ try:
 
     from scriptman.powers.scheduler._models import Job
 
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "APScheduler is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[schedule]."
     )

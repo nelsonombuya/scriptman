@@ -8,9 +8,9 @@ try:
     from scriptman.core.config import config
     from scriptman.powers.database._database import DatabaseHandler
     from scriptman.powers.database._exceptions import DatabaseError
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "SQLAlchemy is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[sqlalchemy]."
     )

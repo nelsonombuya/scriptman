@@ -10,9 +10,9 @@ try:
 
     from scriptman.core.config import config
     from scriptman.powers.cache._backend import CacheBackend
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "DiskCache backend is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[cache]"
     )

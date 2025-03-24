@@ -6,9 +6,9 @@ try:
     from loguru import logger
     from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
     from starlette.responses import Response
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "FastAPI is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[api]."
     )

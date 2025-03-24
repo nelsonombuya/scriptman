@@ -3,9 +3,9 @@ try:
     from typing import Any, Optional, Protocol
 
     from requests import Response, request
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "Requests is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[api]."
     )

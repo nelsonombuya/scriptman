@@ -4,9 +4,9 @@ try:
     from typing import Any, Optional
 
     from fastapi import status
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "FastAPI is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[api]."
     )

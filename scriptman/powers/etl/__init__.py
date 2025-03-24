@@ -12,9 +12,9 @@ try:
     from scriptman.powers.etl._protocol import ETLDatabaseInterface
     from scriptman.powers.executor import TaskExecutor
     from scriptman.powers.time_calculator import TimeCalculator
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "Pandas is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[etl]."
     )

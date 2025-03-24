@@ -150,6 +150,9 @@ class Scripts:
         log_handler = self.__create_log_file(file_path)
 
         try:
+            if config.settings.cwd not in sys_path:
+                sys_path.insert(0, config.settings.cwd)
+
             if script_dir not in sys_path:
                 sys_path.insert(0, script_dir)
 

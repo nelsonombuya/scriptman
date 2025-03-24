@@ -10,9 +10,9 @@ try:
     from typing_extensions import Annotated
 
     from scriptman.powers.api.exceptions import APIException
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "Pydantic is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[api]."
     )

@@ -13,9 +13,9 @@ try:
     from scriptman.powers.cache._diskcache import DiskCacheBackend, FanoutCacheBackend
     from scriptman.powers.generics import AsyncFunc, SyncFunc, T
     from scriptman.powers.time_calculator import TimeCalculator
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "DiskCache backend is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[cache]"
     )

@@ -20,9 +20,9 @@ try:
         Driver,
         SeleniumBrowser,
     )
-except ImportError:
+except ImportError as e:
     raise ImportError(
-        "Selenium is not installed. "
+        f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[selenium]."
     )

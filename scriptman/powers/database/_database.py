@@ -214,6 +214,10 @@ class DatabaseHandler(ABC):
             bool: True if the table was created, False otherwise.
         """
         try:
+            if self.table_exists(table_name):
+                self.log.warning(f'Table "{table_name}" already exists')
+                return True
+
             column_definitions = ", ".join(
                 [
                     f'"{column_name}" {column_type}'
@@ -224,7 +228,7 @@ class DatabaseHandler(ABC):
             if keys:
                 column_definitions += f", PRIMARY KEY ({', '.join(keys)})"
 
-            query = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({column_definitions})'
+            query = f'CREATE TABLE "{table_name}" ({column_definitions})'
             result = self.execute_write_query(query)
             if result:
                 self.log.info(f'Table "{table_name}" created')

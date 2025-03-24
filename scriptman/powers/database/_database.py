@@ -164,7 +164,7 @@ class DatabaseHandler(ABC):
     def execute_write_batch_query(
         self,
         query: str,
-        rows: Iterator[dict[str, Any]] | list[dict[str, Any]],
+        rows: Iterator[dict[str, Any]] | list[dict[str, Any]] = [],
         batch_size: int = config.settings.get("BATCH_SIZE", 1000),
     ) -> bool:
         """

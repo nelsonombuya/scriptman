@@ -1,5 +1,4 @@
 from argparse import ArgumentParser, Namespace, _SubParsersAction
-from pathlib import Path
 
 from loguru import logger
 
@@ -64,13 +63,6 @@ class InitSubParser(BaseParser):
         )
 
         self.parser.add_argument(
-            "--scripts-dir",
-            metavar="PATH",
-            default=".",
-            help="Set the directory where scripts will be stored (default: current dir).",
-        )
-
-        self.parser.add_argument(
             "--log-level",
             choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
             default="INFO",
@@ -99,7 +91,6 @@ class InitSubParser(BaseParser):
         """
         # Update configuration with user-specified values
         config.settings.set("log_level", args.log_level)
-        config.settings.set("scripts_dir", args.scripts_dir)
         config.settings.set("relative_venv_path", args.venv)
         config.settings.set("concurrent", not args.no_concurrent)
 
@@ -118,12 +109,6 @@ class InitSubParser(BaseParser):
         config.add_secrets_to_gitignore()
         config.create_secrets_file()
 
-        # Create scripts directory if it doesn't exist and isn't the current directory
-        scripts_dir = Path(args.scripts_dir)
-        if args.scripts_dir != "." and not scripts_dir.exists():
-            scripts_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"📂 Created scripts directory at {scripts_dir}")
-
         # Display success message
         ext = ShellScriptGenerator.get_file_extension(platform_type)
         ext = ".ps1" if args.powershell else ext
@@ -131,7 +116,6 @@ class InitSubParser(BaseParser):
             "✨ Project initialized successfully\n"
             "--------------------------------------------------------------------\n"
             f"💡 Virtual environment path set to: {args.venv}\n"
-            f"💡 Scripts directory set to: {args.scripts_dir}\n"
             f"💡 Logging level set to: {args.log_level}\n"
             f"💡 Concurrent execution: {'Disabled' if args.no_concurrent else 'Enabled'}\n"
             "--------------------------------------------------------------------\n"

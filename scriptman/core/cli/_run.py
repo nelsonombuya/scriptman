@@ -95,7 +95,7 @@ class RunSubParser(BaseParser):
         scripts = (
             [Path(script) for script in args.scripts]
             if args.scripts
-            else list(Path(config.settings.get("scripts_dir", ".")).glob("*.py"))
+            else list(config.cwd.glob("*.py"))
         )
 
         if not scripts:

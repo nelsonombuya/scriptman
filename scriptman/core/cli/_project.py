@@ -194,10 +194,10 @@ class ProjectSubParser(BaseParser):
                     logger.info("  Poetry dependencies installed")
                 else:
                     logger.warning(
-                        "  Poetry dependencies not installed or Poetry not available"
+                        "⚠ Poetry dependencies not installed or Poetry not available"
                     )
             except FileNotFoundError:
-                logger.warning("  Poetry not found in PATH")
+                logger.warning("⚠ Poetry not found in PATH")
         elif Path(config.cwd / "requirements.txt").exists():
             logger.info("📦 Using requirements.txt for dependency management")
             try:

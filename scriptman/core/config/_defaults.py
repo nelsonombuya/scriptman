@@ -22,17 +22,9 @@ class ConfigModel(BaseModel):
         default=Path(getcwd()),
         description="Current working directory",
     )
-    root_dir: DirectoryPath = Field(
-        default=Path(__file__).parent.parent,
-        description="Root directory",
-    )
     logs_dir: DirectoryPath = Field(
         default=Path(__file__).parent.parent / "logs",
         description="Path to the logs directory",
-    )
-    scripts_dir: str = Field(
-        default=getcwd(),
-        description="Path to the scripts directory",
     )
     downloads_dir: DirectoryPath = Field(
         default=Path(__file__).parent.parent / ".downloads",
@@ -75,7 +67,7 @@ class ConfigModel(BaseModel):
         description="Path to the virtual environment relative to the project root",
     )
 
-    @field_validator("logs_dir", "scripts_dir", "downloads_dir", mode="before")
+    @field_validator("logs_dir", "downloads_dir", mode="before")
     @classmethod
     def initialize_directories(cls, value: str) -> str:
         """

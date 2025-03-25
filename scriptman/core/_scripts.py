@@ -154,10 +154,6 @@ class Scripts:
                 logger.info(f"🔍 Adding '{script_dir}' to sys_path...")
                 sys_path.insert(0, script_dir)
 
-            if config.settings.root_dir not in sys_path:
-                logger.info(f"🔍 Adding '{config.settings.root_dir}' to sys_path...")
-                sys_path.insert(0, config.settings.root_dir)
-
             logger.info(f"🚀 Running '{file_path.name}' script...")
             with TimeCalculator.context(context=file_path.name):
                 retries = config.settings.get("retries", 0)

@@ -340,11 +340,12 @@ class PyODBCHandler(DatabaseHandler):
                 batched_rows.append(record)
                 total_rows += 1
                 if len(batched_rows) >= batch_size:
+                    batch_number += 1
                     self.execute_write_bulk_query(query, batched_rows)
                     batched_rows = []
-                    batch_number += 1
 
             if batched_rows:  # Process any remaining rows
+                batch_number += 1
                 self.execute_write_bulk_query(query, batched_rows)
 
             self.log.success(

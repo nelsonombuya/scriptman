@@ -71,6 +71,13 @@ class RunSubParser(BaseParser):
             default=False,
             help="Force execution of scripts even if they are already running.",
         )
+        self.parser.add_argument(
+            "-v",
+            "--verbose",
+            action="store_true",
+            default=False,
+            help="Enable verbose output.",
+        )
 
     def process(self, args: Namespace) -> int:
         """
@@ -103,6 +110,7 @@ class RunSubParser(BaseParser):
             return 1
 
         config.settings.retries = args.retries if args.retries >= 0 else 0
+        config.settings.verbose = args.verbose
         config.settings.force = args.force
 
         try:

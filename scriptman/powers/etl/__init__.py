@@ -5,7 +5,7 @@ try:
     from typing import Any, Callable, Generator, Literal, Optional, cast
 
     from loguru import logger
-    from pandas import DataFrame, MultiIndex
+    from pandas import DataFrame, MultiIndex, concat
 
     from scriptman.powers.database._exceptions import DatabaseError
     from scriptman.powers.etl._database import ETLDatabase
@@ -52,6 +52,9 @@ class ETL:
 
     def set_index(self, *args: Any, **kwargs: Any) -> "ETL":
         """🔍 Set the index of the DataFrame."""
+        if "inplace" in kwargs:
+            self._data.set_index(*args, **kwargs)
+            return self
         return ETL(self._data.set_index(*args, **kwargs))
 
     def __getitem__(self, key: Any) -> Any:
@@ -147,6 +150,20 @@ class ETL:
         🔍 Create an ETL object from a DataFrame.
         """
         return cls(data)
+
+    @classmethod
+    def from_dataframe_list(cls, data: list[DataFrame], **kwargs: Any) -> "ETL":
+        """
+        🔍 Create an ETL object from a list of DataFrames.
+        """
+        return cls(concat(data, **kwargs))
+
+    @classmethod
+    def from_etl_list(cls, data: list["ETL"], **kwargs: Any) -> "ETL":
+        """
+        🔍 Create an ETL object from a list of ETL objects.
+        """
+        return cls(concat([_.data for _ in data], **kwargs))
 
     @classmethod
     def from_list(cls, data: list[dict[str, Any]]) -> "ETL":

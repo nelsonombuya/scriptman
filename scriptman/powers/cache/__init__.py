@@ -137,20 +137,20 @@ class CacheManager(Generic[T]):
 
                 with cache_manager._track_operation():
                     if result := cache_manager.backend.get(key=key):
-                        logger.success(f"✅ Cache hit for key: {key}")
+                        logger.debug(f"✅ Cache hit for key: {key}")
                         return cast(T, result)
 
-                    logger.warning(f"❔ Cache miss for key: {key}")
+                    logger.info(f"❔ Cache miss for key: {key}")
                     result = func(*args, **kwargs)
 
                     if exclude_none and result is None:
-                        logger.warning(f"❔ Skipping cache for key {key}: result is None")
+                        logger.debug(f"❔ Skipping cache for key {key}: result is None")
                         return cast(T, result)
 
                     if cache_manager.backend.set(
                         key=key, value=result, ttl=ttl, **backend_kwargs
                     ):
-                        logger.info(
+                        logger.debug(
                             f"✅ Stored result in cache with key: {key} with TTL of "
                             + TimeCalculator.calculate_time_taken(0, float(ttl or 0))
                         )
@@ -195,20 +195,20 @@ class CacheManager(Generic[T]):
 
                 with cache_manager._track_operation():
                     if result := cache_manager.backend.get(key=key):
-                        logger.success(f"✅ Cache hit for key: {key}")
+                        logger.debug(f"✅ Cache hit for key: {key}")
                         return cast(T, result)
 
-                    logger.warning(f"❔ Cache miss for key: {key}")
+                    logger.info(f"❔ Cache miss for key: {key}")
                     result = await func(*args, **kwargs)
 
                     if exclude_none and result is None:
-                        logger.warning(f"❔ Skipping cache for key {key}: result is None")
+                        logger.debug(f"❔ Skipping cache for key {key}: result is None")
                         return cast(T, result)
 
                     if cache_manager.backend.set(
                         key=key, value=result, ttl=ttl, **backend_kwargs
                     ):
-                        logger.info(
+                        logger.debug(
                             f"✅ Stored result in cache with key: {key} with TTL of "
                             + TimeCalculator.calculate_time_taken(0, float(ttl or 0))
                         )

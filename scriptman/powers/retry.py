@@ -40,7 +40,7 @@ def retry(
                 except Exception as e:
                     # If a specific exception type is set and e is not it, do not retry
                     if retry_on is not None and not isinstance(e, retry_on):
-                        logger.warning(f"⚠ Skipping retry for exception: {e}")
+                        logger.debug(f"⚠ Skipping retry for exception: {e}")
                         raise e
 
                     # On the last attempt, log and re-raise
@@ -50,7 +50,7 @@ def retry(
 
                     # Calculate delay using exponential backoff
                     delay = min(max(base_delay * (2**attempt), min_delay), max_delay)
-                    logger.warning(
+                    logger.info(
                         f"⏳ Retrying in {delay} seconds... (attempt {attempt + 1}) - {e}"
                     )
                     sync_sleep(delay)
@@ -98,7 +98,7 @@ def async_retry(
                 except Exception as e:
                     # If a specific exception type is set and e is not it, do not retry
                     if retry_on is not None and not isinstance(e, retry_on):
-                        logger.warning(f"⚠ Skipping retry for exception: {e}")
+                        logger.debug(f"⚠ Skipping retry for exception: {e}")
                         raise e
 
                     # On the last attempt, log and re-raise
@@ -108,7 +108,7 @@ def async_retry(
 
                     # Calculate delay using exponential backoff
                     delay = min(max(base_delay * (2**attempt), min_delay), max_delay)
-                    logger.warning(
+                    logger.info(
                         f"⏳ Retrying in {delay} seconds... (attempt {attempt + 1}) - {e}"
                     )
                     await async_sleep(delay)

@@ -75,11 +75,11 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         Returns:
             Response: HTTP response object.
         """
-        logger.info(f"📡 Sending {method.value} request to {url}")
+        logger.debug(f"📡 Sending {method.value} request to {url}")
         logger.debug(f"📡 Request Details: {dumps(kwargs, indent=4)}")
         response = raw_request(method.value, url, **kwargs)
         response.raise_for_status()
-        logger.success(f"✅ {method.value} request for {url} completed successfully.")
+        logger.info(f"✅ {method.value} request for {url} completed successfully.")
         logger.debug(f"📤 Response Details: {dumps(response.json(), indent=4)}")
         return response
 

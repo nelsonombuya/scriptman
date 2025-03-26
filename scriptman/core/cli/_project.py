@@ -191,7 +191,7 @@ class ProjectSubParser(BaseParser):
                     cwd=config.cwd,
                 )
                 if result.returncode == 0:
-                    logger.info("  Poetry dependencies installed")
+                    logger.debug("  Poetry dependencies installed")
                 else:
                     logger.warning(
                         "⚠ Poetry dependencies not installed or Poetry not available"
@@ -203,7 +203,7 @@ class ProjectSubParser(BaseParser):
             try:
                 with open(config.cwd / "requirements.txt", "r") as f:
                     deps = len(f.readlines())
-                logger.info(f"  {deps} packages listed in requirements.txt")
+                logger.debug(f"  {deps} packages listed in requirements.txt")
             except Exception as e:
                 logger.error(f"❌ Error reading requirements.txt: {e}")
         else:

@@ -240,7 +240,7 @@ class SQLAlchemyHandler(DatabaseHandler):
                 self.log.info("No rows to process in bulk operation")
                 return True
 
-            with self._engine.connect() as session:
+            with self._engine.begin() as session:
                 self.log.info(f"Executing bulk operation for {len(rows)} rows...")
                 session.execute(text(query), rows)
             self.log.success("Bulk operation completed successfully")

@@ -26,6 +26,7 @@ class ETL:
     """🔍 Data processing utility for Extract, Transform, Load operations."""
 
     log = logger
+    _data: DataFrame = DataFrame()
 
     def __init__(self, data: Optional[ETL_TYPES] = None) -> None:
         """
@@ -127,15 +128,15 @@ class ETL:
                 raise exception
 
             if operation == "extraction":
-                num_records = len(cls()) if isinstance(cls, type) else len(cls)
+                num_records = len(cls._data) if isinstance(cls, type) else len(cls)
                 if num_records > 0:
                     cls.log.debug(f"Number of records extracted: {num_records}")
-                    cls.log.debug(f"Extracted data: {cls}")
+                    cls.log.debug(f"Extracted data: {cls._data}")
                 else:
                     cls.log.warning("No records were extracted.")
 
             elif operation == "transformation":
-                cls.log.debug(f"Transformed data: {cls}")
+                cls.log.debug(f"Transformed data: {cls._data}")
 
             else:
                 cls.log.success(f"Data {operation_str} complete.")
@@ -788,8 +789,9 @@ class ETL:
 
         if method == "replace" and table_exists:
             db.drop_table(table_name)
+            table_exists = False
 
-        if (method in {"upsert", "update"}) and self.index.empty:
+        if (method in {"upsert", "update"}) and self._data.index.empty:
             message = (
                 "Dataset has no index! "
                 "Please set the index using the `set_index` method."
@@ -805,6 +807,7 @@ class ETL:
                 columns=db.get_table_data_types(self._data.reset_index(), force_nvarchar),
             )
             method = "insert"
+            self.log.info(f"Since table was created, method set to: {method}")
 
         query, values = {
             "insert": db.generate_prepared_insert_query,

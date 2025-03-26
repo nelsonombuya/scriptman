@@ -87,7 +87,7 @@ class ETLDatabase:
             if isinstance(value, (float, int)) and isnan(value):
                 return None
             if force_nvarchar:
-                return str(value) if value is not None else None
+                return str(value) if value else None
             return value
 
         for record in df.reset_index().to_dict(orient="records"):

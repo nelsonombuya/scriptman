@@ -10,7 +10,7 @@ try:
     from scriptman.powers.database._exceptions import DatabaseError
     from scriptman.powers.etl._database import ETLDatabase
     from scriptman.powers.etl._protocol import ETLDatabaseInterface
-    from scriptman.powers.executor import TaskExecutor
+    from scriptman.powers.task import TaskExecutor
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError as e:
     raise ImportError(

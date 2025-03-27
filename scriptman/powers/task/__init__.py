@@ -8,8 +8,8 @@ from uuid import uuid4
 
 from tqdm import tqdm
 
-from scriptman.powers.executor._models import BatchResult, TaskResult, TaskStatus
 from scriptman.powers.generics import AsyncFunc, Func, SyncFunc, T
+from scriptman.powers.task._models import BatchResult, TaskResult, TaskStatus
 
 
 class TaskExecutor(Generic[T]):
@@ -60,7 +60,7 @@ class TaskExecutor(Generic[T]):
         """🆔 Task ID generation"""
         return f"{prefix}_{func_name}_{uuid4().hex[:8]}"
 
-    def run_in_background(self, func: Func[T], *args: Any, **kwargs: Any) -> str:
+    def background(self, func: Func[T], *args: Any, **kwargs: Any) -> str:
         """
         🚀 Run a single task in the background.
 
@@ -100,7 +100,7 @@ class TaskExecutor(Generic[T]):
 
         raise KeyError(f"💥 Task {task_id} not found.")
 
-    def parallel_cpu_bound_task(
+    def multiprocess(
         self,
         func: SyncFunc[T],
         args: list[tuple[Any, ...]] = [],
@@ -121,6 +121,18 @@ class TaskExecutor(Generic[T]):
         Returns:
             BatchResult[T]: Results of all processed tasks
         """
+        from inspect import signature
+
+        # Check if the function is a method (has self or cls parameter)
+        param_names = list(signature(func).parameters.keys())
+        if param_names and param_names[0] in ("self", "cls"):
+            raise ValueError(
+                "Cannot use multiprocess with instance or class methods. "
+                "Methods with 'self' or 'cls' parameters cannot be pickled for "
+                "multiprocessing. Consider using a standalone function, static method "
+                "or the 'background' method instead."
+            )
+
         assert not iscoroutinefunction(func), "CPU-bound tasks should be synchronous."
         batch_id = self._generate_task_id("parallel_cpu", func.__name__)
         start_time = datetime.now()

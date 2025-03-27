@@ -778,6 +778,7 @@ class ETL:
         """
         # Wrap the handler with ETLDatabase for extended functionality
         db = ETLDatabase(db)
+        executor = TaskExecutor()
         table_exists: bool = db.table_exists(table_name)
 
         if self.empty:
@@ -837,7 +838,7 @@ class ETL:
                 self.log.warning(f"Bulk Execution Failed: {error}")
                 self.log.warning("Executing single queries...")
 
-            tasks = TaskExecutor().multithread(
+            tasks = executor.multithread(
                 [(db.execute_write_query, (query, row), {}) for row in values]
             )
             tasks.await_results()  # Will raise an exception if any query fails
@@ -846,7 +847,7 @@ class ETL:
         except DatabaseError as error:
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
             partial_func = partial(self._insert_or_update, db, table_name)
-            tasks = TaskExecutor().multithread(
+            tasks = executor.multithread(
                 [(lambda row: partial_func(row), (row,), {}) for row in values]
             )
             tasks.await_results()  # Will raise an exception if any query fails

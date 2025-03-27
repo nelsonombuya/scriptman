@@ -837,26 +837,20 @@ class ETL:
                 self.log.warning(f"Bulk Execution Failed: {error}")
                 self.log.warning("Executing single queries...")
 
-            return all(
-                TaskExecutor[bool]()
-                .parallel_io_bound_task(
-                    func=db.execute_write_query,
-                    args=[(query, row) for row in values],
-                )
-                .results
+            tasks = TaskExecutor().multithread(
+                [(db.execute_write_query, (query, row), {}) for row in values]
             )
+            tasks.await_results()  # Will raise an exception if any query fails
+            return tasks.are_successful
 
         except DatabaseError as error:
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
             partial_func = partial(self._insert_or_update, db, table_name)
-            return all(
-                TaskExecutor[bool]()
-                .parallel_io_bound_task(
-                    func=lambda record: partial_func(record),
-                    args=[(record,) for record in values],
-                )
-                .results
+            tasks = TaskExecutor().multithread(
+                [(lambda row: partial_func(row), (row,), {}) for row in values]
             )
+            tasks.await_results()  # Will raise an exception if any query fails
+            return tasks.are_successful
 
     def _insert_or_update(
         self, database_handler: ETLDatabase, table_name: str, record: dict[str, Any]

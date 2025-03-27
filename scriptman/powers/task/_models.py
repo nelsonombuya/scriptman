@@ -1,159 +1,171 @@
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Generic, Optional, Self
-
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from concurrent.futures import ALL_COMPLETED, FIRST_EXCEPTION, Future, wait
+from dataclasses import dataclass, field
+from time import perf_counter
+from typing import Generic, Literal, Optional, Union, overload
 
 from scriptman.powers.generics import T
 
 
-class TaskStatus(str, Enum):
-    """🎭 Task statuses for better lifecycle management"""
+@dataclass
+class TaskFuture(Generic[T]):
+    """📦 Container for a background task that can be awaited later"""
 
-    FAILED = "failed"
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
+    _future: Future[T]
+    _start_time: float = field(default_factory=perf_counter)
 
+    @overload
+    def await_result(self, *, raise_exceptions: Literal[True] = True) -> T:
+        """⏱ Await and return the task result, raising an exception if it fails"""
+        ...
 
-class TaskResult(BaseModel, Generic[T]):
-    """
-    🚀 TaskResult Model - Encapsulates the result of a task execution
+    @overload
+    def await_result(self, *, raise_exceptions: Literal[False]) -> Optional[T]:
+        """⏱ Await and return the task result, returning None if it fails"""
+        ...
 
-    This model stores the status, result, and duration of task executions.
-    """
-
-    task_id: str
-    status: TaskStatus = TaskStatus.PENDING
-    args: tuple[Any, ...] = ()
-    kwargs: dict[str, Any] = {}
-    result: Optional[T] = None
-    error: Optional[BaseException] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    duration: Optional[timedelta] = None
-    parent_id: Optional[str] = None
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @model_validator(mode="after")
-    def calculate_duration(self) -> Self:
+    def await_result(self, *, raise_exceptions: bool = True) -> Union[T, Optional[T]]:
         """
-        🌟 Duration Calculator - Automatically calculates the task duration during
-        initialization if `start_time` and `end_time` are provided.
-        """
-        if self.start_time and self.end_time:
-            self.duration = self.end_time - self.start_time
-        return self
+        ⌚ Await and return the task result
 
-
-class BatchResult(BaseModel, Generic[T]):
-    """
-    📦 BatchResult Model - Encapsulates results for a batch of tasks
-    """
-
-    batch_id: str
-    tasks: list[TaskResult[T]]
-    start_time: datetime = Field(default_factory=datetime.now)
-    end_time: Optional[datetime] = None
-    duration: Optional[timedelta] = None
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @model_validator(mode="after")
-    def calculate_duration(self) -> Self:
-        """
-        🌟 Duration Calculator - Automatically calculates the task duration
-        during initialization if `start_time` and `end_time` are provided.
-        """
-        if self.start_time and self.end_time:
-            self.duration = self.end_time - self.start_time
-        return self
-
-    @field_validator("tasks", mode="after")
-    @classmethod
-    def validate_tasks(cls, value: list[TaskResult[T]]) -> list[TaskResult[T]]:
-        task_ids: set[str] = set()
-        for task in value:
-            if task.task_id in task_ids:
-                raise ValueError(f"Duplicate task ID: {task.task_id}")
-            task_ids.add(task.task_id)
-
-        return value
-
-    @property
-    def completed(self) -> bool:
-        """
-        ✅ Completion Status - Checks if all tasks in the batch are completed
+        Args:
+            raise_exceptions: Whether to raise exceptions that occurred during execution
 
         Returns:
-            bool: True if all tasks are completed, failed, or cancelled, else False.
+            The task result if successful, or None if failed and raise_exceptions is False
+
+        Raises:
+            Exception: If the task failed and raise_exceptions is True
         """
-        return all(
-            task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED)
-            for task in self.tasks
+        try:
+            return self._future.result()
+        except Exception as e:
+            if raise_exceptions:
+                raise e
+            return None
+
+    @property
+    def is_done(self) -> bool:
+        """✅ Whether the task has completed (successfully or with error)"""
+        return self._future.done()
+
+    @property
+    def is_successful(self) -> bool:
+        """✅ Whether the task completed successfully"""
+        return self.is_done and self.await_result(raise_exceptions=False) is not None
+
+    @property
+    def duration(self) -> float:
+        """⏰ Task duration in seconds (if completed)"""
+        from time import perf_counter
+
+        if not self.is_done:
+            # For running tasks, simply return current duration
+            return perf_counter() - self._start_time
+
+        # For completed tasks, we want to ensure we capture the actual completion time
+        if not hasattr(self._future, "_completion_timestamp"):
+            try:
+                # Get the result without blocking since we know it's done
+                self._future.result(timeout=0)
+            except Exception:
+                pass  # Task failed, but we still want to track when it completed
+            finally:
+                # Store completion time regardless of success/failure
+                setattr(self._future, "_completion_timestamp", perf_counter())
+
+        return float(getattr(self._future, "_completion_timestamp")) - self._start_time
+
+
+@dataclass
+class BatchTaskFuture(Generic[T]):
+    """📋 Container for multiple parallel tasks that can be awaited together"""
+
+    _tasks: list[TaskFuture[T]] = field(default_factory=list)
+    _start_time: float = field(default_factory=perf_counter)
+
+    @overload
+    def await_results(
+        self, *, raise_exceptions: Literal[True] = True, timeout: Optional[float] = None
+    ) -> list[T]:
+        """⏱ Await and return results from all tasks, raising an exception if any fail"""
+        ...
+
+    @overload
+    def await_results(
+        self, *, raise_exceptions: Literal[False], timeout: Optional[float] = None
+    ) -> list[Optional[T]]:
+        """⏱ Await and return results from all tasks, returning None for failed tasks"""
+        ...
+
+    def await_results(
+        self, *, raise_exceptions: bool = True, timeout: Optional[float] = None
+    ) -> Union[list[T], list[Optional[T]]]:
+        """
+        ⌚ Await and return results from all tasks
+
+        Args:
+            raise_exceptions: Whether to raise exceptions that occurred during execution
+            timeout: Maximum time to wait (in seconds) or None to wait indefinitely
+
+        Returns:
+            List of task results in the same order as the tasks.
+            If raise_exceptions is False, failed tasks will be None.
+
+        Raises:
+            Exception: If any task failed and raise_exceptions is True
+        """
+        done, not_done = wait(
+            timeout=timeout,
+            fs=[task._future for task in self._tasks],
+            return_when=ALL_COMPLETED if not raise_exceptions else FIRST_EXCEPTION,
         )
 
-    @property
-    def successful(self) -> bool:
-        """
-        🏆 Success Status - Checks if all tasks in the batch completed successfully
+        # If we got here with raise_exceptions=True, all tasks succeeded or none started
+        results: list[T | None] = []
+        exceptions: list[Exception] = []
+        for task in self._tasks:
+            try:
+                results.append(task.await_result(raise_exceptions=False))
+            except Exception as e:
+                exceptions.append(e)
+                results.append(None)
 
-        Returns:
-            bool: True if all tasks have `COMPLETED` status, else False.
-        """
-        return all(task.status == TaskStatus.COMPLETED for task in self.tasks)
+        if raise_exceptions and exceptions:
+            raise exceptions[0]  # Raise the first exception encountered
 
-    @property
-    def failed_tasks(self) -> list[TaskResult[T]]:
-        """
-        ❌ Failed Tasks - Gets a list of all failed tasks
-
-        Returns:
-            list[TaskResult[T]]: List of tasks with `FAILED` status.
-        """
-        return [task for task in self.tasks if task.status == TaskStatus.FAILED]
+        return results
 
     @property
-    def results(self) -> list[T]:
-        """
-        📦 Results - Gets a list of all task results
-
-        Returns:
-            list[T]: List of task results
-        """
-        return [task.result for task in self.tasks if task.result]
+    def are_successful(self) -> bool:
+        """✅ Whether all tasks have completed successfully"""
+        return all(task.is_successful for task in self._tasks)
 
     @property
-    def all_tasks(self) -> list[TaskResult[T]]:
-        """
-        📦 All Tasks - Gets a list of all tasks
-
-        Returns:
-            list[TaskResult[T]]: List of all tasks
-        """
-        return self.tasks
+    def is_all_done(self) -> bool:
+        """✅ Whether all tasks have completed (successfully or with error)"""
+        return all(task.is_done for task in self._tasks)
 
     @property
-    def stats(self) -> dict[str, Any]:
-        """
-        🗃️ Stats - Provides a dictionary representation of the instance's statistics.
+    def is_any_done(self) -> bool:
+        """✅ Whether any tasks have completed (successfully or with error)"""
+        return any(task.is_done for task in self._tasks)
 
-        Returns:
-            dict: Batch details including ID, task counts, completion statuses, and
-                execution timings.
-        """
-        return {
-            "batch_id": self.batch_id,
-            "total_tasks": len(self.tasks),
-            "completed_tasks": sum(
-                1 for t in self.tasks if t.status == TaskStatus.COMPLETED
-            ),
-            "failed_tasks": sum(1 for t in self.tasks if t.status == TaskStatus.FAILED),
-            "cancelled_tasks": sum(
-                1 for t in self.tasks if t.status == TaskStatus.CANCELLED
-            ),
-            "start_time": self.start_time,
-            "end_time": self.end_time,
-            "duration": self.duration,
-            "tasks": {task.task_id: task.model_dump() for task in self.tasks},
-        }
+    @property
+    def duration(self) -> float:
+        """⏰ Batch duration in seconds (from start to now or completion)"""
+        if not self.is_all_done:
+            return perf_counter() - self._start_time
+
+        # Get the latest completion time among all tasks
+        latest_finish = max(task.duration + self._start_time for task in self._tasks)
+        return latest_finish - self._start_time
+
+    @property
+    def completed_count(self) -> int:
+        """📊 Number of completed tasks"""
+        return sum(1 for task in self._tasks if task.is_done)
+
+    @property
+    def total_count(self) -> int:
+        """📊 Total number of tasks"""
+        return len(self._tasks)

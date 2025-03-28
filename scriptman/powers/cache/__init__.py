@@ -109,7 +109,7 @@ class CacheManager:
     def get(self, key: str, **backend_kwargs: Any) -> Any:
         """🔍 Get a value from the cache."""
         if key in backend_kwargs:
-            backend_kwargs.pop(key)
+            backend_kwargs.pop(key)  # Remove the key from the backend kwargs
         return self.backend.get(key, **backend_kwargs)
 
     def set(

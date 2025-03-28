@@ -9,7 +9,7 @@ try:
 
     from scriptman.powers.api._models import APIRequest, APIResponse
     from scriptman.powers.api.exceptions import APIException
-    from scriptman.powers.generics import AsyncFunc, SyncFunc
+    from scriptman.powers.generics import AsyncFunc, P, SyncFunc
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -82,7 +82,7 @@ def create_error_response(request: APIRequest, e: Exception) -> dict[str, Any]:
     return APIResponse.from_api_exception(request, e).model_dump()
 
 
-def api_route(func: SyncFunc[dict[str, Any]]) -> SyncFunc[JSONResponse]:
+def api_route(func: SyncFunc[P, dict[str, Any]]) -> SyncFunc[P, JSONResponse]:
     """
     🔄 Decorator to wrap synchronous API route functions with standardized
     request/response handling.
@@ -95,7 +95,7 @@ def api_route(func: SyncFunc[dict[str, Any]]) -> SyncFunc[JSONResponse]:
     """
 
     @wraps(func)
-    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+    def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
         request = APIRequest()
         try:
             result = func(*args, **kwargs)
@@ -108,7 +108,7 @@ def api_route(func: SyncFunc[dict[str, Any]]) -> SyncFunc[JSONResponse]:
     return sync_wrapper
 
 
-def async_api_route(func: AsyncFunc[dict[str, Any]]) -> AsyncFunc[JSONResponse]:
+def async_api_route(func: AsyncFunc[P, dict[str, Any]]) -> AsyncFunc[P, JSONResponse]:
     """
     🔄⚡ Decorator to wrap asynchronous API route functions with standardized
     request/response handling.
@@ -121,7 +121,7 @@ def async_api_route(func: AsyncFunc[dict[str, Any]]) -> AsyncFunc[JSONResponse]:
     """
 
     @wraps(func)
-    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+    async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
         request = APIRequest()
         try:
             result = await func(*args, **kwargs)

@@ -32,7 +32,7 @@ class Job(BaseModel):
 
     id: str
     name: str
-    function: Func[Any]
+    function: Func[..., Any]
     enabled: bool = True
     trigger: BaseTrigger
     max_instances: int = 1

@@ -81,12 +81,15 @@ class ETLDatabase:
         Returns:
             Iterator[dict[str, Any]]: An iterator of prepared records.
         """
+        from json import dumps
         from math import isnan
 
         def transform_value(value: Any) -> Any:
             if isinstance(value, (float, int)) and isnan(value):
                 return None
             if force_nvarchar:
+                if isinstance(value, (dict, list)):
+                    return dumps(value)
                 return str(value) if value else None
             return value
 

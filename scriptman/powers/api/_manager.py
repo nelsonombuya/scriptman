@@ -13,7 +13,7 @@ try:
     from scriptman.core.config import config
     from scriptman.powers.api._middleware import FastAPIMiddleware
     from scriptman.powers.api._templates import api_route, async_api_route
-    from scriptman.powers.generics import AsyncFunc, Func, SyncFunc
+    from scriptman.powers.generics import AsyncFunc, Func, P, SyncFunc
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -32,8 +32,8 @@ class APIManager:
     _app: Optional[FastAPI] = None
     _routers: list[APIRouter] = []
     _instance: Optional["APIManager"] = None
-    _startup_handlers: list[Func[None]] = []
-    _shutdown_handlers: list[Func[None]] = []
+    _startup_handlers: list[Func[..., None]] = []
+    _shutdown_handlers: list[Func[..., None]] = []
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "APIManager":
         if cls._instance is None:
@@ -63,7 +63,7 @@ class APIManager:
 
     def route(
         self, path: str, methods: list[str] = ["GET"], **kwargs: Any
-    ) -> Callable[[Func[dict[str, Any]]], Func[JSONResponse]]:
+    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
         """
         Decorator for adding routes directly to the API.
 
@@ -73,13 +73,13 @@ class APIManager:
             **kwargs: Additional FastAPI route options
         """
 
-        def decorator(func: Func[dict[str, Any]]) -> Func[JSONResponse]:
-            template_func: AsyncFunc[JSONResponse] | SyncFunc[JSONResponse]
+        def decorator(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
+            template_func: AsyncFunc[P, JSONResponse] | SyncFunc[P, JSONResponse]
 
             if iscoroutinefunction(func):
-                template_func = async_api_route(cast(AsyncFunc[dict[str, Any]], func))
+                template_func = async_api_route(cast(AsyncFunc[P, dict[str, Any]], func))
             else:
-                template_func = api_route(cast(SyncFunc[dict[str, Any]], func))
+                template_func = api_route(cast(SyncFunc[P, dict[str, Any]], func))
 
             self.app.add_api_route(
                 endpoint=template_func,
@@ -160,11 +160,11 @@ class APIManager:
         """Add a router to the application."""
         self.app.include_router(router, prefix=prefix, **kwargs)
 
-    def add_startup_handler(self, handler: Func[None]) -> None:
+    def add_startup_handler(self, handler: Func[..., None]) -> None:
         """Add a startup handler to be executed when the application starts."""
         self._startup_handlers.append(handler)
 
-    def add_shutdown_handler(self, handler: Func[None]) -> None:
+    def add_shutdown_handler(self, handler: Func[..., None]) -> None:
         """Add a shutdown handler to be executed when the application shuts down."""
         self._shutdown_handlers.append(handler)
 

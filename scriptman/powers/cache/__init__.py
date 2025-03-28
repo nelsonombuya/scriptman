@@ -3,7 +3,7 @@ try:
     from hashlib import md5
     from inspect import ismethod
     from threading import Lock
-    from typing import Any, Callable, Generic, Optional, cast
+    from typing import Any, Callable, Optional, cast
 
     from dill import dumps
     from loguru import logger
@@ -11,7 +11,7 @@ try:
     from scriptman.core.config import config
     from scriptman.powers.cache._backend import CacheBackend
     from scriptman.powers.cache._diskcache import DiskCacheBackend, FanoutCacheBackend
-    from scriptman.powers.generics import AsyncFunc, SyncFunc, T
+    from scriptman.powers.generics import AsyncFunc, P, R, SyncFunc
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError as e:
     raise ImportError(
@@ -21,7 +21,7 @@ except ImportError as e:
     )
 
 
-class CacheManager(Generic[T]):
+class CacheManager:
     """Thread-safe singleton cache manager with safe backend switching capabilities"""
 
     _active_operations: int = 0
@@ -31,9 +31,9 @@ class CacheManager(Generic[T]):
     __backend: CacheBackend
     __initialized: bool = False
     __backend_switch_lock: Lock = Lock()
-    __instance: Optional["CacheManager[T]"] = None
+    __instance: Optional["CacheManager"] = None
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> "CacheManager[T]":
+    def __new__(cls, *args: Any, **kwargs: Any) -> "CacheManager":
         with cls.__lock:
             if cls.__instance is None:
                 cls.__instance = super().__new__(cls, *args, **kwargs)
@@ -98,20 +98,33 @@ class CacheManager(Generic[T]):
             self.__backend_switch_lock.release()
 
     @classmethod
-    def get_instance(cls, *args: Any, **kwargs: Any) -> "CacheManager[T]":
+    def get_instance(cls, *args: Any, **kwargs: Any) -> "CacheManager":
         """🚀 Get the singleton instance of CacheManager"""
         return cls(*args, **kwargs)
 
-    def _track_operation(self) -> "OperationTracker[T]":
+    def _track_operation(self) -> "OperationTracker":
         """🔎 Context manager to track active cache operations"""
-        return OperationTracker[T](self)
+        return OperationTracker(self)
+
+    def get(self, key: str, **backend_kwargs: Any) -> Any:
+        """🔍 Get a value from the cache."""
+        if key in backend_kwargs:
+            backend_kwargs.pop(key)
+        return self.backend.get(key, **backend_kwargs)
+
+    def set(
+        self, key: str, value: Any, ttl: Optional[int] = None, **backend_kwargs: Any
+    ) -> bool:
+        """🔍 Set a value in the cache."""
+        if "ttl" in backend_kwargs:
+            backend_kwargs.pop("ttl")  # Remove the ttl from the backend kwargs
+        return self.backend.set(key, value, ttl, **backend_kwargs)
 
     @staticmethod
     def cache_result(
         ttl: Optional[int] = config.settings.get("cache.ttl"),
-        exclude_none: bool = False,
         **backend_kwargs: Any,
-    ) -> Callable[[SyncFunc[T]], SyncFunc[T]]:
+    ) -> Callable[[SyncFunc[P, R]], SyncFunc[P, R]]:
         """
         📦 Decorator for caching function results. Works with synchronous functions.
 
@@ -120,45 +133,38 @@ class CacheManager(Generic[T]):
         Args:
             ttl (Optional[int]): The number of seconds until the key expires.
                 Defaults to None.
-            exclude_none (bool): If set to True, then None values will not be cached.
-                Defaults to False.
             **backend_kwargs: Additional keyword arguments to be passed to the cache
                 backend's set method when storing values.
 
         Returns:
-            Callable[..., SyncFunc[T]]: Decorated function.
+            Callable[[SyncFunc[P, R]], SyncFunc[P, R]]: Decorated function.
         """
-        cache_manager: CacheManager[T] = CacheManager.get_instance()
+        cache = CacheManager.get_instance()
 
-        def decorator(func: SyncFunc[T]) -> SyncFunc[T]:
+        def decorator(func: SyncFunc[P, R]) -> SyncFunc[P, R]:
             @wraps(func)
-            def sync_wrapper(*args: Any, **kwargs: Any) -> T:
-                key = CacheManager.generate_callable_key(func, args, kwargs)
+            def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                key = cache.generate_callable_key(func, args, kwargs)
 
-                with cache_manager._track_operation():
-                    if result := cache_manager.backend.get(key=key):
+                with cache._track_operation():
+                    if result := cache.get(key=key):
                         logger.debug(f"✅ Cache hit for key: {key}")
-                        return cast(T, result)
+                        return cast(R, result)
 
                     logger.info(f"❔ Cache miss for key: {key}")
                     result = func(*args, **kwargs)
 
-                    if exclude_none and result is None:
-                        logger.debug(f"❔ Skipping cache for key {key}: result is None")
-                        return cast(T, result)
+                    if not result:
+                        logger.debug(f"❔ Skipping cache for key {key}: result is empty")
+                        return cast(R, result)
 
-                    if cache_manager.backend.set(
-                        key=key, value=result, ttl=ttl, **backend_kwargs
-                    ):
-                        logger.debug(
-                            f"✅ Stored result in cache with key: {key} with TTL of "
-                            + TimeCalculator.calculate_time_taken(0, float(ttl or 0))
-                        )
+                    if cache.set(key=key, value=result, ttl=ttl, **backend_kwargs):
+                        ttl_str = TimeCalculator.calculate_time_taken(0, float(ttl or 0))
+                        logger.debug(f"✅ Stored {key} in cache for {ttl_str}")
                     else:
-                        logger.error(
-                            f"❌ Failed to store result in cache with key: {key}"
-                        )
-                    return cast(T, result)
+                        logger.error(f"❌ Failed to store {key} in cache")
+
+                    return cast(R, result)
 
             return sync_wrapper
 
@@ -167,9 +173,8 @@ class CacheManager(Generic[T]):
     @staticmethod
     def async_cache_result(
         ttl: Optional[int] = config.settings.get("cache.ttl"),
-        exclude_none: bool = False,
         **backend_kwargs: Any,
-    ) -> Callable[[AsyncFunc[T]], AsyncFunc[T]]:
+    ) -> Callable[[AsyncFunc[P, R]], AsyncFunc[P, R]]:
         """
         📦 Decorator for caching function results. Works with both asynchronous functions.
 
@@ -178,53 +183,45 @@ class CacheManager(Generic[T]):
         Args:
             ttl (Optional[int]): The number of seconds until the key expires.
                 Defaults to None.
-            exclude_none (bool): If set to True, then None values will not be cached.
-                Defaults to False.
             **backend_kwargs: Additional keyword arguments to be passed to the cache
                 backend's set method when storing values.
 
         Returns:
-            Callable[..., AsyncFunc[T]]: Decorated function.
+            Callable[[AsyncFunc[P, R]], AsyncFunc[P, R]]: Decorated function.
         """
-        cache_manager: CacheManager[T] = CacheManager.get_instance()
+        cache: CacheManager = CacheManager.get_instance()
 
-        def decorator(func: AsyncFunc[T]) -> AsyncFunc[T]:
+        def decorator(func: AsyncFunc[P, R]) -> AsyncFunc[P, R]:
             @wraps(func)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> T:
-                key = CacheManager.generate_callable_key(func, args, kwargs)
+            async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                key = cache.generate_callable_key(func, args, kwargs)
 
-                with cache_manager._track_operation():
-                    if result := cache_manager.backend.get(key=key):
+                with cache._track_operation():
+                    if result := cache.get(key=key):
                         logger.debug(f"✅ Cache hit for key: {key}")
-                        return cast(T, result)
+                        return cast(R, result)
 
                     logger.info(f"❔ Cache miss for key: {key}")
                     result = await func(*args, **kwargs)
 
-                    if exclude_none and result is None:
-                        logger.debug(f"❔ Skipping cache for key {key}: result is None")
-                        return cast(T, result)
+                    if not result:
+                        logger.debug(f"❔ Skipping cache for key {key}: result is empty")
+                        return cast(R, result)
 
-                    if cache_manager.backend.set(
-                        key=key, value=result, ttl=ttl, **backend_kwargs
-                    ):
-                        logger.debug(
-                            f"✅ Stored result in cache with key: {key} with TTL of "
-                            + TimeCalculator.calculate_time_taken(0, float(ttl or 0))
-                        )
+                    if cache.set(key=key, value=result, ttl=ttl, **backend_kwargs):
+                        ttl_str = TimeCalculator.calculate_time_taken(0, float(ttl or 0))
+                        logger.debug(f"✅ Stored {key} in cache for {ttl_str}")
                     else:
-                        logger.error(
-                            f"❌ Failed to store result in cache with key: {key}"
-                        )
-                    return cast(T, result)
+                        logger.error(f"❌ Failed to store {key} in cache")
+
+                    return cast(R, result)
 
             return async_wrapper
 
         return decorator
 
-    @staticmethod
     def generate_callable_key(
-        func: Callable[..., T], args: tuple[Any, ...], kwargs: dict[str, Any]
+        self, func: Callable[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]
     ) -> str:
         """
         🔑 Generate a unique cache key for a callable function.
@@ -243,14 +240,14 @@ class CacheManager(Generic[T]):
             str: A unique MD5 hash string representing the cache key.
         """
         key_properties = {
-            "func": CacheManager.get_function_name(func),
-            "kwargs": CacheManager.sort_dictionary(kwargs),
-            "args": CacheManager.remove_self_or_cls_from_args(func, args),
+            "func": self.get_function_name(func),
+            "kwargs": self.sort_dictionary(kwargs),
+            "args": self.remove_self_or_cls_from_args(func, args),
         }
         return md5(dumps(key_properties)).hexdigest()
 
-    @staticmethod
     def sort_dictionary(
+        self,
         dictionary: dict[Any, Any],
         key: Optional[Callable[..., Any]] = None,
         reverse: bool = False,
@@ -271,9 +268,8 @@ class CacheManager(Generic[T]):
         """
         return dict(sorted(dictionary.items(), key=key, reverse=reverse))
 
-    @staticmethod
     def remove_self_or_cls_from_args(
-        func: Callable[..., Any], args: tuple[Any, ...]
+        self, func: Callable[..., Any], args: tuple[Any, ...]
     ) -> tuple[Any, ...]:
         """
         🗑️ Remove the `self` or `cls` argument from the argument tuple if present.
@@ -294,8 +290,7 @@ class CacheManager(Generic[T]):
             args[1:] if args and ismethod(getattr(args[0], func.__name__, None)) else args
         )
 
-    @staticmethod
-    def get_function_name(func: Callable[..., Any]) -> str:
+    def get_function_name(self, func: Callable[..., Any]) -> str:
         """
         🔎 Retrieve the fully qualified name of a function, including its module name.
 
@@ -312,32 +307,16 @@ class CacheManager(Generic[T]):
         name = getattr(func, "__qualname__", type(func).__name__)
         return f"{module}.{name}"
 
-    def get(self, key: str, **backend_kwargs: Any) -> Any:
-        """🔍 Get a value from the cache."""
-        return self.backend.get(key, **backend_kwargs)
 
-    def set(
-        self,
-        key: str,
-        value: Any,
-        ttl: Optional[int] = None,
-        **backend_kwargs: Any,
-    ) -> bool:
-        """🔍 Set a value in the cache."""
-        if "ttl" in backend_kwargs:
-            backend_kwargs.pop("ttl")  # Remove the ttl from the backend kwargs
-        return self.backend.set(key, value, ttl, **backend_kwargs)
-
-
-class OperationTracker(Generic[T]):
-    def __init__(self, cache_manager: CacheManager[T]) -> None:
+class OperationTracker:
+    def __init__(self, cache_manager: CacheManager) -> None:
         """
         🚀 Initialize the operation tracker with the cache manager.
 
         Args:
             cache_manager (CacheManager): The cache manager to track operations for.
         """
-        self.cache_manager: CacheManager[T] = cache_manager
+        self.cache_manager: CacheManager = cache_manager
 
     def __enter__(self) -> None:
         """

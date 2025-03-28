@@ -1,7 +1,7 @@
 try:
     from abc import ABC
     from json import dumps
-    from typing import Any, Generic, Optional
+    from typing import Any, Optional, overload
 
     from loguru import logger
     from pydantic import ValidationError
@@ -33,7 +33,7 @@ except ImportError as e:
     )
 
 
-class BaseAPIClient(ABC, Generic[ResponseModelT]):
+class BaseAPIClient(ABC):
     """🌐 Base class for API client implementations with advanced features:
     - ✅ Response validation via Pydantic models
     - 🛡️ Type-safe response model validation
@@ -44,8 +44,7 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         self,
         base_url: str,
         headers: Optional[dict[str, str]] = None,
-        request_handler: Optional[RequestHandler] = None,
-        default_response_model: Optional[type[ResponseModelT]] = None,
+        request_handler: RequestHandler = DefaultRequestHandler(),
     ):
         """
         🏗️ Initialize API client with base URL, request configuration, and optional
@@ -54,14 +53,12 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         Args:
             base_url (str): Base URL for the API.
             headers (dict, optional): Request headers.
-            request_handler (RequestHandler, optional): Custom request handler.
-            default_response_model (Type[ResponseModelT], optional): Default response
-                model for validation.
+            request_handler (RequestHandler): Custom request handler.
+                Defaults to DefaultRequestHandler() which uses the `requests` library.
         """
         self.base_url = base_url
         self.headers = headers or {}
-        self.default_response_model = default_response_model
-        self.request_handler: RequestHandler = request_handler or DefaultRequestHandler()
+        self.request_handler: RequestHandler = request_handler
 
     def raw_request(self, method: HTTPMethod, url: str, **kwargs: Any) -> Response:
         """
@@ -83,14 +80,40 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         logger.debug(f"📤 Response Details: {dumps(response.json(), indent=4)}")
         return response
 
+    @overload
     def request(
         self,
         url: str,
         method: HTTPMethod,
+        response_model: type[ResponseModelT],
         params: Optional[dict[str, str]] = None,
         body: Optional[dict[str, Any]] = None,
         timeout: Optional[int] = None,
+    ) -> ResponseModelT:
+        """🚀 Send an HTTP request with strongly-typed response validation."""
+        ...
+
+    @overload
+    def request(
+        self,
+        url: str,
+        method: HTTPMethod,
+        response_model: None = None,
+        params: Optional[dict[str, str]] = None,
+        body: Optional[dict[str, Any]] = None,
+        timeout: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """🚀 Send an HTTP request without response validation."""
+        ...
+
+    def request(
+        self,
+        url: str,
+        method: HTTPMethod,
         response_model: Optional[type[ResponseModelT]] = None,
+        params: Optional[dict[str, str]] = None,
+        body: Optional[dict[str, Any]] = None,
+        timeout: Optional[int] = None,
     ) -> ResponseModelT | dict[str, Any]:
         """
         🚀 Send an HTTP request with optional response validation.
@@ -98,14 +121,14 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         Args:
             url (str): Endpoint URL (relative to base URL).
             method (HTTPMethod): HTTP method.
+            response_model (Type[BaseModel], optional): Response validation model.
             params (dict, optional): Query parameters.
             body (dict, optional): Request payload.
             timeout (int, optional): Request timeout in seconds.
-            response_model (Type[ResponseModelT], optional): Response validation model.
 
         Returns:
-            ResponseModelT: Validated response data if response_model is provided,
-                otherwise raw JSON.
+            ResponseModelT: Validated response data as the specific model type if
+                response_model is provided, otherwise raw JSON dictionary.
 
         Raises:
             APIResponseError: When API returns an error response
@@ -113,18 +136,16 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
             requests.RequestException: When request fails
         """
         response = self._send_request(self._clean_url(url), method, params, body, timeout)
-        response_model = self._get_response_model(response_model)
         data: dict[str, Any] = response.json()
 
-        return (
-            data
-            if not response_model
-            else self.validate_response(response, response_model)
-        )
+        if not response_model:
+            return data
+
+        return self.validate_response(response, response_model)
 
     def _clean_url(self, url: str) -> str:
         """
-        Clean the URL by removing the base URL and leading and trailing slashes.
+        🧹 Clean the URL by removing the base URL and leading and trailing slashes.
 
         Args:
             url (str): URL to clean.
@@ -144,7 +165,7 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         timeout: Optional[int] = None,
     ) -> Response:
         """
-        Helper method to send the HTTP request and handle HTTP errors.
+        📩 Helper method to send the HTTP request and handle HTTP errors.
 
         Args:
             url (str): Request URL.
@@ -193,41 +214,9 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
                 message=f"Request to {url} failed with error: {e}",
             )
 
-    def _get_response_model(
-        self, response_model: Optional[type[ResponseModelT]] = None
-    ) -> Optional[type[ResponseModelT]]:
-        """
-        🍱 Get the response model for the current request.
-
-        - If the response_model is specified, use it.
-        - If the default_response_model is specified and the generic type is provided,
-            use the default_response_model for the generic type.
-        - If the default_response_model is specified and the generic type is not provided,
-            use the default_response_model.
-        - Otherwise, return None.
-
-        Args:
-            response_model (Type[ResponseModelT], optional): The response model to use.
-
-        Returns:
-            Type[ResponseModelT]: The response model to use.
-        """
-        return (
-            response_model
-            if response_model
-            else (
-                # HACK: Getting the generic for the response model
-                self.default_response_model[self.generic]  # type:ignore
-                if self.generic
-                and self.default_response_model
-                and self.default_response_model != self.generic
-                else self.default_response_model if self.default_response_model else None
-            )
-        )
-
     def validate_response(
-        self, response: Response, response_model: Optional[type[ResponseModelT]]
-    ) -> ResponseModelT | dict[str, Any]:
+        self, response: Response, response_model: type[ResponseModelT]
+    ) -> ResponseModelT:
         """
         ✅ Validate and parse the JSON response using a Pydantic model.
 
@@ -241,12 +230,9 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
         Raises:
             exceptions.APIException: If validation fails.
         """
-        data: dict[str, Any] = response.json()
-        if not response_model:
-            return data
 
         try:
-            return response_model.model_validate(data)
+            return response_model.model_validate(response.json())
         except ValidationError as e:
             logger.error(f"❌ Response validation failed: {e}")
             raise exceptions.ValidationError(
@@ -258,28 +244,6 @@ class BaseAPIClient(ABC, Generic[ResponseModelT]):
                 },
             )
 
-    @staticmethod
-    def get_generic(object: Any) -> Optional[type]:
-        """🔍 Return the type argument of the generic client, or None."""
-        return (  # HACK: Get the type argument of the generic class instance
-            object.__getattribute__("__orig_class__").__getattribute__("__args__")[0]
-            if hasattr(object, "__orig_class__")
-            else None
-        )
-
-    @property
-    def generic(self) -> Optional[type]:
-        """
-        👤 The type argument of the generic client, or None.
-
-        This can be used to access the type argument of the generic client
-        from within the client class itself.
-
-        Returns:
-            Optional[type]: The type argument of the generic client, or None.
-        """
-        return self.get_generic(self)
-
 
 __all__: list[str] = [
     "api",
@@ -289,7 +253,6 @@ __all__: list[str] = [
     "EntityModelT",
     "BaseAPIClient",
     "RequestHandler",
-    "ResponseModelT",
     "async_api_route",
     "BaseEntityModel",
     "EntityIdentifier",

@@ -141,7 +141,7 @@ class APIResponse(BaseModel):
 
 
 # ⚙ Type Variables
-ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)  # Response
+ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)  # Response Model
 EntityModelT = TypeVar("EntityModelT", bound="BaseEntityModel")  # Response Entities
 
 

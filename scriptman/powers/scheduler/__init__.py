@@ -335,7 +335,7 @@ class Scheduler:
                 for job in self.__scheduler.get_jobs()
             ]
 
-    def run_service(self, block: bool = True) -> Optional[Thread]:
+    def start_service(self, block: bool = True) -> Optional[Thread]:
         """
         🔄 Run the scheduler as a background service.
 
@@ -346,7 +346,6 @@ class Scheduler:
         Returns:
             Optional[Thread]: The service thread if block=False, otherwise None
         """
-
         if block:
             self._service_loop()
             return None

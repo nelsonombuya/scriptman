@@ -32,7 +32,7 @@ class Job(BaseModel):
 
     id: str
     name: str
-    function: Func[..., Any]
+    func: Func[..., Any]
     enabled: bool = True
     trigger: BaseTrigger
     max_instances: int = 1
@@ -66,19 +66,19 @@ class Job(BaseModel):
             dict[str, Any]: A dictionary containing the job's details.
         """
 
-        @wraps(self.function)
+        @wraps(self.func)
         def wrapper(*f_args: Any, **f_kwargs: Any) -> Any:
             try:
-                return self.function(*f_args, **f_kwargs)
+                return self.func(*f_args, **f_kwargs)
             except Exception as e:
                 logger.error(f"❌ Job {self.name} failed: {e}")
                 raise e
 
-        if hasattr(self.function, "__qualname__"):
-            wrapper.__qualname__ = self.function.__qualname__
+        if hasattr(self.func, "__qualname__"):
+            wrapper.__qualname__ = self.func.__qualname__
 
         job_details = super().model_dump(*args, **kwargs)
-        job_details["function"] = wrapper
+        job_details["func"] = wrapper
         return job_details
 
     def info_dump(self) -> dict[str, Any]:
@@ -92,8 +92,8 @@ class Job(BaseModel):
             dict[str, Any]: A dictionary containing the job's details.
         """
         function_name = (
-            self.function.__qualname__
-            if hasattr(self.function, "__qualname__")
+            self.func.__qualname__
+            if hasattr(self.func, "__qualname__")
             else "<unknown_function>"
         )
 
@@ -110,7 +110,7 @@ class Job(BaseModel):
             "id": self.id,
             "name": self.name,
             "enabled": self.enabled,
-            "function": function_name,
+            "func": function_name,
             "trigger": trigger_details,
             "max_instances": self.max_instances,
         }

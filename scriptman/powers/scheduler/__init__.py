@@ -1,9 +1,9 @@
 try:
     from pathlib import Path
-    from threading import RLock
+    from threading import RLock, Thread
     from typing import Any, Callable, Optional
 
-    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from apscheduler.schedulers.background import BackgroundScheduler
     from apscheduler.schedulers.base import BaseScheduler
     from apscheduler.triggers.base import BaseTrigger
     from loguru import logger
@@ -22,8 +22,9 @@ except ImportError as e:
 
 class Scheduler:
     __initialized: bool = False
+    __is_service_running: bool = False
     __instance: Optional["Scheduler"] = None
-    __scheduler: BaseScheduler = AsyncIOScheduler()
+    __service_thread: Optional[Thread] = None
     __lock: RLock = RLock()  # Reentrant lock for thread safety
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "Scheduler":
@@ -44,24 +45,29 @@ class Scheduler:
 
     def __init__(
         self,
-        thread_pool_size: Optional[int] = None,
-        process_pool_size: Optional[int] = None,
+        scheduler_class: type[BaseScheduler] = BackgroundScheduler,
+        thread_pool_size: int | None = None,
+        process_pool_size: int | None = None,
+        **kwargs: dict[str, Any],
     ) -> None:
         """
-        🚀 Initialize the Scheduler singleton instance.
-
-        This method starts the scheduler and sets the __initialized flag to True.
-        If the instance has already been initialized, it simply returns.
+        🚀 Initialize the scheduler singleton with flexibility to change scheduler type.
 
         Args:
+            scheduler_class: The scheduler class to use (default: BackgroundScheduler)
             thread_pool_size: The number of threads to use for the task executor.
             process_pool_size: The number of processes to use for the task executor.
+            **kwargs: Additional arguments to pass to the scheduler constructor
         """
         with self.__lock:
             if self.__initialized:
                 return
 
+            # Scheduler Setup
+            self.__scheduler = scheduler_class(**kwargs)
             self.__scheduler.start()
+            self.__service_thread = None
+            self.__is_service_running = False
 
             # Script & Function Scheduling
             self.__scripts = Scripts()
@@ -70,19 +76,16 @@ class Scheduler:
                 process_pool_size=process_pool_size,
             )
 
+            # Initialize the scheduler instance
             self.__initialized = True
 
+    @property
+    def scheduler(self) -> BaseScheduler:
+        """Get the underlying APScheduler instance for advanced operations"""
+        return self.__scheduler
+
     def add_job(self, job: Job) -> None:
-        """
-        ➕ Add a job to the scheduler.
-
-        Args:
-            job: A Job instance to be added to the scheduler.
-
-        Notes:
-            If the job is enabled, it is added to the scheduler.
-            If the job is disabled, a warning is logged.
-        """
+        """➕ Add a job to the scheduler."""
         with self.__lock:
             if job.enabled:
                 logger.info(f"➕ Adding scheduled job: {job.name}")
@@ -91,20 +94,29 @@ class Scheduler:
                 logger.warning(f"Job {job.name} is disabled")
 
     def remove_job(self, job_id: str) -> None:
-        """
-        ➖ Remove a scheduled job by its ID.
-
-        Args:
-            job_id: The ID of the job to be removed.
-
-        Notes:
-            If the job is found, it is removed from the scheduler.
-            If the job is not found, a warning is logged.
-        """
+        """➖ Remove a scheduled job by its ID."""
         with self.__lock:
             if job_id in self.__scheduler.get_jobs():
                 logger.info(f"➖ Removing scheduled job: {job_id}")
                 self.__scheduler.remove_job(job_id)
+            else:
+                logger.warning(f"Job with ID {job_id} not found")
+
+    def pause_job(self, job_id: str) -> None:
+        """⏸ Pause a scheduled job by its ID"""
+        with self.__lock:
+            if job_id in self.__scheduler.get_jobs():
+                logger.info(f"⏸ Pausing scheduled job: {job_id}")
+                self.__scheduler.pause_job(job_id)
+            else:
+                logger.warning(f"Job with ID {job_id} not found")
+
+    def resume_job(self, job_id: str) -> None:
+        """▶️ Resume a paused job by its ID"""
+        with self.__lock:
+            if job_id in self.__scheduler.get_jobs():
+                logger.info(f"▶️ Resuming scheduled job: {job_id}")
+                self.__scheduler.resume_job(job_id)
             else:
                 logger.warning(f"Job with ID {job_id} not found")
 
@@ -126,19 +138,87 @@ class Scheduler:
             else:
                 logger.warning(f"Job with ID {job_id} not found")
 
-    def change_scheduler(self, scheduler: BaseScheduler) -> None:
+    def change_scheduler(
+        self, scheduler_class: type[BaseScheduler], **kwargs: dict[str, Any]
+    ) -> bool:
         """
-        🔄 Change the scheduler.
+        🔄 Change the scheduler type and migrate all existing jobs to the new scheduler.
 
         Args:
-            scheduler: The new scheduler.
+            scheduler_class: The new scheduler class to use (e.g., BackgroundScheduler)
+            **kwargs: Additional arguments to pass to the new scheduler constructor
 
-        Notes:
-            If the scheduler is not found, a warning is logged.
+        Returns:
+            bool: True if migration was successful, False otherwise
         """
-        with self.__lock:
-            logger.info(f"🔄 Changing scheduler to: {scheduler}")
-            self.__scheduler = scheduler
+        if self.__is_service_running:
+            logger.warning(
+                "⚠ Cannot change scheduler while service is running. "
+                "Stop the service first."
+            )
+            return False
+
+        current_jobs = self._extract_jobs()
+        was_running = self.__scheduler.running
+
+        try:
+            if was_running:
+                self.__scheduler.shutdown(wait=True)
+
+            self.__scheduler = scheduler_class(**kwargs)
+
+            if was_running:
+                self.__scheduler.start()
+
+            self._restore_jobs(current_jobs)
+            logger.success(
+                f"✅ Successfully migrated {len(current_jobs)} jobs "
+                f"to {scheduler_class.__name__}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Error changing scheduler: {e}")
+            # If we fail, try to restore the original scheduler state
+            if not self.__scheduler.running and was_running:
+                self.__scheduler.start()
+            return False
+
+    def _extract_jobs(self) -> list[dict[str, Any]]:
+        """📩 Extract all job configurations from the current scheduler."""
+        from copy import deepcopy
+
+        return [
+            {
+                "id": job.id,
+                "func": job.func,
+                "trigger": deepcopy(job.trigger),
+                "name": job.name,
+                "misfire_grace_time": job.misfire_grace_time,
+                "coalesce": job.coalesce,
+                "max_instances": job.max_instances,
+                "next_run_time": job.next_run_time,
+                # Extract any other job properties you need
+            }
+            for job in self.__scheduler.get_jobs()
+        ]
+
+    def _restore_jobs(self, jobs: list[dict[str, Any]]) -> None:
+        """📩 Restore jobs to the current scheduler."""
+        for job_details in jobs:
+            # The job ID is passed separately
+            job_id = job_details.pop("id")
+
+            # Extract the function and trigger which are required parameters
+            func = job_details.pop("func")
+            trigger = job_details.pop("trigger")
+
+            # Remove next_run_time since APScheduler will calculate this
+            if "next_run_time" in job_details:
+                job_details.pop("next_run_time")
+
+            # Add the job with all its original parameters
+            self.__scheduler.add_job(func=func, trigger=trigger, id=job_id, **job_details)
 
     def schedule_script(
         self,
@@ -179,7 +259,7 @@ class Scheduler:
         job = Job(
             id=job_id,
             name=job_name,
-            function=execute_script,
+            func=execute_script,
             trigger=trigger,
             enabled=enabled,
             max_instances=max_instances,
@@ -226,7 +306,7 @@ class Scheduler:
         job = Job(
             id=job_id,
             name=job_name,
-            function=execute_function,
+            func=execute_function,
             trigger=trigger,
             enabled=enabled,
             max_instances=max_instances,
@@ -247,7 +327,7 @@ class Scheduler:
                 Job(
                     id=job.id,
                     name=job.name,
-                    function=job.func,
+                    func=job.func,
                     trigger=job.trigger,
                     enabled=job.next_run_time is not None,
                     max_instances=job.max_instances,
@@ -255,13 +335,81 @@ class Scheduler:
                 for job in self.__scheduler.get_jobs()
             ]
 
-    def __del__(self) -> None:
+    def run_service(self, block: bool = True) -> Optional[Thread]:
         """
-        👋 Goodbye! Shut down the scheduler when the instance is deleted.
+        🔄 Run the scheduler as a background service.
+
+        Args:
+            block (bool): If True, this function will block the current thread.
+                If False, will start in a separate thread and return immediately.
+
+        Returns:
+            Optional[Thread]: The service thread if block=False, otherwise None
         """
-        with self.__lock:
-            logger.info("👋 Goodbye! Shutting down the scheduler...")
+
+        if block:
+            self._service_loop()
+            return None
+        else:
+            self.__service_thread = Thread(target=self._service_loop, daemon=False)
+            self.__service_thread.start()
+            return self.__service_thread
+
+    def _service_loop(self) -> None:
+        """🔄 Run the scheduler as a background service."""
+        self.__is_service_running = True
+        logger.info("🔄 Scheduler service started")
+
+        # Set up signal handlers for clean shutdown
+        def handle_exit_signal(signum: int, frame: Any) -> None:
+            logger.info(f"Received exit signal {signum}")
+            self.__is_service_running = False
+
+        try:
+            # Register signal handlers (works on Unix-like systems)
+            from signal import SIGINT, SIGTERM, signal
+
+            signal(SIGINT, handle_exit_signal)
+            signal(SIGTERM, handle_exit_signal)
+        except (AttributeError, ValueError):
+            # Running in a thread or on Windows where signals work differently
+            logger.debug("Service is running in a thread or on Windows")
+
+        try:
+            # Keep the service running until requested to stop
+            from time import sleep
+
+            while self.__is_service_running:
+                sleep(1)
+        except (KeyboardInterrupt, SystemExit):
+            logger.info("Received exit signal")
+        finally:
+            logger.info("Scheduler service stopping...")
             self.__scheduler.shutdown()
+            logger.info("Scheduler service stopped")
+
+    def stop_service(self) -> bool:
+        """🛑 Stop the scheduler service if it's running"""
+        if self.__is_service_running:
+            self.__is_service_running = False
+            if self.__service_thread and self.__service_thread.is_alive():
+                self.__service_thread.join(timeout=5)
+            return True
+        return False
+
+    @property
+    def is_service_running(self) -> bool:
+        """Check if the scheduler service is running"""
+        return self.__is_service_running
+
+    def __del__(self) -> None:
+        """👋 Goodbye! Shut down the scheduler when the instance is deleted."""
+        try:
+            with self.__lock:
+                logger.info("👋 Goodbye! Shutting down the scheduler...")
+                self.__scheduler.shutdown()
+        except Exception as e:
+            logger.warning(f"❌ Error shutting down scheduler: {e}")
 
 
 # Creating the singleton instance

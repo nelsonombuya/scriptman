@@ -18,8 +18,8 @@ class Version(BaseModel):
     """
 
     major: int = Field(default=2, description="Major version number")
-    minor: int = Field(default=3, description="Minor version number")
-    commit: int = Field(default=395, description="Commit count")
+    minor: int = Field(default=4, description="Minor version number")
+    commit: int = Field(default=397, description="Commit count")
 
     @property
     def scriptman(self) -> str:

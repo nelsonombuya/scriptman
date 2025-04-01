@@ -33,6 +33,20 @@ class Scripts:
             scripts (list[Path]): A list of script paths to be executed.
         """
         for script in scripts:
+            if script.is_dir():
+                logger.info(f"📁 Found directory '{script}'. Checking for scripts...")
+                if python_files := list(script.glob("**/*.py")):
+                    logger.info(
+                        f"📁 Found {len(python_files)} Python scripts "
+                        f"in directory '{script}'"
+                    )
+                    scripts.extend(python_files)
+                    scripts.remove(script)
+                else:
+                    logger.warning(f"📁 No Python scripts found in directory '{script}'")
+
+                continue
+
             if not script.is_file():
                 logger.warning(f"⚠ Skipping '{script}'. Not a valid file.")
                 scripts.remove(script)

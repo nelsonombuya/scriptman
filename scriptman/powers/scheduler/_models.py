@@ -69,7 +69,10 @@ class Job(BaseModel):
         @wraps(self.func)
         def wrapper(*f_args: Any, **f_kwargs: Any) -> Any:
             try:
-                return self.func(*f_args, **f_kwargs)
+                logger.info(f"▶️ Executing scheduled job: {self.name}")
+                result = self.func(*f_args, **f_kwargs)
+                logger.success(f"✅ Job {self.name} executed successfully")
+                return result
             except Exception as e:
                 logger.error(f"❌ Job {self.name} failed: {e}")
                 raise e

@@ -254,6 +254,7 @@ class Scheduler:
                 self.__scripts.run_scripts, [script_path]
             )
             task.await_result()  # Wait for completion to catch any errors
+            logger.success(f"✅ Script {script_path} executed successfully")
 
         # Create and add the job
         job = Job(
@@ -301,6 +302,7 @@ class Scheduler:
             logger.info(f"▶️ Executing scheduled function: {func.__name__}")
             task = self.__task_executor.background(func, *args, **kwargs)
             task.await_result()  # Wait for completion to catch any errors
+            logger.success(f"✅ Function {func.__name__} executed successfully")
 
         # Create and add the job
         job = Job(

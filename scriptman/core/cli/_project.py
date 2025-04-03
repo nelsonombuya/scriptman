@@ -247,7 +247,10 @@ class ProjectSubParser(BaseParser):
                 )
                 if stash_result.returncode != 0:
                     logger.error(f"❌ Failed to stash changes: {stash_result.stderr}")
+                    if stash_result.stdout:
+                        logger.debug(f"Stash output: {stash_result.stdout}")
                     return False
+                logger.info(stash_result.stdout.strip())
 
         # Pull latest changes
         try:
@@ -260,9 +263,23 @@ class ProjectSubParser(BaseParser):
                 check=True,
                 cwd=config.cwd,
             )
-            logger.info(pull_result.stdout.strip())
+            if pull_result.stdout:
+                logger.info(pull_result.stdout.strip())
+
+            # Check if there was actually any update
+            if "Already up to date" in pull_result.stdout:
+                logger.info("✓ Repository already up to date")
+            elif "Updating" in pull_result.stdout:
+                logger.info("✓ Repository updated successfully")
+
+            # Check for non-fatal warnings
+            if pull_result.stderr and "fatal" not in pull_result.stderr.lower():
+                logger.warning(f"⚠️ Git pull warnings: {pull_result.stderr}")
+
         except subprocess.CalledProcessError as e:
             logger.error(f"❌ Git pull failed: {e.stderr}")
+            if e.stdout:
+                logger.debug(f"Command output: {e.stdout}")
 
             # If we stashed changes, try to restore them even if pull failed
             if ignore_local_changes and has_local_changes:
@@ -288,11 +305,14 @@ class ProjectSubParser(BaseParser):
             )
             if pop_result.returncode != 0:
                 logger.error(f"❌ Failed to restore stashed changes: {pop_result.stderr}")
+                if pop_result.stdout:
+                    logger.debug(f"Command output: {pop_result.stdout}")
                 logger.warning(
                     "⚠️ Your changes are stored in the git stash. "
                     "Use 'git stash apply' to recover them."
                 )
                 return False
+            logger.info(pop_result.stdout.strip())
 
         logger.success("✅ Project code updated successfully")
         return True
@@ -308,6 +328,8 @@ class ProjectSubParser(BaseParser):
         if is_poetry:
             logger.info("🧩 Poetry detected, updating dependencies...")
             try:
+                # Lock dependencies first
+                logger.info("📝 Updating poetry.lock file...")
                 lock_result = subprocess.run(
                     ["poetry", "lock"],
                     stdout=subprocess.PIPE,
@@ -316,7 +338,11 @@ class ProjectSubParser(BaseParser):
                     check=True,
                     cwd=config.cwd,
                 )
-                logger.info(lock_result.stdout.strip())
+                if lock_result.stdout:
+                    logger.info(lock_result.stdout.strip())
+
+                # Install dependencies
+                logger.info("📚 Installing dependencies...")
                 install_result = subprocess.run(
                     ["poetry", "install"],
                     stdout=subprocess.PIPE,
@@ -325,7 +351,11 @@ class ProjectSubParser(BaseParser):
                     check=True,
                     cwd=config.cwd,
                 )
-                logger.info(install_result.stdout.strip())
+                if install_result.stdout:
+                    logger.info(install_result.stdout.strip())
+
+                # Update dependencies to latest versions
+                logger.info("🔄 Updating dependencies to latest versions...")
                 update_result = subprocess.run(
                     ["poetry", "update"],
                     stdout=subprocess.PIPE,
@@ -334,11 +364,20 @@ class ProjectSubParser(BaseParser):
                     check=True,
                     cwd=config.cwd,
                 )
-                logger.info(update_result.stdout.strip())
+                if update_result.stdout:
+                    logger.info(update_result.stdout.strip())
+
+                # Check for non-error output in stderr (warnings)
+                for result in [lock_result, install_result, update_result]:
+                    if result.stderr and "error" not in result.stderr.lower():
+                        logger.warning(f"⚠️ Poetry warnings: {result.stderr}")
+
                 logger.success("✅ Dependencies updated successfully with Poetry")
                 return True
             except subprocess.CalledProcessError as e:
                 logger.error(f"❌ Poetry update failed: {e.stderr}")
+                if e.stdout:
+                    logger.debug(f"Command output: {e.stdout}")
                 return False
             except FileNotFoundError:
                 logger.error(
@@ -366,15 +405,19 @@ class ProjectSubParser(BaseParser):
                     return False
 
                 # Update pip itself first
-                subprocess.run(
+                pip_update_result = subprocess.run(
                     [python_exe, "-m", "pip", "install", "--upgrade", "pip"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
+                    text=True,
                     check=True,
                     cwd=config.cwd,
                 )
+                logger.info("Updated pip:")
+                logger.info(pip_update_result.stdout.strip())
 
                 # Update packages from requirements.txt
+                logger.info("Updating packages from requirements.txt...")
                 update_result = subprocess.run(
                     [
                         python_exe,
@@ -392,10 +435,27 @@ class ProjectSubParser(BaseParser):
                     cwd=config.cwd,
                 )
 
+                # Log the output to show what happened
+                if update_result.stdout:
+                    logger.info(update_result.stdout.strip())
+
+                # Check for warnings in stderr but don't fail
+                if update_result.stderr:
+                    if "error" in update_result.stderr.lower():
+                        logger.error(
+                            f"❌ pip update encountered errors: {update_result.stderr}"
+                        )
+                        return False
+                    else:
+                        # Just warnings, not fatal
+                        logger.warning(f"⚠️ pip update warnings: {update_result.stderr}")
+
                 logger.success("✅ Dependencies updated successfully with pip")
                 return True
             except subprocess.CalledProcessError as e:
                 logger.error(f"❌ pip update failed: {e.stderr}")
+                if e.stdout:
+                    logger.debug(f"Command output: {e.stdout}")
                 return False
         else:
             logger.warning(

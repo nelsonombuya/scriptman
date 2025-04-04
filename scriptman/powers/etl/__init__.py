@@ -399,7 +399,9 @@ class ETL:
         with self.timed_context(context, "transformation"):
             return ETL(self._data[condition])
 
-    def flatten_all_nested_columns(self, separator: str = "_") -> "ETL":
+    def flatten_all_nested_columns(
+        self, case: Literal["snake", "camel"] = "snake"
+    ) -> "ETL":
         """
         🔍 Flatten all the columns in the dataframe that contain nested dictionaries.
 
@@ -408,8 +410,8 @@ class ETL:
         original column name with the nested keys, separated by the specified separator.
 
         Args:
-            separator (str, optional): The separator to use between the original column
-                name and nested keys. Defaults to "_".
+            case (Literal["snake", "camel"], optional): The case to use for the new
+                column names. Defaults to "snake".
 
         Returns:
             ETL: A new ETL object with all nested dictionary columns flattened.
@@ -433,11 +435,11 @@ class ETL:
             # Flatten each dictionary column
             result = self._data.copy()
             for col in dict_columns:
-                result = ETL(result).flatten(col, separator).data
+                result = ETL(result).flatten(col, case).data
 
             return ETL(result)
 
-    def flatten(self, column: str, separator: str = "_") -> "ETL":
+    def flatten(self, column: str, case: Literal["snake", "camel"] = "snake") -> "ETL":
         """
         🔍 Flatten a nested dictionary column into separate columns.
 
@@ -448,8 +450,9 @@ class ETL:
 
         Args:
             column (str): The name of the column containing nested dictionaries.
-            separator (str, optional): The separator to use between the original column
-                name and nested keys. Defaults to "_".
+            case (Literal["snake", "camel"], optional): The case to use for the new
+                column names. Defaults to "snake".
+
 
         Returns:
             ETL: A new ETL object with the flattened DataFrame.
@@ -474,10 +477,13 @@ class ETL:
             # Extract and flatten the nested dictionaries
             df = self._data.copy()
             nested_data = df[column].tolist()
-            flattened = json_normalize(nested_data, sep=separator)
-            flattened.columns = [
-                f"{column}{separator}{col}" for col in flattened.columns  # type: ignore
-            ]
+            flattened = json_normalize(nested_data)
+            case_func = (
+                self.__convert_to_snake_case
+                if case == "snake"
+                else self.__convert_to_camel_case
+            )
+            flattened.columns = [case_func(c) for c in flattened.columns]  # type: ignore
 
             # Combine with original DataFrame (excluding the original nested column)
             result = df.drop(columns=[column])
@@ -654,21 +660,53 @@ class ETL:
             # Convert columns like 'FirstName', 'LastName' to 'first_name', 'last_name'
             etl_snake = etl.to_snake_case()
         """
-        from re import sub
-
-        def convert_to_snake_case(name: str) -> str:
-            # Replace spaces, hyphens, and other separators with underscores
-            s1 = sub(r"[\s\-\.]", "_", name)
-            # Insert underscore between camelCase transitions
-            s2 = sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
-            # Convert to lowercase
-            return s2.lower()
-
         # Create a copy of the DataFrame with renamed columns
-        renamed_columns = {col: convert_to_snake_case(col) for col in self._data.columns}
+        renamed_columns = {_: self.__convert_to_snake_case(_) for _ in self._data.columns}
         new_data = self._data.rename(columns=renamed_columns)
         self.log.info(f"Converted {len(renamed_columns)} column names to snake_case")
         return ETL(new_data)
+
+    def to_camel_case(self) -> "ETL":
+        """
+        🐐 Converts all column names in the DataFrame to camelCase.
+
+        This method transforms column names like 'first_name', 'last_name' to
+        'FirstName', 'LastName'.
+
+        Returns:
+            ETL: A new ETL instance with camelCase column names.
+
+        Example:
+            # Convert columns like 'first_name', 'last_name' to 'FirstName', 'LastName'
+            etl_camel = etl.to_camel_case()
+        """
+        # Create a copy of the DataFrame with renamed columns
+        renamed_columns = {_: self.__convert_to_camel_case(_) for _ in self._data.columns}
+        new_data = self._data.rename(columns=renamed_columns)
+        self.log.info(f"Converted {len(renamed_columns)} column names to camelCase")
+        return ETL(new_data)
+
+    def __convert_to_snake_case(self, name: str) -> str:
+        """🐍 Convert a string to snake_case."""
+        from re import sub
+
+        # Replace spaces, hyphens, and other separators with underscores
+        s1 = sub(r"[\s\-\.]", "_", name)
+        # Insert underscore between camelCase transitions
+        s2 = sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
+        # Convert to lowercase
+        return s2.lower()
+
+    def __convert_to_camel_case(self, name: str) -> str:
+        """🐐 Convert a string to camelCase."""
+        from re import sub
+
+        # Replace underscores with spaces
+        s1 = sub(r"_", " ", name)
+        # Capitalize each word
+        s2 = sub(r"(?:^| )(\w)", lambda m: m.group(1).upper(), s1)
+        # Remove spaces
+        return s2.strip()
 
     """
     🔍 Loading methods

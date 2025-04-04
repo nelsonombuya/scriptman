@@ -56,6 +56,7 @@ class BaseAPIClient(ABC):
             request_handler (RequestHandler): Custom request handler.
                 Defaults to DefaultRequestHandler() which uses the `requests` library.
         """
+        self.log = logger
         self.base_url = base_url
         self.headers = headers or {}
         self.request_handler: RequestHandler = request_handler
@@ -72,12 +73,12 @@ class BaseAPIClient(ABC):
         Returns:
             Response: HTTP response object.
         """
-        logger.debug(f"📡 Sending {method.value} request to {url}")
-        logger.debug(f"📡 Request Details: {dumps(kwargs, indent=4)}")
+        self.log.debug(f"📡 Sending {method.value} request to {url}")
+        self.log.debug(f"📡 Request Details: {dumps(kwargs, indent=4)}")
         response = raw_request(method.value, url, **kwargs)
         response.raise_for_status()
-        logger.info(f"✅ {method.value} request for {url} completed successfully.")
-        logger.debug(f"📤 Response Details: {dumps(response.json(), indent=4)}")
+        self.log.info(f"✅ {method.value} request for {url} completed successfully.")
+        self.log.debug(f"📤 Response Details: {dumps(response.json(), indent=4)}")
         return response
 
     @overload
@@ -177,9 +178,9 @@ class BaseAPIClient(ABC):
             Response: HTTP response object.
         """
         try:
-            logger.info(f"📤 Sending {method.value} request to {url}")
+            self.log.info(f"📤 Sending {method.value} request to {url}")
             request_data = {"url": url, "method": method, "params": params, "body": body}
-            logger.debug(f"📤 Request Details: {dumps(request_data, indent=4)}")
+            self.log.debug(f"📤 Request Details: {dumps(request_data, indent=4)}")
 
             response = self.request_handler.send(
                 url=url,
@@ -191,13 +192,13 @@ class BaseAPIClient(ABC):
             )
             response.raise_for_status()
 
-            logger.info(f"📤 Received response from {url}")
-            logger.debug(f"📤 Response Details: {dumps(response.json(), indent=4)}")
+            self.log.info(f"📤 Received response from {url}")
+            self.log.debug(f"📤 Response Details: {dumps(response.json(), indent=4)}")
             return response
         except RequestException as e:
-            logger.error(f"🔥 Request to {url} failed with error: {e}")
+            self.log.error(f"🔥 Request to {url} failed with error: {e}")
             response_data = e.response.json() if e.response else None
-            logger.debug(f"📤 Response Details: {dumps(response_data, indent=4)}")
+            self.log.debug(f"📤 Response Details: {dumps(response_data, indent=4)}")
 
             raise exceptions.APIException(
                 exception=e,
@@ -207,7 +208,7 @@ class BaseAPIClient(ABC):
             )
 
         except Exception as e:
-            logger.error(f"🔥 Request to {url} failed with error: {e}")
+            self.log.error(f"🔥 Request to {url} failed with error: {e}")
             raise exceptions.APIException(
                 exception=e,
                 status_code=500,
@@ -234,7 +235,7 @@ class BaseAPIClient(ABC):
         try:
             return response_model.model_validate(response.json())
         except ValidationError as e:
-            logger.error(f"❌ Response validation failed: {e}")
+            self.log.error(f"❌ Response validation failed: {e}")
             raise exceptions.ValidationError(
                 f"❌ Response validation failed: {e}",
                 exception=e,

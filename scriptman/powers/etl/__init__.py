@@ -703,10 +703,19 @@ class ETL:
 
         # Replace underscores with spaces
         s1 = sub(r"_", " ", name)
-        # Capitalize each word
-        s2 = sub(r"(?:^| )(\w)", lambda m: m.group(1).upper(), s1)
-        # Remove spaces
-        return s2.strip()
+
+        # Handle capitalization - first word should be lowercase, others uppercase
+        words = s1.split()
+        if len(words) == 1:
+            # If it's a single word, just lowercase it
+            result = words[0].lower()
+        else:
+            # First word lowercase, rest capitalized
+            first_word = words[0].lower()
+            rest_words = [word.capitalize() for word in words[1:]]
+            result = first_word + "".join(rest_words)
+
+        return result
 
     """
     🔍 Loading methods

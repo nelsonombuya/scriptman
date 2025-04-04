@@ -477,7 +477,7 @@ class ETL:
             # Extract and flatten the nested dictionaries
             df = self._data.copy()
             nested_data = df[column].tolist()
-            flattened = json_normalize(nested_data)
+            flattened = json_normalize(nested_data, sep="_")
             case_func = (
                 self.__convert_to_snake_case
                 if case == "snake"

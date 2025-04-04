@@ -22,6 +22,11 @@ class RunSubParser(BaseParser):
             "run", help="Run scripts with advanced configuration options."
         )
 
+        # Allow for script-specific arguments after -- delimiter
+        self.parser.add_argument(
+            "script_args", nargs="*", help="Arguments to pass to the scripts (after '--')"
+        )
+
         # Initialize sub-commands
         self.run()
 
@@ -109,7 +114,12 @@ class RunSubParser(BaseParser):
             logger.error("❓ No scripts found in the current directory.")
             return 1
 
-        config.settings.retries = args.retries if args.retries >= 0 else 0
+        if args.retries < 0:
+            logger.error("❌ Retries must be a non-negative integer.")
+            return 1
+
+        config.settings.script_args = getattr(args, "script_args", [])
+        config.settings.retries = args.retries
         config.settings.verbose = args.verbose
         config.settings.force = args.force
 

@@ -1,8 +1,9 @@
+import sys
 from asyncio import gather, run, to_thread
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from runpy import run_path
-from sys import path as sys_path
 
 from filelock import FileLock, Timeout
 from loguru import logger
@@ -165,14 +166,26 @@ class Scripts:
             logger.add(lambda msg: print(msg), level="DEBUG", format="{message}")
 
         try:
-            if script_dir not in sys_path:
+            if script_dir not in sys.path:
                 logger.debug(f"🔍 Adding '{script_dir}' to sys_path...")
-                sys_path.insert(0, script_dir)
+                sys.path.insert(0, script_dir)
 
-            logger.info(f"🚀 Running '{file_path.name}' script...")
+            original_argv = deepcopy(sys.argv)
+            message = f"🚀 Running '{file_path.name}' script..."
+
+            if script_args := config.settings.get("script_args", []):
+                logger.debug(f"🔍 Passing arguments to script: {script_args}")
+                sys.argv = [str(file_path)] + script_args
+                message += f" with args: {script_args}"
+
+            logger.info(message)
             with TimeCalculator.context(context=file_path.name):
                 retries = config.settings.get("retries", 0)
                 retry(retries)(run_path)(str(file_path), run_name="__main__")
+
+            if script_args:
+                sys.argv = original_argv
+
             logger.success(f"✅ Script '{file_path.name}' executed successfully")
             return True
         except Exception as e:

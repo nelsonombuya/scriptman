@@ -19,3 +19,4 @@ __all__: list[str] = ["powers", "config", "logger"]
 # TODO: Script aliases
 # TODO: Exit from scriptman while running things on multiple threads
 # TODO: Stop specific script from running
+# TODO: Run scripts with args via Scriptman

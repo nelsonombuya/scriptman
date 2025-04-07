@@ -7,9 +7,9 @@ try:
     from loguru import logger
     from pandas import DataFrame, MultiIndex, concat
 
+    from scriptman.powers.database._database import DatabaseHandler
     from scriptman.powers.database._exceptions import DatabaseError
     from scriptman.powers.etl._database import ETLDatabase
-    from scriptman.powers.etl._protocol import ETLDatabaseInterface
     from scriptman.powers.task import TaskExecutor
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError as e:
@@ -234,7 +234,7 @@ class ETL:
     @classmethod
     def from_db(
         cls,
-        db: ETLDatabaseInterface,
+        db: DatabaseHandler,
         query: str,
         params: dict[str, Any] = {},
     ) -> "ETL":
@@ -242,7 +242,7 @@ class ETL:
         📂 Extract data from a database using a provided query.
 
         Args:
-            db (ETLDatabaseInterface): The handler to manage the database connection.
+            db (DatabaseHandler): The handler to manage the database connection.
             query (str): The SQL query to execute for data extraction.
             params (dict[str, Any], optional): A dictionary of parameters to use in the
                 query. Defaults to an empty dictionary.
@@ -790,7 +790,7 @@ class ETL:
 
     def to_db(
         self,
-        db: ETLDatabaseInterface,
+        db_handler: DatabaseHandler,
         table_name: str,
         batch_size: int = 1000,
         batch_execute: bool = True,
@@ -805,7 +805,8 @@ class ETL:
         ensure that the indices are defined in the dataset using the `set_index` method.
 
         Args:
-            db (ETLDatabaseInterface): The database handler to use for executing queries.
+            db_handler (DatabaseHandler): The database handler to use for executing
+                queries.
             table_name (str): The name of the table to load the data into.
             batch_execute (bool, optional): Whether to execute queries in batches.
                 Defaults to True.
@@ -824,8 +825,8 @@ class ETL:
             bool: True if the data was loaded successfully.
         """
         # Wrap the handler with ETLDatabase for extended functionality
-        db = ETLDatabase(db)
         executor = TaskExecutor()
+        db = ETLDatabase(db_handler)
         table_exists: bool = db.table_exists(table_name)
 
         if self.empty:
@@ -931,4 +932,4 @@ class ETL:
         return all(results)
 
 
-__all__: list[str] = ["ETL", "ETLDatabaseInterface"]
+__all__: list[str] = ["ETL"]

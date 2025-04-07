@@ -3,7 +3,8 @@ try:
 
     from pandas import DataFrame
 
-    from scriptman.powers.etl._protocol import ETLDatabaseInterface
+    from scriptman.powers.database._database import DatabaseHandler
+
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -14,7 +15,7 @@ except ImportError as e:
 class ETLDatabase:
     """📦 ETL database operations using composition instead of inheritance"""
 
-    def __init__(self, database_handler: ETLDatabaseInterface):
+    def __init__(self, database_handler: DatabaseHandler):
         """
         🚀 Initialize ETL database with a database handler.
 

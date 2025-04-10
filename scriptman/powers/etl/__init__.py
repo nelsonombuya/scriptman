@@ -483,7 +483,10 @@ class ETL:
                 if case == "snake"
                 else self.__convert_to_camel_case
             )
-            flattened.columns = [case_func(c) for c in flattened.columns]  # type: ignore
+            flattened.columns = [  # type:ignore # Modifying types to avoid type errors
+                case_func(f"{column.lower()}_{str(col).lower()}")
+                for col in flattened.columns
+            ]
 
             # Combine with original DataFrame (excluding the original nested column)
             result = df.drop(columns=[column])

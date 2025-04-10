@@ -232,8 +232,13 @@ class ETLDatabase:
         """
         indices = df.index.names
         reset_df = df.reset_index()
-        data_types = self.get_table_data_types(reset_df)
         assert indices is not None, "Index names are required"
+        data_types = self.get_table_data_types(reset_df, force_nvarchar)
+
+        # Force NVARCHAR(255) for index columns
+        for column, _ in data_types.items():
+            if column in indices and force_nvarchar:
+                data_types[column] = "NVARCHAR(255)"
 
         # Columns to be used in the MERGE statement
         columns_to_insert = [c for c in reset_df.columns]
@@ -242,6 +247,7 @@ class ETLDatabase:
         # Build the query parts
         temp_table = f"#temp_{table_name}"
         temp_schema = ", ".join([f'"{c}" {data_types[c]}' for c in columns_to_insert])
+        temp_schema += f", PRIMARY KEY ({', '.join(indices)})"  # Add keys to temp table
         update = ", ".join([f'target."{c}" = source."{c}"' for c in columns_to_update])
         match_conditions = " AND ".join([f'source."{k}" = target."{k}"' for k in indices])
 
@@ -255,9 +261,9 @@ class ETLDatabase:
         VALUES ({', '.join([f':{c}' for c in columns_to_insert])});
 
         -- Perform the merge operation
-        MERGE INTO "{table_name}" AS target
+        MERGE "{table_name}" AS target
         USING "{temp_table}" AS source
-        ON {match_conditions}
+        ON ({match_conditions})
         WHEN MATCHED THEN
             UPDATE SET {update}
         WHEN NOT MATCHED THEN

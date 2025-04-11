@@ -7,7 +7,7 @@ from typing import Any, Awaitable, Callable, Optional
 from tqdm import tqdm
 
 from scriptman.powers.generics import P, R
-from scriptman.powers.task._models import BatchTaskFuture, TaskFuture
+from scriptman.powers.task._models import Task, Tasks
 
 
 class TaskExecutor:
@@ -73,9 +73,7 @@ class TaskExecutor:
         self._thread_pool = ThreadPoolExecutor(max_workers=thread_pool_size)
         self._process_pool = ProcessPoolExecutor(max_workers=process_pool_size)
 
-    def background(
-        self, func: Callable[P, R], *args: Any, **kwargs: Any
-    ) -> TaskFuture[R]:
+    def background(self, func: Callable[P, R], *args: Any, **kwargs: Any) -> Task[R]:
         """
         🚀 Run a single task in the background.
 
@@ -85,7 +83,7 @@ class TaskExecutor:
             **kwargs: Keyword arguments for the function
 
         Returns:
-            TaskFuture: Container that can be awaited to get the result
+            Task: Container that can be awaited to get the result
 
         Examples:
             # Start a task in the background
@@ -100,13 +98,13 @@ class TaskExecutor:
         """
         start_time = perf_counter()
         future = self._thread_pool.submit(func, *args, **kwargs)
-        return TaskFuture[R](future, start_time)
+        return Task[R](future, args, kwargs, start_time)
 
     def multithread(
         self,
         tasks: list[tuple[Callable[P, R], tuple[Any, ...], dict[str, Any]]],
         show_progress: bool = True,
-    ) -> BatchTaskFuture[R]:
+    ) -> Tasks[R]:
         """
         🌐 Process I/O-bound tasks in parallel using threading.
 
@@ -117,7 +115,7 @@ class TaskExecutor:
             show_progress: Whether to show a progress bar
 
         Returns:
-            BatchTaskFuture: Container that manages all tasks together
+            Tasks: Container that manages all tasks together
 
         Examples:
             # Run multiple API calls in parallel
@@ -132,13 +130,13 @@ class TaskExecutor:
             # Or ignore errors and get partial results
             results = batch.await_result(raise_exceptions=False)
         """
-        batch = BatchTaskFuture[R]()
+        batch = Tasks[R]()
         iterator = tqdm(tasks, desc="Threading") if show_progress else tasks
 
         for func, args, kwargs in iterator:
             start_time = perf_counter()
             future = self._thread_pool.submit(func, *args, **kwargs)
-            batch._tasks.append(TaskFuture(future, start_time))
+            batch._tasks.append(Task(future, args, kwargs, start_time))
 
         return batch
 
@@ -146,7 +144,7 @@ class TaskExecutor:
         self,
         tasks: list[tuple[Callable[P, R], tuple[Any, ...], dict[str, Any]]],
         show_progress: bool = True,
-    ) -> BatchTaskFuture[R]:
+    ) -> Tasks[R]:
         """
         🔄 Process CPU-intensive tasks in parallel using multiprocessing.
 
@@ -157,7 +155,7 @@ class TaskExecutor:
             show_progress: Whether to show a progress bar
 
         Returns:
-            BatchTaskFuture: Container that manages all tasks together
+            Tasks: Container that manages all tasks together
 
         Examples:
             # Process multiple images in parallel
@@ -191,13 +189,13 @@ class TaskExecutor:
                     "Async functions are not supported with multiprocessing."
                 )
 
-        batch = BatchTaskFuture[R]()
+        batch = Tasks[R]()
         iterator = tqdm(tasks, desc="Processing") if show_progress else tasks
 
         for func, args, kwargs in iterator:
             start_time = perf_counter()
             future = self._process_pool.submit(func, *args, **kwargs)
-            batch._tasks.append(TaskFuture(future, start_time))
+            batch._tasks.append(Task(future, args, kwargs, start_time))
 
         return batch
 
@@ -237,4 +235,4 @@ class TaskExecutor:
         self.cleanup()
 
 
-__all__: list[str] = ["TaskExecutor", "TaskFuture", "BatchTaskFuture"]
+__all__: list[str] = ["TaskExecutor", "Task", "Tasks"]

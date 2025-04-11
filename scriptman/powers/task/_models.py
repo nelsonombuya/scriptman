@@ -1,17 +1,39 @@
 from concurrent.futures import ALL_COMPLETED, FIRST_EXCEPTION, Future, wait
 from dataclasses import dataclass, field
 from time import perf_counter
-from typing import Generic, Literal, Optional, Union, overload
+from typing import Any, Generic, Iterator, Literal, overload
+
+from loguru import logger
 
 from scriptman.powers.generics import T
 
 
+class TaskException(Exception):
+    def __init__(self, exception: Exception) -> None:
+        self.message = str(exception)
+        super().__init__(exception)
+        self.exception = exception
+
+
 @dataclass
-class TaskFuture(Generic[T]):
+class Task(Generic[T]):
     """📦 Container for a background task that can be awaited later"""
 
     _future: Future[T]
+    _args: tuple[Any, ...] = field(default_factory=tuple)
+    _kwargs: dict[str, Any] = field(default_factory=dict)
     _start_time: float = field(default_factory=perf_counter)
+
+    @property
+    def result(self) -> T:
+        """🔍 Get the task result"""
+        return self.await_result()
+
+    @property
+    def exception(self) -> Exception | None:
+        """🔍 Get the task exception"""
+        result = self.await_result(raise_exceptions=False)
+        return result.exception if isinstance(result, TaskException) else None
 
     @overload
     def await_result(self, *, raise_exceptions: Literal[True] = True) -> T:
@@ -19,11 +41,11 @@ class TaskFuture(Generic[T]):
         ...
 
     @overload
-    def await_result(self, *, raise_exceptions: Literal[False]) -> Optional[T]:
-        """⏱ Await and return the task result, returning None if it fails"""
+    def await_result(self, *, raise_exceptions: Literal[False]) -> T | TaskException:
+        """⏱ Await and return the task result, returning the exception if it fails"""
         ...
 
-    def await_result(self, *, raise_exceptions: bool = True) -> Union[T, Optional[T]]:
+    def await_result(self, *, raise_exceptions: bool = True) -> T | TaskException:
         """
         ⌚ Await and return the task result
 
@@ -31,7 +53,7 @@ class TaskFuture(Generic[T]):
             raise_exceptions: Whether to raise exceptions that occurred during execution
 
         Returns:
-            The task result if successful, or None if failed and raise_exceptions is False
+            The task result if successful, or the exception if failed
 
         Raises:
             Exception: If the task failed and raise_exceptions is True
@@ -39,9 +61,14 @@ class TaskFuture(Generic[T]):
         try:
             return self._future.result()
         except Exception as e:
+            logger.error(
+                f"Task failed with exception: {e}"
+                f"\nArgs: {self._args}"
+                f"\nKwargs: {self._kwargs}"
+            )
             if raise_exceptions:
                 raise e
-            return None
+            return TaskException(e)
 
     @property
     def is_done(self) -> bool:
@@ -51,7 +78,8 @@ class TaskFuture(Generic[T]):
     @property
     def is_successful(self) -> bool:
         """✅ Whether the task completed successfully"""
-        return self.is_done and self.await_result(raise_exceptions=False) is not None
+        result = self.await_result(raise_exceptions=False)
+        return self.is_done and not isinstance(result, TaskException)
 
     @property
     def duration(self) -> float:
@@ -77,58 +105,97 @@ class TaskFuture(Generic[T]):
 
 
 @dataclass
-class BatchTaskFuture(Generic[T]):
+class Tasks(Generic[T]):
     """📋 Container for multiple parallel tasks that can be awaited together"""
 
-    _tasks: list[TaskFuture[T]] = field(default_factory=list)
+    _tasks: list[Task[T]] = field(default_factory=list)
     _start_time: float = field(default_factory=perf_counter)
+
+    def __getitem__(self, index: int) -> Task[T]:
+        return self._tasks[index]
+
+    def __iter__(self) -> Iterator[Task[T]]:
+        return iter(self._tasks)
+
+    def __len__(self) -> int:
+        return len(self._tasks)
+
+    @property
+    def results(self) -> list[T]:
+        return [task.result for task in self._tasks]
+
+    @property
+    def exceptions(self) -> list[Exception | None]:
+        return [task.exception for task in self._tasks]
 
     @overload
     def await_results(
-        self, *, raise_exceptions: Literal[True] = True, timeout: Optional[float] = None
+        self,
+        *,
+        raise_exceptions: Literal[True] = True,
+        only_successful_results: bool = False,
     ) -> list[T]:
         """⏱ Await and return results from all tasks, raising an exception if any fail"""
         ...
 
     @overload
     def await_results(
-        self, *, raise_exceptions: Literal[False], timeout: Optional[float] = None
-    ) -> list[Optional[T]]:
-        """⏱ Await and return results from all tasks, returning None for failed tasks"""
+        self,
+        *,
+        raise_exceptions: Literal[False] = False,
+        only_successful_results: Literal[True] = True,
+    ) -> list[T]:
+        """⏱ Await and return results from all tasks, filtering out failed tasks"""
+        ...
+
+    @overload
+    def await_results(
+        self,
+        *,
+        raise_exceptions: Literal[False] = False,
+        only_successful_results: Literal[False] = False,
+    ) -> list[T | TaskException]:
+        """⏱ Await and return results from all tasks, returning TaskException for failed
+        tasks"""
         ...
 
     def await_results(
-        self, *, raise_exceptions: bool = True, timeout: Optional[float] = None
-    ) -> Union[list[T], list[Optional[T]]]:
+        self,
+        *,
+        raise_exceptions: bool = True,
+        only_successful_results: bool = False,
+    ) -> list[T] | list[T | TaskException]:
         """
         ⌚ Await and return results from all tasks
 
         Args:
             raise_exceptions: Whether to raise exceptions that occurred during execution
-            timeout: Maximum time to wait (in seconds) or None to wait indefinitely
+            only_successful_results: Whether to filter out TaskException results
 
         Returns:
             List of task results in the same order as the tasks.
-            If raise_exceptions is False, failed tasks will be None.
+            If raise_exceptions is False, failed tasks will be TaskException objects.
 
         Raises:
             Exception: If any task failed and raise_exceptions is True
         """
         done, not_done = wait(
-            timeout=timeout,
             fs=[task._future for task in self._tasks],
             return_when=ALL_COMPLETED if not raise_exceptions else FIRST_EXCEPTION,
         )
 
         # If we got here with raise_exceptions=True, all tasks succeeded or none started
-        results: list[T | None] = []
+        results: list[T | TaskException] = []
         exceptions: list[Exception] = []
+
         for task in self._tasks:
-            try:
-                results.append(task.await_result(raise_exceptions=False))
-            except Exception as e:
-                exceptions.append(e)
-                results.append(None)
+            result = task.await_result(raise_exceptions=False)
+            if isinstance(result, TaskException):
+                exceptions.append(result.exception)
+                if not only_successful_results:
+                    results.append(result)
+            else:
+                results.append(result)
 
         if raise_exceptions and exceptions:
             raise exceptions[0]  # Raise the first exception encountered
@@ -141,7 +208,7 @@ class BatchTaskFuture(Generic[T]):
         return all(task.is_successful for task in self._tasks)
 
     @property
-    def is_all_done(self) -> bool:
+    def are_done(self) -> bool:
         """✅ Whether all tasks have completed (successfully or with error)"""
         return all(task.is_done for task in self._tasks)
 
@@ -153,7 +220,7 @@ class BatchTaskFuture(Generic[T]):
     @property
     def duration(self) -> float:
         """⏰ Batch duration in seconds (from start to now or completion)"""
-        if not self.is_all_done:
+        if not self.are_done:
             return perf_counter() - self._start_time
 
         # Get the latest completion time among all tasks
@@ -169,3 +236,13 @@ class BatchTaskFuture(Generic[T]):
     def total_count(self) -> int:
         """📊 Total number of tasks"""
         return len(self._tasks)
+
+    @property
+    def successful_count(self) -> int:
+        """📊 Number of successful tasks"""
+        return sum(1 for task in self._tasks if task.is_successful)
+
+    @property
+    def failure_count(self) -> int:
+        """📊 Number of failed tasks"""
+        return sum(1 for task in self._tasks if not task.is_successful)

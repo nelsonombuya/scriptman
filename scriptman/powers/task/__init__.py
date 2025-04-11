@@ -6,7 +6,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 from tqdm import tqdm
 
-from scriptman.powers.generics import T
+from scriptman.powers.generics import P, R
 from scriptman.powers.task._models import BatchTaskFuture, TaskFuture
 
 
@@ -74,8 +74,8 @@ class TaskExecutor:
         self._process_pool = ProcessPoolExecutor(max_workers=process_pool_size)
 
     def background(
-        self, func: Callable[..., T], *args: Any, **kwargs: Any
-    ) -> TaskFuture[T]:
+        self, func: Callable[P, R], *args: Any, **kwargs: Any
+    ) -> TaskFuture[R]:
         """
         🚀 Run a single task in the background.
 
@@ -100,13 +100,13 @@ class TaskExecutor:
         """
         start_time = perf_counter()
         future = self._thread_pool.submit(func, *args, **kwargs)
-        return TaskFuture[T](future, start_time)
+        return TaskFuture[R](future, start_time)
 
     def multithread(
         self,
-        tasks: list[tuple[Callable[..., T], tuple[Any, ...], dict[str, Any]]],
+        tasks: list[tuple[Callable[P, R], tuple[Any, ...], dict[str, Any]]],
         show_progress: bool = True,
-    ) -> BatchTaskFuture[T]:
+    ) -> BatchTaskFuture[R]:
         """
         🌐 Process I/O-bound tasks in parallel using threading.
 
@@ -132,7 +132,7 @@ class TaskExecutor:
             # Or ignore errors and get partial results
             results = batch.await_result(raise_exceptions=False)
         """
-        batch = BatchTaskFuture[T]()
+        batch = BatchTaskFuture[R]()
         iterator = tqdm(tasks, desc="Threading") if show_progress else tasks
 
         for func, args, kwargs in iterator:
@@ -144,9 +144,9 @@ class TaskExecutor:
 
     def multiprocess(
         self,
-        tasks: list[tuple[Callable[..., T], tuple[Any, ...], dict[str, Any]]],
+        tasks: list[tuple[Callable[P, R], tuple[Any, ...], dict[str, Any]]],
         show_progress: bool = True,
-    ) -> BatchTaskFuture[T]:
+    ) -> BatchTaskFuture[R]:
         """
         🔄 Process CPU-intensive tasks in parallel using multiprocessing.
 
@@ -191,7 +191,7 @@ class TaskExecutor:
                     "Async functions are not supported with multiprocessing."
                 )
 
-        batch = BatchTaskFuture[T]()
+        batch = BatchTaskFuture[R]()
         iterator = tqdm(tasks, desc="Processing") if show_progress else tasks
 
         for func, args, kwargs in iterator:
@@ -211,7 +211,7 @@ class TaskExecutor:
         self._process_pool.shutdown(wait=wait)
 
     @staticmethod
-    def await_async[T](awaitable: Awaitable[T]) -> T:
+    def await_async[R](awaitable: Awaitable[R]) -> R:
         """⌚ Run an async coroutine synchronously and wait for the result.
 
         Args:

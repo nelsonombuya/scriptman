@@ -6,6 +6,7 @@ from loguru import logger
 from tqdm import tqdm
 
 from scriptman.core.config import config
+from scriptman.powers.generics import BaseModelT
 from scriptman.powers.time_calculator import TimeCalculator
 
 
@@ -115,6 +116,26 @@ class DatabaseHandler(ABC):
             list[dict[str, Any]]: The results of the query as a list of dictionaries.
         """
         pass
+
+    def execute_read_query_with_model(
+        self, query: str, model: type[BaseModelT], params: dict[str, Any] = {}
+    ) -> list[BaseModelT]:
+        """
+        📖 Executes the given SQL query with optional parameters and returns the
+        results as a list of dictionaries.
+
+        NOTE: This method should be used for SELECT queries only; and is best used with
+        prepared queries.
+
+        Args:
+            query (str): The SQL query to execute.
+            params (dict[str, Any], optional): The parameters for the query.
+            model (type[BaseModel]): A Pydantic model to use for the query's results.
+
+        Returns:
+            list[BaseModel]: The results of the query as a list of Pydantic models.
+        """
+        return [model(**row) for row in self.execute_read_query(query, params)]
 
     @abstractmethod
     def execute_write_query(

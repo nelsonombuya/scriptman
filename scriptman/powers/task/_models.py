@@ -132,6 +132,19 @@ class Tasks(Generic[T]):
     def await_results(
         self,
         *,
+        raise_exceptions: Literal[False] = False,
+        only_successful_results: Literal[False] = False,
+    ) -> list[T | TaskException]:
+        """
+        ⏱ Await and return results from all tasks, returning TaskException for failed
+        tasks
+        """
+        ...
+
+    @overload
+    def await_results(
+        self,
+        *,
         raise_exceptions: Literal[True] = True,
         only_successful_results: bool = False,
     ) -> list[T]:
@@ -142,21 +155,10 @@ class Tasks(Generic[T]):
     def await_results(
         self,
         *,
-        raise_exceptions: Literal[False] = False,
+        raise_exceptions: bool = False,
         only_successful_results: Literal[True] = True,
     ) -> list[T]:
         """⏱ Await and return results from all tasks, filtering out failed tasks"""
-        ...
-
-    @overload
-    def await_results(
-        self,
-        *,
-        raise_exceptions: Literal[False] = False,
-        only_successful_results: Literal[False] = False,
-    ) -> list[T | TaskException]:
-        """⏱ Await and return results from all tasks, returning TaskException for failed
-        tasks"""
         ...
 
     def await_results(

@@ -1,5 +1,7 @@
 from typing import Awaitable, Callable, ParamSpec, TypeVar, Union
 
+from pydantic import BaseModel
+
 # ⚙ Type variables for generic types
 T = TypeVar("T")  # For generic argument or return types
 P = ParamSpec("P")  # For generic argument types
@@ -13,3 +15,6 @@ AsyncFunc = Callable[P, Awaitable[R]]
 
 # For both sync and async functions
 Func = Union[SyncFunc[P, R], AsyncFunc[P, R]]
+
+# For Pydantic BaseModel
+BaseModelT = TypeVar("BaseModelT", bound=BaseModel)

@@ -7,6 +7,7 @@ try:
     from pydantic import BaseModel, field_validator
     from pydantic.config import ConfigDict
 
+    from scriptman.core.config import config
     from scriptman.powers.generics import Func
 except ImportError as e:
     raise ImportError(
@@ -68,6 +69,16 @@ class Job(BaseModel):
 
         @wraps(self.func)
         def wrapper(*f_args: Any, **f_kwargs: Any) -> Any:
+            from datetime import datetime
+
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            logger_id = logger.add(
+                f"{config.settings.logs_dir}/{self.name}_{timestamp}.log",
+                compression="zip",
+                rotation="1 day",
+                enqueue=True,
+            )
+
             try:
                 logger.info(f"▶️ Executing scheduled job: {self.name}")
                 result = self.func(*f_args, **f_kwargs)
@@ -76,9 +87,8 @@ class Job(BaseModel):
             except Exception as e:
                 logger.error(f"❌ Job {self.name} failed: {e}")
                 raise e
-
-        if hasattr(self.func, "__qualname__"):
-            wrapper.__qualname__ = self.func.__qualname__
+            finally:
+                logger.remove(logger_id)
 
         job_details = super().model_dump(*args, **kwargs)
         job_details["func"] = wrapper

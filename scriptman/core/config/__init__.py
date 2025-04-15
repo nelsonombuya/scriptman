@@ -55,7 +55,7 @@ class Config:
         self.__settings = TOMLConfigManager(config_file, section)
         self.__secrets = TOMLConfigManager(secrets_file)
 
-        self._initialize_settings(config)
+        self._initialize_settings()
         self._initialize_logging()
         self.__initialized = True
 
@@ -110,14 +110,14 @@ class Config:
         """
         return self.cwd.joinpath(".secrets.toml")
 
-    def _initialize_settings(self, config: ConfigModel) -> None:
+    def _initialize_settings(self) -> None:
         """
         📚 Initialize configuration defaults only for missing values.
 
         Iterate over the provided ConfigModel fields and set the default value in the
         config manager if the field is not already present.
         """
-        for field_name, field in config.model_fields.items():
+        for field_name, field in ConfigModel.model_fields.items():
             if field_name not in self.__settings:
                 self.__settings[field_name] = field.default
 

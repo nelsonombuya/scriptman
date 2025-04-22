@@ -90,6 +90,7 @@ class BaseAPIClient(ABC):
         params: Optional[dict[str, str]] = None,
         body: Optional[dict[str, Any]] = None,
         timeout: Optional[int] = None,
+        rate_limit_waiting_time: int = 60,
     ) -> ResponseModelT:
         """🚀 Send an HTTP request with strongly-typed response validation."""
         ...
@@ -103,6 +104,7 @@ class BaseAPIClient(ABC):
         params: Optional[dict[str, str]] = None,
         body: Optional[dict[str, Any]] = None,
         timeout: Optional[int] = None,
+        rate_limit_waiting_time: int = 60,
     ) -> dict[str, Any]:
         """🚀 Send an HTTP request without response validation."""
         ...
@@ -115,6 +117,7 @@ class BaseAPIClient(ABC):
         params: Optional[dict[str, str]] = None,
         body: Optional[dict[str, Any]] = None,
         timeout: Optional[int] = None,
+        rate_limit_waiting_time: int = 60,
     ) -> ResponseModelT | dict[str, Any]:
         """
         🚀 Send an HTTP request with optional response validation.
@@ -126,6 +129,8 @@ class BaseAPIClient(ABC):
             params (dict, optional): Query parameters.
             body (dict, optional): Request payload.
             timeout (int, optional): Request timeout in seconds.
+            rate_limit_waiting_time (int, optional): Waiting time for rate limit in
+                seconds.
 
         Returns:
             ResponseModelT: Validated response data as the specific model type if
@@ -136,7 +141,14 @@ class BaseAPIClient(ABC):
             ResponseValidationError: When response validation fails
             requests.RequestException: When request fails
         """
-        response = self._send_request(self._clean_url(url), method, params, body, timeout)
+        response = self._send_request(
+            rate_limit_waiting_time=rate_limit_waiting_time,
+            url=self._clean_url(url),
+            timeout=timeout,
+            method=method,
+            params=params,
+            body=body,
+        )
         data: dict[str, Any] = response.json()
 
         if not response_model:
@@ -164,6 +176,7 @@ class BaseAPIClient(ABC):
         params: Optional[dict[str, str]],
         body: Optional[dict[str, Any]],
         timeout: Optional[int] = None,
+        rate_limit_waiting_time: int = 60,
     ) -> Response:
         """
         📩 Helper method to send the HTTP request and handle HTTP errors.
@@ -196,6 +209,18 @@ class BaseAPIClient(ABC):
             self.log.debug(f"📤 Response Details: {dumps(response.json(), indent=4)}")
             return response
         except RequestException as e:
+            if e.response and e.response.status_code == 429:
+                from time import sleep
+
+                self.log.info(
+                    "🔴 Rate limit exceeded. "
+                    f"Waiting for {rate_limit_waiting_time} seconds."
+                )
+                sleep(rate_limit_waiting_time)
+                return self._send_request(
+                    url, method, params, body, timeout, rate_limit_waiting_time
+                )
+
             self.log.error(f"🔥 Request to {url} failed with error: {e}")
             response_data = e.response.json() if e.response else None
             self.log.debug(f"📤 Response Details: {dumps(response_data, indent=4)}")

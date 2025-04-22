@@ -10,6 +10,7 @@ try:
     from scriptman.powers.database._database import DatabaseHandler
     from scriptman.powers.database._exceptions import DatabaseError
     from scriptman.powers.etl._database import ETLDatabase
+    from scriptman.powers.generics import P
     from scriptman.powers.task import TaskExecutor
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError as e:
@@ -258,7 +259,7 @@ class ETL:
 
     @classmethod
     def from_extractor(
-        cls, extractor: Callable[..., ETL_TYPES], *args: Any, **kwargs: Any
+        cls, extractor: Callable[P, ETL_TYPES], *args: Any, **kwargs: Any
     ) -> "ETL":
         """
         ⚙ Extract data using a custom extractor function.
@@ -366,8 +367,6 @@ class ETL:
         Returns:
             ETL: A new ETL object with the concatenated data.
         """
-        from pandas import concat
-
         with self.timed_context("Concatenation", "transformation"):
             if "axis" not in kwargs:
                 kwargs["axis"] = 0

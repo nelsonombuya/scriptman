@@ -132,21 +132,8 @@ class Tasks(Generic[T]):
     def await_results(
         self,
         *,
-        raise_exceptions: Literal[False] = False,
-        only_successful_results: Literal[False] = False,
-    ) -> list[T | TaskException]:
-        """
-        ⏱ Await and return results from all tasks, returning TaskException for failed
-        tasks
-        """
-        ...
-
-    @overload
-    def await_results(
-        self,
-        *,
         raise_exceptions: Literal[True] = True,
-        only_successful_results: bool = False,
+        only_successful_results: Literal[True] = True,
     ) -> list[T]:
         """⏱ Await and return results from all tasks, raising an exception if any fail"""
         ...
@@ -155,10 +142,33 @@ class Tasks(Generic[T]):
     def await_results(
         self,
         *,
-        raise_exceptions: bool = True,
+        raise_exceptions: Literal[True] = True,
+        only_successful_results: Literal[False] = False,
+    ) -> list[T]:
+        """⏱ Await and return results from all tasks, raising an exception if any fail"""
+        ...
+
+    @overload
+    def await_results(
+        self,
+        *,
+        raise_exceptions: Literal[False] = False,
         only_successful_results: Literal[True] = True,
     ) -> list[T]:
-        """⏱ Await and return results from all tasks, filtering out failed tasks"""
+        """⏱ Await and return results from all tasks, only returning successful results"""
+        ...
+
+    @overload
+    def await_results(
+        self,
+        *,
+        raise_exceptions: Literal[False] = False,
+        only_successful_results: Literal[False] = False,
+    ) -> list[T | TaskException]:
+        """
+        ⏱ Await and return results from all tasks, returning TaskException for failed
+        tasks
+        """
         ...
 
     def await_results(

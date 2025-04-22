@@ -155,7 +155,7 @@ class Tasks(Generic[T]):
     def await_results(
         self,
         *,
-        raise_exceptions: bool = False,
+        raise_exceptions: bool = True,
         only_successful_results: Literal[True] = True,
     ) -> list[T]:
         """⏱ Await and return results from all tasks, filtering out failed tasks"""

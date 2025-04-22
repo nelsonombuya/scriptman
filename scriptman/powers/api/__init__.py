@@ -209,7 +209,10 @@ class BaseAPIClient(ABC):
             self.log.debug(f"📤 Response Details: {dumps(response.json(), indent=4)}")
             return response
         except RequestException as e:
-            if e.response and e.response.status_code == 429:
+            self.log.debug(f"Exception type: {type(e).__name__}")
+            self.log.debug(f"Exception structure: {vars(e)}")
+
+            if e.response is not None and e.response.status_code == 429:
                 from time import sleep
 
                 self.log.info(

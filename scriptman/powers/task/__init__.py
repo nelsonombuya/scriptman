@@ -2,7 +2,7 @@ from asyncio import get_event_loop, iscoroutinefunction
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from inspect import signature
 from time import perf_counter
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Literal, Optional
 
 from tqdm import tqdm
 
@@ -99,6 +99,43 @@ class TaskExecutor:
         start_time = perf_counter()
         future = self._thread_pool.submit(func, *args, **kwargs)
         return Task[R](future, args, kwargs, start_time)
+
+    def parallel(
+        self,
+        tasks: list[tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]]],
+        scope: Literal["multithreading", "multiprocessing"] = "multithreading",
+        show_progress: bool = True,
+    ) -> Tasks[Any]:
+        """
+        🔄 Run tasks in parallel using either multithreading or multiprocessing.
+
+        Args:
+            tasks: List of (func, args, kwargs) tuples
+            scope: Execution scope ("multithreading" or "multiprocessing")
+            show_progress: Whether to show a progress bar
+
+        Returns:
+            Tasks: Container that manages all tasks together
+
+        Examples:
+            # Run tasks in multithreading
+            batch = executor.parallel(tasks, scope="multithreading")
+
+            # Run tasks in multiprocessing
+            batch = executor.parallel(tasks, scope="multiprocessing")
+
+            # Monitor progress
+            print(f"Completed: {batch.completed_count}/{batch.total_count}")
+
+            # Wait for all results with timeout
+            try:
+                results = batch.await_result(timeout=60.0)
+            except TimeoutError:
+                print("Some tasks didn't complete in time")
+        """
+        if scope == "multiprocessing":
+            return self.multiprocess(tasks, show_progress)
+        return self.multithread(tasks, show_progress)
 
     def multithread(
         self,

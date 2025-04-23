@@ -127,20 +127,7 @@ class ETL:
             if exception:
                 cls.log.error(f"Error during {operation_str}: {exception}")
                 raise exception
-
-            if operation == "extraction":
-                num_records = len(cls._data) if isinstance(cls, type) else len(cls)
-                if num_records > 0:
-                    cls.log.debug(f"Number of records extracted: {num_records}")
-                    cls.log.debug(f"Extracted data: {cls._data}")
-                else:
-                    cls.log.warning("No records were extracted.")
-
-            elif operation == "transformation":
-                cls.log.debug(f"Transformed data: {cls._data}")
-
-            else:
-                cls.log.success(f"Data {operation_str} complete.")
+            cls.log.success(f"Data {operation_str} complete.")
 
     """
     🔍 Extraction Methods

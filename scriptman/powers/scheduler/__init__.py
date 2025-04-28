@@ -333,7 +333,7 @@ class Scheduler:
                     trigger=job.trigger,
                     enabled=job.next_run_time is not None,
                     max_instances=job.max_instances,
-                ).info_dump()
+                ).model_dump()
                 for job in self.__scheduler.get_jobs()
             ]
 

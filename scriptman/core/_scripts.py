@@ -4,10 +4,12 @@ from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from runpy import run_path
+from typing import Optional
 
 from filelock import FileLock, Timeout
 from loguru import logger
 
+from scriptman.core._summary import JobSummary
 from scriptman.core.config import config
 from scriptman.powers.retry import retry
 from scriptman.powers.time_calculator import TimeCalculator
@@ -17,13 +19,11 @@ class Scripts:
     def __init__(self) -> None:
         """
         ✨ Initializes the Scripts class with an empty dictionary to store
-        script execution results.
-
-        The dictionary maps each script path to a boolean indicating whether
-        the script executed successfully, or an exception if the script
-        execution failed.
+        script execution results and a job summary tracker.
         """
-        self.__results: dict[Path, bool | Exception] = {}
+        self.__results: dict[Path, Optional[Exception]] = {}
+        self.job_summary = JobSummary()
+        self.job_summary.start_session()
 
     def run_scripts(self, scripts: list[Path]) -> None:
         """
@@ -68,6 +68,8 @@ class Scripts:
             else:
                 logger.warning("🔍 No scripts to run")
 
+        self.save_summary()
+
     def __format_result(self, script: Path) -> str:
         """
         ✍🏾 Formats the result of a single script execution into a string.
@@ -79,7 +81,7 @@ class Scripts:
             str: A string that represents the status of the script execution.
         """
         result = self.__results.get(script, Exception("Script not executed"))
-        if result is True:
+        if result is None:
             status = "✅"
         else:
             status = f"❌ -> {type(result).__qualname__}: {str(result)}"
@@ -149,7 +151,7 @@ class Scripts:
             format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
         )
 
-    def execute(self, file_path: Path) -> bool | Exception:
+    def execute(self, file_path: Path) -> Optional[Exception]:
         """
         🏃🏾‍♂️ Runs a script and logs its output.
 
@@ -157,7 +159,8 @@ class Scripts:
             file_path (Path): The path of the script to run.
 
         Returns:
-            bool: True if the script executed successfully, or the exception otherwise.
+            Optional[Exception]: The exception raised by the script, or None if the
+                script executed successfully.
         """
         script_dir = str(file_path.parent)
         log_handler = self.__create_log_file(file_path)
@@ -187,7 +190,9 @@ class Scripts:
                 sys.argv = original_argv
 
             logger.success(f"✅ Script '{file_path.name}' executed successfully")
-            return True
+            self.__results[file_path] = None
+            self.job_summary.add_job(file_path, True)
+            return None
         except Exception as e:
             logger.error(f"❌ Error running '{file_path.name}' script: {e}")
             if config.on_failure_callback is not None:
@@ -198,6 +203,25 @@ class Scripts:
                     "🔍 If experiencing import errors, "
                     "try adding root_dir to the config file using scriptman config."
                 )
+            self.__results[file_path] = e
+            self.job_summary.add_job(file_path, False, e)
             return e
         finally:
             logger.remove(log_handler)
+
+    def save_summary(self, file_path: Optional[Path] = None) -> None:
+        """
+        Save the job summary to a JSON file.
+
+        Args:
+            file_path (Optional[Path]): Path to save the summary. If None,
+                saves to a default location in the logs directory.
+        """
+        self.job_summary.end_session()
+        if file_path is None:
+            file_path = (
+                Path(config.settings.logs_dir)
+                / f"scriptman_summary_{datetime.now().strftime('%Y-%m-%d')}.json"
+            )
+        self.job_summary.save_to_file(file_path)
+        logger.info(f"📊 Job summary saved to {file_path}")

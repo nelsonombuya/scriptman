@@ -7,7 +7,7 @@ try:
     from pydantic import BaseModel, field_validator
     from pydantic.config import ConfigDict
 
-    from scriptman.core.config import config
+    from scriptman.core._summary import JobSummaryService
     from scriptman.powers.generics import Func
 except ImportError as e:
     raise ImportError(
@@ -48,82 +48,34 @@ class Job(BaseModel):
 
     @field_validator("max_instances", mode="before")
     @classmethod
-    def not_invalid_max_instances(cls, v: int) -> int:
+    def positive_integer(cls, v: int) -> int:
         if v < 1:
-            raise ValueError("Max instances must be greater than 0")
+            raise ValueError("Max instances must be a positive integer")
         return v
 
-    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+    def __call__(self, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> Any:
         """
-        💡 Returns a job info dictionary.
+        🚀 Executes the job function and tracks its execution in the summary service.
 
-        Returns a dictionary containing the job's details, such as its ID, name, enabled
-        status, function name, trigger details, and maximum number of instances.
-
-        The function attribute is wrapped to catch any exceptions and log them with
-        the job name.
+        Args:
+            *args: Positional arguments to pass to the job function.
+            **kwargs: Keyword arguments to pass to the job function.
 
         Returns:
-            dict[str, Any]: A dictionary containing the job's details.
+            Any: The result of the job function execution.
         """
+        summary_service = JobSummaryService()
 
         @wraps(self.func)
-        def wrapper(*f_args: Any, **f_kwargs: Any) -> Any:
-            from datetime import datetime
-
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            logger_id = logger.add(
-                f"{config.settings.logs_dir}/{self.name}_{timestamp}.log",
-                compression="zip",
-                rotation="1 day",
-                enqueue=True,
-            )
-
+        def wrapper(*f_args: tuple[Any, ...], **f_kwargs: dict[str, Any]) -> Any:
             try:
-                logger.info(f"▶️ Executing scheduled job: {self.name}")
                 result = self.func(*f_args, **f_kwargs)
+                summary_service.add_job(self.id, self.name, True)
                 logger.success(f"✅ Job {self.name} executed successfully")
                 return result
             except Exception as e:
+                summary_service.add_job(self.id, self.name, False, e)
                 logger.error(f"❌ Job {self.name} failed: {e}")
                 raise e
-            finally:
-                logger.remove(logger_id)
 
-        job_details = super().model_dump(*args, **kwargs)
-        job_details["func"] = wrapper
-        return job_details
-
-    def info_dump(self) -> dict[str, Any]:
-        """
-        💡 Returns a job info dictionary.
-
-        Returns a dictionary containing the job's details, such as its ID, name, enabled
-        status, function name, trigger details, and maximum number of instances.
-
-        Returns:
-            dict[str, Any]: A dictionary containing the job's details.
-        """
-        function_name = (
-            self.func.__qualname__
-            if hasattr(self.func, "__qualname__")
-            else "<unknown_function>"
-        )
-
-        trigger_details = {
-            "type": self.trigger.__class__.__name__,
-            **{
-                k: getattr(self.trigger, k)
-                for k in self.trigger.__slots__
-                if k not in ["__weakref__", "__dict__"]
-            },
-        }
-
-        return {
-            "id": self.id,
-            "name": self.name,
-            "enabled": self.enabled,
-            "func": function_name,
-            "trigger": trigger_details,
-            "max_instances": self.max_instances,
-        }
+        return wrapper(*args, **kwargs)

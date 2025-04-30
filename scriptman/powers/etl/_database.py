@@ -220,6 +220,9 @@ class ETLDatabase:
         """
         ✍🏾 Generates a SQL MERGE INTO query using a temporary table approach.
 
+        NOTE: The source table needs to be added to the query as {{source_table}} using
+        string.format.
+
         Args:
             table_name (str): The name of the table to merge into.
             df (DataFrame): The DataFrame containing the data to merge.
@@ -235,17 +238,11 @@ class ETLDatabase:
         assert indices is not None, "Index names are required"
         data_types = self.get_table_data_types(reset_df, force_nvarchar)
 
-        # Force NVARCHAR(255) for index columns
-        for column in data_types.keys():
-            if column in indices and force_nvarchar:
-                data_types[column] = "NVARCHAR(255)"
-
         # Columns to be used in the MERGE statement
         columns_to_insert = [c for c in reset_df.columns]
         columns_to_update = [c for c in reset_df.columns if c not in indices]
 
         # Build the query parts
-        temp_table = f"#temp_{table_name}"
         temp_schema = ", ".join([f"[{c}] {data_types[c]}" for c in columns_to_insert])
         temp_schema += f", PRIMARY KEY ({', '.join(['[' + k + ']' for k in indices])})"
         update = ", ".join([f"target.[{c}] = source.[{c}]" for c in columns_to_update])
@@ -253,27 +250,15 @@ class ETLDatabase:
 
         # Construct the complete query with temporary table
         query = f"""
-        -- Create temporary table
-        CREATE TABLE {temp_table} ({temp_schema});
-
-        -- Insert data into temporary table
-        INSERT INTO {temp_table} ({', '.join(['[' + c + ']' for c in columns_to_insert])})
-        VALUES ({', '.join([f':{c}' for c in columns_to_insert])});
-
-        -- Perform the merge operation
         MERGE [{table_name}] AS target
-        USING {temp_table} AS source
+        USING {{source_table}} AS source
         ON ({match_conditions})
         WHEN MATCHED THEN
             UPDATE SET {update}
         WHEN NOT MATCHED THEN
             INSERT ({', '.join(['[' + c + ']' for c in columns_to_insert])})
-            VALUES ({', '.join([f'source.[{c}]' for c in columns_to_insert])});
-
-        -- Clean up temporary table
-        DROP TABLE {temp_table};
+            VALUES ({', '.join([f'source.[{c}]' for c in columns_to_insert])})
         """
-
         return query, self.prepare_values(df, force_nvarchar)
 
     def execute_read_query(

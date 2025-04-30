@@ -2,7 +2,7 @@ try:
     from contextlib import contextmanager
     from functools import partial
     from pathlib import Path
-    from typing import Any, Callable, Generator, Literal, Optional, cast
+    from typing import Any, Callable, Generator, Iterator, Literal, Optional, cast
 
     from loguru import logger
     from pandas import DataFrame, MultiIndex, concat
@@ -814,7 +814,6 @@ class ETL:
             bool: True if the data was loaded successfully.
         """
         # Wrap the handler with ETLDatabase for extended functionality
-        results: list[bool] = []
         executor = TaskExecutor()
         db = ETLDatabase(db_handler)
         table_exists: bool = db.table_exists(table_name)
@@ -863,17 +862,22 @@ class ETL:
             f'with "{db.database_type}" database'
         )
         self.log.debug(f"Query: {query}")
-        statements = db.split_query_statements(query)
 
         try:
+            if "merge" in query.lower():
+                return self._merge(
+                    query=query,
+                    values=values,
+                    database_handler=db,
+                    batch_size=batch_size,
+                    table_name=table_name,
+                    force_nvarchar=force_nvarchar,
+                )
+
             if not batch_execute:
                 raise ValueError("Bulk Execute is disabled.")
 
-            for statement in statements:
-                result = db.execute_write_batch_query(statement, values, batch_size)
-                results.append(result)
-
-            return all(results)
+            return db.execute_write_batch_query(query, values, batch_size)
 
         except (MemoryError, ValueError) as error:
             if not batch_execute:
@@ -882,27 +886,80 @@ class ETL:
                 self.log.warning(f"Bulk Execution Failed: {error}")
                 self.log.warning("Executing single queries...")
 
-            for statement in statements:
-                tasks = executor.multithread(
-                    [(db.execute_write_query, (statement, row), {}) for row in values]
-                )
-                tasks.await_results()  # Will raise an exception if any query fails
-                results.append(tasks.are_successful)
-
-            return all(results)
+            tasks = executor.multithread(
+                [(db.execute_write_query, (query, row), {}) for row in values]
+            )
+            tasks.await_results()  # Will raise an exception if any query fails
+            return tasks.are_successful
 
         except DatabaseError as error:
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
             partial_func = partial(self._insert_or_update, db, table_name)
+            tasks = executor.multithread(
+                [(lambda row: partial_func(row), (row,), {}) for row in values]
+            )
+            tasks.await_results()  # Will raise an exception if any query fails
+            return tasks.are_successful
 
-            for statement in statements:
-                tasks = executor.multithread(
-                    [(lambda row: partial_func(row), (row,), {}) for row in values]
-                )
-                tasks.await_results()  # Will raise an exception if any query fails
-                results.append(tasks.are_successful)
+    def _merge(
+        self,
+        database_handler: ETLDatabase,
+        table_name: str,
+        query: str,
+        values: Iterator[dict[str, Any]] | list[dict[str, Any]],
+        force_nvarchar: bool = False,
+        batch_size: int = 1000,
+    ) -> bool:
+        """
+        ✍🏾 Private method to merge data into the mssql database using a temporary table.
 
-            return all(results)
+        Args:
+            database_handler (ETLDatabase): The database handler to use for executing
+                queries.
+            query (str): The query to execute.
+            values (Iterator[dict[str, Any]] | list[dict[str, Any]]): The values to merge.
+
+        Returns:
+            bool: True if the data was merged successfully.
+        """
+        from uuid import uuid4
+
+        temp_table = f"#temp_{table_name}_{uuid4()}"
+        merge_query = query.format(source_table=temp_table)
+
+        try:
+            # Create the temporary table
+            database_handler.create_table(
+                table_name=temp_table,
+                keys=self._data.index.names,
+                columns=database_handler.get_table_data_types(
+                    self._data.reset_index(), force_nvarchar
+                ),
+            )
+
+            # Insert the data into the temporary table
+            temp_query, temp_values = database_handler.generate_prepared_insert_query(
+                temp_table, self._data, force_nvarchar
+            )
+            database_handler.execute_write_batch_query(
+                temp_query, temp_values, batch_size
+            )
+
+            # Merge the data into the target table
+            return database_handler.execute_write_batch_query(
+                merge_query, values, batch_size
+            )
+
+        except DatabaseError as error:
+            # If the merge fails, retry using insert/update
+            self.log.error(f"Database Error: {error}. Retrying using insert/update...")
+            for value in values:
+                self._insert_or_update(database_handler, table_name, value)
+            return True
+
+        finally:
+            # Drop the temporary table
+            database_handler.drop_table(temp_table)
 
     def _insert_or_update(
         self, database_handler: ETLDatabase, table_name: str, record: dict[str, Any]

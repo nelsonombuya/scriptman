@@ -785,6 +785,7 @@ class ETL:
         batch_execute: bool = True,
         force_nvarchar: bool = False,
         method: Literal["truncate", "replace", "insert", "update", "upsert"] = "upsert",
+        synchronize_schema: bool = True,
     ) -> bool:
         """
         📂 Loads the ETL data into a database table, with options for batch execution and
@@ -805,6 +806,8 @@ class ETL:
                 batch. Defaults to 1000.
             method (Literal["truncate", "replace", "insert", "update", "upsert"]):
                 The loading method to use. Defaults to "upsert".
+            synchronize_schema (bool, optional): Whether to synchronize the schema of
+                the table before loading the data. Defaults to True.
 
         Raises:
             ValueError: If the dataset is empty or if bulk execute is disabled.
@@ -836,6 +839,13 @@ class ETL:
             )
             self.log.error(message)
             raise ValueError(message)
+
+        if table_exists and synchronize_schema:
+            db.synchronize_table_schema(
+                force_nvarchar=force_nvarchar,
+                table_name=table_name,
+                df=self._data,
+            )
 
         if not table_exists:
             self.log.warning(f'Table "{table_name}" does not exist. Creating table...')

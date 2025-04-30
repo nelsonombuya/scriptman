@@ -1,6 +1,7 @@
 try:
     from typing import Any, Iterator, Optional
 
+    from loguru import logger
     from pandas import DataFrame
 
     from scriptman.powers.database._database import DatabaseHandler
@@ -23,6 +24,10 @@ class ETLDatabase:
             database_handler: DatabaseHandler object
         """
         self.db = database_handler
+        self.log = logger.bind(
+            database=self.db.database_name,
+            handler=self.__class__.__name__,
+        )
 
     @property
     def database_name(self) -> str:
@@ -213,6 +218,93 @@ class ETLDatabase:
         assert query is not None, "Unsupported database type"
         assert values is not None, "No values to upsert"
         return query, values
+
+    def synchronize_table_schema(
+        self, table_name: str, df: DataFrame, force_nvarchar: bool = False
+    ) -> bool:
+        """
+        🔄 Synchronizes the table schema with the DataFrame structure.
+
+        This method will:
+        1. Check if the table exists
+        2. If it doesn't exist, create it with the DataFrame's schema
+        3. If it exists, check for missing columns and add them
+        4. Update column data types if needed
+
+        Args:
+            table_name (str): The name of the table to synchronize
+            df (DataFrame): The DataFrame containing the target schema
+            force_nvarchar (bool): Whether to force all columns to be NVARCHAR(MAX)
+
+        Returns:
+            bool: True if schema was synchronized successfully, False otherwise
+        """
+        try:
+            # Get the target schema from the DataFrame
+            target_schema = self.get_table_data_types(df, force_nvarchar)
+
+            if not self.db.table_exists(table_name):
+                # Create new table with the DataFrame's schema
+                return self.db.create_table(table_name, target_schema)
+
+            # Get current table schema
+            schema_query = f"""
+                SELECT
+                    COLUMN_NAME,
+                    DATA_TYPE,
+                    CHARACTER_MAXIMUM_LENGTH,
+                    IS_NULLABLE
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = '{table_name}'
+            """
+            current_schema = self.db.execute_read_query(schema_query)
+
+            # Convert current schema to a dictionary
+            current_columns = {
+                row["COLUMN_NAME"]: {
+                    "type": row["DATA_TYPE"],
+                    "max_length": row["CHARACTER_MAXIMUM_LENGTH"],
+                    "nullable": row["IS_NULLABLE"] == "YES",
+                }
+                for row in current_schema
+            }
+
+            # Find missing columns and columns that need type updates
+            missing_columns = {}
+            type_updates = {}
+
+            for column, target_type in target_schema.items():
+                if column not in current_columns:
+                    missing_columns[column] = target_type
+                else:
+                    current_type = current_columns[column]["type"]
+                    # Check if type needs to be updated
+                    if current_type != target_type:
+                        type_updates[column] = target_type
+
+            # Add missing columns
+            if missing_columns:
+                alter_queries = []
+                for column, data_type in missing_columns.items():
+                    alter_queries.append(
+                        f"ALTER TABLE [{table_name}] ADD [{column}] {data_type}"
+                    )
+                self.db.execute_multiple_write_queries(";".join(alter_queries))
+
+            # Update column types if needed
+            if type_updates:
+                alter_queries = []
+                for column, new_type in type_updates.items():
+                    alter_queries.append(
+                        f"ALTER TABLE [{table_name}] ALTER COLUMN [{column}] {new_type}"
+                    )
+                self.db.execute_multiple_write_queries(";".join(alter_queries))
+
+            return True
+
+        except Exception as e:
+            self.log.error(f"Error synchronizing table schema: {str(e)}")
+            return False
 
     def generate_merge_query(
         self, table_name: str, df: DataFrame, force_nvarchar: bool = False

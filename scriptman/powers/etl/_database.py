@@ -246,7 +246,19 @@ class ETLDatabase:
         temp_schema = ", ".join([f"[{c}] {data_types[c]}" for c in columns_to_insert])
         temp_schema += f", PRIMARY KEY ({', '.join(['[' + k + ']' for k in indices])})"
         update = ", ".join([f"target.[{c}] = source.[{c}]" for c in columns_to_update])
-        match_conditions = " AND ".join([f"source.[{k}] = target.[{k}]" for k in indices])
+
+        # Add COLLATE clause for string comparisons to handle collation conflicts
+        match_conditions = " AND ".join(
+            [
+                (
+                    f"source.[{k}] COLLATE SQL_Latin1_General_CP1_CI_AS = "
+                    f"target.[{k}] COLLATE SQL_Latin1_General_CP1_CI_AS"
+                    if data_types.get(k, "").startswith("NVARCHAR")
+                    else f"source.[{k}] = target.[{k}]"
+                )
+                for k in indices
+            ]
+        )
 
         # Construct the complete query with temporary table
         query = f"""
@@ -257,7 +269,7 @@ class ETLDatabase:
             UPDATE SET {update}
         WHEN NOT MATCHED THEN
             INSERT ({', '.join(['[' + c + ']' for c in columns_to_insert])})
-            VALUES ({', '.join([f'source.[{c}]' for c in columns_to_insert])})
+            VALUES ({', '.join([f'source.[{c}]' for c in columns_to_insert])});
         """
         return query, self.prepare_values(df, force_nvarchar)
 

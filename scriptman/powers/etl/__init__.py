@@ -864,7 +864,7 @@ class ETL:
         self.log.debug(f"Query: {query}")
 
         try:
-            if "merge" in query.lower():
+            if f"merge [{table_name}] as target" in query.lower():
                 return self._merge(
                     query=query,
                     values=values,
@@ -924,7 +924,7 @@ class ETL:
         """
         from uuid import uuid4
 
-        temp_table = f"#temp_{table_name}_{uuid4()}"
+        temp_table = f"#temp_{table_name}_{uuid4()}".replace("-", "_")
         merge_query = query.format(source_table=temp_table)
 
         try:
@@ -945,9 +945,14 @@ class ETL:
                 temp_query, temp_values, batch_size
             )
 
-            # Merge the data into the target table
-            return database_handler.execute_write_batch_query(
-                merge_query, values, batch_size
+            """
+            ✍🏾 Merge the data into the target table
+
+            NOTE: Since the data is already in the temporary table, we can just
+            execute the merge query without values.
+            """
+            return database_handler.execute_write_query(
+                merge_query, check_affected_rows=True
             )
 
         except DatabaseError as error:

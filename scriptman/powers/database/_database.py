@@ -6,6 +6,7 @@ from loguru import logger
 from tqdm import tqdm
 
 from scriptman.core.config import config
+from scriptman.powers.database._exceptions import DatabaseError
 from scriptman.powers.generics import BaseModelT
 from scriptman.powers.time_calculator import TimeCalculator
 
@@ -97,6 +98,50 @@ class DatabaseHandler(ABC):
         """
         pass
 
+    def split_query_statements(self, query: str) -> list[str]:
+        """
+        🔍 Splits a SQL query into individual statements.
+
+        Args:
+            query (str): The SQL query to split
+
+        Returns:
+            list[str]: List of individual SQL statements
+        """
+        # Split on semicolons, but preserve those within quotes
+        current = ""
+        statements = []
+        in_quotes = False
+        quote_char = None
+
+        for char in query:
+            if char in ['"', "'"] and not in_quotes:
+                in_quotes = True
+                quote_char = char
+            elif char == quote_char and in_quotes:
+                in_quotes = False
+                quote_char = None
+
+            current += char
+
+            if char == ";" and not in_quotes:
+                statements.append(current.strip())
+                current = ""
+
+        if current.strip():
+            statements.append(current.strip())
+
+        # Remove any comments that might have been preserved in quotes
+        cleaned_statements = []
+        for stmt in statements:
+            cleaned = sub(r"--.*?(?:\n|$)", "", stmt, flags=IGNORECASE)  # Inline comments
+            cleaned = sub(r"/\*.*?\*/", "", cleaned, flags=IGNORECASE)  # Block comments
+            cleaned = cleaned.strip()
+            if cleaned:
+                cleaned_statements.append(cleaned)
+
+        return cleaned_statements
+
     @abstractmethod
     def execute_read_query(
         self, query: str, params: dict[str, Any] = {}
@@ -117,6 +162,27 @@ class DatabaseHandler(ABC):
         """
         pass
 
+    def execute_multiple_read_queries(
+        self, query: str, params: dict[str, Any] = {}
+    ) -> list[list[dict[str, Any]]]:
+        """
+        📖 Executes multiple SQL queries with optional parameters and returns the
+        results as a list of lists of dictionaries.
+
+        NOTE: This method should be used for SELECT queries only; and is best used with
+        prepared queries.
+
+        Args:
+            query (str): The SQL query to execute (should contain multiple statements).
+            params (dict[str, Any], optional): The parameters for the query.
+
+        Returns:
+            list[list[dict[str, Any]]]: The results of the queries as a list of lists of
+                dictionaries.
+        """
+        statements = self.split_query_statements(query)
+        return [self.execute_read_query(stmt, params) for stmt in statements]
+
     def execute_read_query_with_model(
         self, query: str, model: type[BaseModelT], params: dict[str, Any] = {}
     ) -> list[BaseModelT]:
@@ -125,7 +191,7 @@ class DatabaseHandler(ABC):
         results as a list of dictionaries.
 
         NOTE: This method should be used for SELECT queries only; and is best used with
-        prepared queries.
+        prepared queries. It also assumes that the query is a single statement.
 
         Args:
             query (str): The SQL query to execute.
@@ -162,6 +228,33 @@ class DatabaseHandler(ABC):
         """
         pass
 
+    def execute_multiple_write_queries(
+        self, query: str, params: dict[str, Any] = {}, check_affected_rows: bool = False
+    ) -> bool:
+        """
+        ✍🏾 Executes multiple SQL write queries with optional parameters and commits the
+        transaction.
+
+        NOTE: This method should be used for INSERT, UPDATE, DELETE, and other write
+        queries only; and is best used with prepared queries.
+
+        Args:
+            query (str): The SQL query to execute.
+            params (dict[str, Any], optional): The parameters for the query.
+            check_affected_rows (bool, optional): When true, raises a DatabaseError if no
+                row was affected. Defaults to False.
+
+        Returns:
+            bool: True if the query was executed successfully, False otherwise.
+        """
+        statements = self.split_query_statements(query)
+        if len(statements) > 1:
+            self.log.debug(f"Query contains {len(statements)} statements...")
+
+        for statement in statements:
+            self.execute_write_query(statement, params, check_affected_rows)
+        return True
+
     @abstractmethod
     def execute_write_bulk_query(
         self, query: str, rows: list[dict[str, Any]] = []
@@ -181,7 +274,6 @@ class DatabaseHandler(ABC):
         """
         pass
 
-    @abstractmethod
     def execute_write_batch_query(
         self,
         query: str,
@@ -189,22 +281,61 @@ class DatabaseHandler(ABC):
         batch_size: int = config.settings.get("BATCH_SIZE", 1000),
     ) -> bool:
         """
-        📃 Executes multiple SQL insert queries with the given SQL query and rows.
-
-        NOTE: This method should be used for INSERT/UPDATE queries only; and is best used
-        with prepared queries.
+        ⛓ Executes a bulk write operation with the given query and rows of parameters.
+        Optionally processes the data in batches for memory efficiency.
 
         Args:
-            query (str): The SQL query to execute for each row.
-            rows (Iterator[dict[str, Any]], list[dict[str, Any]]): The iterator of rows
-                to insert.
-            batch_size (int, optional): The number of rows to insert in each batch.
-                Defaults to the BATCH_SIZE from the environment configuration.
+            query (str): The SQL query to execute.
+            rows (Union[Iterator[list[dict[str, Any]]], list[dict[str, Any]]]): Either a
+                list of rows to process or an iterator that yields batches of rows.
+                Each row is a dictionary where the keys are the column names and the
+                values are the corresponding values for each row.
+            batch_size (int): Size of batches to process.
 
         Returns:
-            bool: True if the queries were executed successfully, False otherwise.
+            bool: True if the operation was successful
+
+        Raises:
+            DatabaseError: If the bulk operation fails
         """
-        pass
+        total_rows: int = 0
+        batch_number: int = 0
+        batched_rows: list[dict[str, Any]] = []
+
+        try:
+            self.log.info("Executing bulk operation with iterative batches...")
+            for record in rows:
+                batched_rows.append(record)
+                total_rows += 1
+                if len(batched_rows) >= batch_size:
+                    batch_number += 1
+                    self.execute_write_bulk_query(query, batched_rows)
+                    batched_rows = []
+
+            if batched_rows:  # Process any remaining rows
+                batch_number += 1
+                self.execute_write_bulk_query(query, batched_rows)
+
+            self.log.success(
+                f"Successfully executed the bulk operation with "
+                f"{batch_number} batches of {total_rows} rows"
+            )
+            return True
+
+        except Exception as error:
+            sample_rows = "\n\t".join(str(row) for row in batched_rows[:5])
+            if len(batched_rows) > 5:
+                sample_rows += "\n\t... and more rows"
+
+            self.log.error(
+                "Unable to bulk execute query: \n"
+                f"Error: {error}\n"
+                f"Query: {query}\n"
+                f"Batch Size: {batch_size}\n"
+                f"Total Rows: {len(batched_rows)}\n"
+                f"Sample Rows:\n\t{sample_rows}"
+            )
+            raise DatabaseError("Unable to bulk execute query", error)
 
     def table_exists(self, table_name: str) -> bool:
         """❓ Checks if the given table exists in the database."""

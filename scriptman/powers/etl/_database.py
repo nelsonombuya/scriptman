@@ -236,7 +236,7 @@ class ETLDatabase:
         data_types = self.get_table_data_types(reset_df, force_nvarchar)
 
         # Force NVARCHAR(255) for index columns
-        for column, _ in data_types.items():
+        for column in data_types.keys():
             if column in indices and force_nvarchar:
                 data_types[column] = "NVARCHAR(255)"
 
@@ -246,10 +246,10 @@ class ETLDatabase:
 
         # Build the query parts
         temp_table = f"#temp_{table_name}"
-        temp_schema = ", ".join([f'"{c}" {data_types[c]}' for c in columns_to_insert])
-        temp_schema += f", PRIMARY KEY ({', '.join(indices)})"  # Add keys to temp table
-        update = ", ".join([f'target."{c}" = source."{c}"' for c in columns_to_update])
-        match_conditions = " AND ".join([f'source."{k}" = target."{k}"' for k in indices])
+        temp_schema = ", ".join([f"[{c}] {data_types[c]}" for c in columns_to_insert])
+        temp_schema += f", PRIMARY KEY ({', '.join(['[' + k + ']' for k in indices])})"
+        update = ", ".join([f"target.[{c}] = source.[{c}]" for c in columns_to_update])
+        match_conditions = " AND ".join([f"source.[{k}] = target.[{k}]" for k in indices])
 
         # Construct the complete query with temporary table
         query = f"""
@@ -257,21 +257,21 @@ class ETLDatabase:
         CREATE TABLE {temp_table} ({temp_schema});
 
         -- Insert data into temporary table
-        INSERT INTO {temp_table} ({', '.join([f'"{c}"' for c in columns_to_insert])})
+        INSERT INTO {temp_table} ({', '.join(['[' + c + ']' for c in columns_to_insert])})
         VALUES ({', '.join([f':{c}' for c in columns_to_insert])});
 
         -- Perform the merge operation
-        MERGE "{table_name}" AS target
-        USING "{temp_table}" AS source
+        MERGE [{table_name}] AS target
+        USING {temp_table} AS source
         ON ({match_conditions})
         WHEN MATCHED THEN
             UPDATE SET {update}
         WHEN NOT MATCHED THEN
-            INSERT ({', '.join([f'"{c}"' for c in columns_to_insert])})
-            VALUES ({', '.join([f'source."{c}"' for c in columns_to_insert])});
+            INSERT ({', '.join(['[' + c + ']' for c in columns_to_insert])})
+            VALUES ({', '.join([f'source.[{c}]' for c in columns_to_insert])});
 
         -- Clean up temporary table
-        DROP TABLE "{temp_table}";
+        DROP TABLE {temp_table};
         """
 
         return query, self.prepare_values(df, force_nvarchar)
@@ -320,3 +320,7 @@ class ETLDatabase:
     def drop_table(self, table_name: str) -> bool:
         """Delegate to the database handler"""
         return self.db.drop_table(table_name)
+
+    def split_query_statements(self, query: str) -> list[str]:
+        """Delegate to the database handler"""
+        return self.db.split_query_statements(query)

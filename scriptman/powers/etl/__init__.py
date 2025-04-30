@@ -814,6 +814,7 @@ class ETL:
             bool: True if the data was loaded successfully.
         """
         # Wrap the handler with ETLDatabase for extended functionality
+        results: list[bool] = []
         executor = TaskExecutor()
         db = ETLDatabase(db_handler)
         table_exists: bool = db.table_exists(table_name)
@@ -862,11 +863,17 @@ class ETL:
             f'with "{db.database_type}" database'
         )
         self.log.debug(f"Query: {query}")
+        statements = db.split_query_statements(query)
 
         try:
             if not batch_execute:
                 raise ValueError("Bulk Execute is disabled.")
-            return db.execute_write_batch_query(query, values, batch_size)
+
+            for statement in statements:
+                result = db.execute_write_batch_query(statement, values, batch_size)
+                results.append(result)
+
+            return all(results)
 
         except (MemoryError, ValueError) as error:
             if not batch_execute:
@@ -875,20 +882,27 @@ class ETL:
                 self.log.warning(f"Bulk Execution Failed: {error}")
                 self.log.warning("Executing single queries...")
 
-            tasks = executor.multithread(
-                [(db.execute_write_query, (query, row), {}) for row in values]
-            )
-            tasks.await_results()  # Will raise an exception if any query fails
-            return tasks.are_successful
+            for statement in statements:
+                tasks = executor.multithread(
+                    [(db.execute_write_query, (statement, row), {}) for row in values]
+                )
+                tasks.await_results()  # Will raise an exception if any query fails
+                results.append(tasks.are_successful)
+
+            return all(results)
 
         except DatabaseError as error:
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
             partial_func = partial(self._insert_or_update, db, table_name)
-            tasks = executor.multithread(
-                [(lambda row: partial_func(row), (row,), {}) for row in values]
-            )
-            tasks.await_results()  # Will raise an exception if any query fails
-            return tasks.are_successful
+
+            for statement in statements:
+                tasks = executor.multithread(
+                    [(lambda row: partial_func(row), (row,), {}) for row in values]
+                )
+                tasks.await_results()  # Will raise an exception if any query fails
+                results.append(tasks.are_successful)
+
+            return all(results)
 
     def _insert_or_update(
         self, database_handler: ETLDatabase, table_name: str, record: dict[str, Any]

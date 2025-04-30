@@ -1,11 +1,10 @@
 try:
-    from typing import Any, Iterator, Optional
+    from typing import Any, Optional
 
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import Engine
     from sqlalchemy.exc import SQLAlchemyError
 
-    from scriptman.core.config import config
     from scriptman.powers.database._database import DatabaseHandler
     from scriptman.powers.database._exceptions import DatabaseError
 except ImportError as e:
@@ -208,7 +207,7 @@ class SQLAlchemyHandler(DatabaseHandler):
         except (SQLAlchemyError, ValueError) as error:
             self.log.error(
                 "Unable to execute write query: \n"
-                f"Error: {error} + \n"
+                f"Error: {error} \n"
                 f"Query: {query} \n"
                 f"Params: {params} \n"
             )
@@ -221,7 +220,7 @@ class SQLAlchemyHandler(DatabaseHandler):
         ⛓ Executes a bulk write operation with the given query and rows of parameters.
 
         Args:
-            query (str): The SQL query to execute (using ? parameters)
+            query (str): The SQL query to execute (using named parameters)
             rows (list[dict[str, Any]]): The list of rows to process. Each row is a
                 dictionary where the keys are the column names and the values are the
                 corresponding values for each row.
@@ -256,71 +255,6 @@ class SQLAlchemyHandler(DatabaseHandler):
                 f"Error: {error} \n"
                 f"Query: {query} \n"
                 f"Rows: {sample_rows} \n"
-            )
-            raise DatabaseError("Unable to bulk execute query", error)
-
-    def execute_write_batch_query(
-        self,
-        query: str,
-        rows: Iterator[dict[str, Any]] | list[dict[str, Any]] = [],
-        batch_size: int = config.settings.get("BATCH_SIZE", 1000),
-    ) -> bool:
-        """
-        ⛓ Executes a bulk write operation with the given query and rows of parameters.
-        Optionally processes the data in batches for memory efficiency.
-
-        Args:
-            query (str): The SQL query to execute (using ? parameters)
-            rows (Union[Iterator[list[dict[str, Any]]], list[dict[str, Any]]]): Either a
-                list of rows to process or an iterator that yields batches of rows.
-                Each row is a dictionary where the keys are the column names and the
-                values are the corresponding values for each row.
-            batch_size (int): Size of batches to process.
-
-        Returns:
-            bool: True if the operation was successful
-
-        Raises:
-            DatabaseError: If the bulk operation fails
-        """
-        total_rows: int = 0
-        batch_number: int = 0
-        batched_rows: list[dict[str, Any]] = []
-        _, parameter_style = self.validate_query_parameterization(query)
-        assert parameter_style in ["named", "none"], "Named parameters are required"
-
-        try:
-            self.log.info("Executing bulk operation with iterative batches...")
-            for record in rows:
-                batched_rows.append(record)
-                total_rows += 1
-                if len(batched_rows) >= batch_size:
-                    batch_number += 1
-                    self.execute_write_bulk_query(query, batched_rows)
-                    batched_rows = []
-
-            if batched_rows:  # Process any remaining rows
-                batch_number += 1
-                self.execute_write_bulk_query(query, batched_rows)
-
-            self.log.success(
-                f"Successfully executed the bulk operation with "
-                f"{batch_number} batches of {total_rows} rows"
-            )
-            return True
-
-        except SQLAlchemyError as error:
-            sample_rows = "\n\t".join(str(row) for row in batched_rows[:5])
-            if len(batched_rows) > 5:
-                sample_rows += "\n\t... and more rows"
-
-            self.log.error(
-                "Unable to bulk execute query: \n"
-                f"Error: {error}\n"
-                f"Query: {query}\n"
-                f"Batch Size: {batch_size}\n"
-                f"Total Rows: {len(batched_rows)}\n"
-                f"Sample Rows:\n\t{sample_rows}"
             )
             raise DatabaseError("Unable to bulk execute query", error)
 

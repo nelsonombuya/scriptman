@@ -934,7 +934,7 @@ class ETL:
         """
         from uuid import uuid4
 
-        temp_table = f"#temp_{table_name}_{uuid4()}".replace("-", "_")
+        temp_table = f"temp_{table_name}_{uuid4()}".replace("-", "_")
         merge_query = query.format(source_table=temp_table)
 
         try:

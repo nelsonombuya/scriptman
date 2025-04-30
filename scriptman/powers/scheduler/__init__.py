@@ -1,4 +1,5 @@
 try:
+    from datetime import datetime
     from pathlib import Path
     from threading import RLock, Thread
     from typing import Any, Callable, Optional
@@ -6,9 +7,11 @@ try:
     from apscheduler.schedulers.background import BackgroundScheduler
     from apscheduler.schedulers.base import BaseScheduler
     from apscheduler.triggers.base import BaseTrigger
+    from apscheduler.triggers.cron import CronTrigger
     from loguru import logger
 
     from scriptman.core._scripts import Scripts
+    from scriptman.core._summary import JobSummaryService
     from scriptman.powers.scheduler._models import Job
     from scriptman.powers.task import TaskExecutor
 
@@ -71,13 +74,49 @@ class Scheduler:
 
             # Script & Function Scheduling
             self.__scripts = Scripts()
-            self.__task_executor = TaskExecutor(
+            self.__summary = JobSummaryService()
+            self.__executor = TaskExecutor(
                 thread_pool_size=thread_pool_size,
                 process_pool_size=process_pool_size,
             )
 
+            # Schedule the daily summary release job
+            self._schedule_daily_summary_release()
+
             # Initialize the scheduler instance
             self.__initialized = True
+
+    def _schedule_daily_summary_release(self) -> None:
+        """📊 Schedule a job to release the daily job summary at 11 PM."""
+
+        def release_daily_summary() -> None:
+            """Release the daily job summary."""
+            try:
+                today = datetime.now().date().isoformat()
+                summary = self.__summary.get_summary(today)
+                if summary:
+                    logger.info(f"📊 Releasing daily job summary for {today}")
+                    logger.info(f"Total jobs: {summary['total_jobs']}")
+                    logger.info(f"Successful jobs: {summary['successful_jobs']}")
+                    logger.info(f"Failed jobs: {summary['failed_jobs']}")
+
+                    # Clean up old summaries
+                    self.__summary.cleanup_old_summaries()
+            except Exception as e:
+                logger.error(f"❌ Error releasing daily summary: {e}")
+
+        # Schedule the job to run at 11 PM every day
+        trigger = CronTrigger(hour=23, minute=0)
+        job = Job(
+            id="daily_summary_release",
+            name="Daily Job Summary Release",
+            func=release_daily_summary,
+            trigger=trigger,
+            enabled=True,
+            max_instances=1,
+        )
+        self.add_job(job)
+        logger.info("📅 Scheduled daily job summary release at 11 PM")
 
     @property
     def scheduler(self) -> BaseScheduler:
@@ -250,19 +289,25 @@ class Scheduler:
         # Create a wrapper function that executes the script in a thread
         def execute_script() -> None:
             logger.info(f"▶️ Executing scheduled script: {script_path}")
-            task = self.__task_executor.background(
-                self.__scripts.run_scripts, [script_path]
-            )
-            task.await_result()  # Wait for completion to catch any errors
-            logger.success(f"✅ Script {script_path} executed successfully")
+            try:
+                task = self.__executor.background(
+                    self.__scripts.run_scripts, [script_path]
+                )
+                task.await_result()  # Wait for completion to catch any errors
+                logger.success(f"✅ Script {script_path} executed successfully")
+                self.__summary.add_job(job_id, job_name, success=True)
+            except Exception as e:
+                logger.error(f"❌ Error executing script {script_path}: {e}")
+                self.__summary.add_job(job_id, job_name, success=False, error=e)
+                raise  # Re-raise the exception to maintain the original behavior
 
         # Create and add the job
         job = Job(
             id=job_id,
             name=job_name,
-            func=execute_script,
             trigger=trigger,
             enabled=enabled,
+            func=execute_script,
             max_instances=max_instances,
         )
 
@@ -300,9 +345,15 @@ class Scheduler:
         # Create a wrapper function that executes the function in a thread
         def execute_function() -> None:
             logger.info(f"▶️ Executing scheduled function: {func.__name__}")
-            task = self.__task_executor.background(func, *args, **kwargs)
-            task.await_result()  # Wait for completion to catch any errors
-            logger.success(f"✅ Function {func.__name__} executed successfully")
+            try:
+                task = self.__executor.background(func, *args, **kwargs)
+                task.await_result()  # Wait for completion to catch any errors
+                logger.success(f"✅ Function {func.__name__} executed successfully")
+                self.__summary.add_job(job_id, job_name, success=True)
+            except Exception as e:
+                logger.error(f"❌ Error executing function {func.__name__}: {e}")
+                self.__summary.add_job(job_id, job_name, success=False, error=e)
+                raise  # Re-raise the exception to maintain the original behavior
 
         # Create and add the job
         job = Job(

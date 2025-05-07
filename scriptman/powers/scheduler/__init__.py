@@ -1,5 +1,5 @@
 try:
-    from datetime import datetime
+    from datetime import datetime, time
     from pathlib import Path
     from threading import RLock, Thread
     from typing import Any, Callable, Optional
@@ -8,6 +8,7 @@ try:
     from apscheduler.schedulers.base import BaseScheduler
     from apscheduler.triggers.base import BaseTrigger
     from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.triggers.interval import IntervalTrigger
     from loguru import logger
 
     from scriptman.core._scripts import Scripts
@@ -281,15 +282,14 @@ class Scheduler:
         """
         script_path = Path(script_path)
         if not script_path.exists():
-            logger.error(f"❌ Script not found: {script_path}")
-            return
+            raise FileNotFoundError(f"Script not found: {script_path}")
 
         job_name = name or f"script_{script_path.stem}"
 
         # Create a wrapper function that executes the script in a thread
         def execute_script() -> None:
-            logger.info(f"▶️ Executing scheduled script: {script_path}")
             try:
+                logger.info(f"▶️ Executing scheduled script: {script_path}")
                 task = self.__executor.background(
                     self.__scripts.run_scripts, [script_path]
                 )
@@ -313,6 +313,82 @@ class Scheduler:
 
         self.add_job(job)
         logger.info(f"📅 Scheduled script {script_path} with job ID: {job_id}")
+
+    def schedule_script_in_time_window(
+        self,
+        script_path: Path | str,
+        job_id: str,
+        interval_minutes: int,
+        start_time: time,
+        end_time: time,
+        name: Optional[str] = None,
+        enabled: bool = True,
+        max_instances: int = 1,
+    ) -> None:
+        """
+        🕒 Schedule a script to run within a specific time window.
+
+        Args:
+            script_path: Path to the script to schedule
+            job_id: Unique identifier for the job
+            interval_minutes: How often to run the job (in minutes)
+            start_time: The time of day when the job should start running
+            end_time: The time of day when the job should stop running
+            name: Optional name for the job (defaults to script name)
+            enabled: Whether the job is enabled
+            max_instances: Maximum number of concurrent instances
+        """
+        assert interval_minutes >= 1, "Interval must be at least 1 minute"
+        assert end_time > start_time, "end_time must be after start_time"
+
+        script_path = Path(script_path)
+        if not script_path.exists():
+            raise FileNotFoundError(f"Script not found: {script_path}")
+
+        job_name = name or script_path.stem
+        trigger = IntervalTrigger(minutes=interval_minutes)
+
+        def execute_script() -> None:
+            """Execute the script if within the time window."""
+            current_time = datetime.now().time()
+            if job.start_time and current_time < job.start_time:
+                logger.info(f"⏳ Waiting for {job.start_time} for job {job.name}")
+                return
+
+            if job.end_time and current_time > job.end_time:
+                logger.info(f"⏹️ Job {job.name} has reached end time {job.end_time}")
+                return
+
+            try:
+                logger.info(f"▶️ Executing scheduled script: {script_path}")
+                task = self.__executor.background(
+                    self.__scripts.run_scripts, [script_path]
+                )
+                task.await_result()  # Wait for completion to catch any errors
+                logger.success(f"✅ Script {script_path} executed successfully")
+                self.__summary.add_job(job_id, job_name, success=True)
+            except Exception as e:
+                logger.error(f"❌ Error executing script {script_path}: {e}")
+                self.__summary.add_job(job_id, job_name, success=False, error=e)
+                raise  # Re-raise the exception to maintain the original behavior
+
+        # Create and add the job
+        job = Job(
+            id=job_id,
+            name=job_name,
+            trigger=trigger,
+            enabled=enabled,
+            end_time=end_time,
+            func=execute_script,
+            start_time=start_time,
+            max_instances=max_instances,
+        )
+
+        self.add_job(job)
+        logger.info(
+            f"🕒 Scheduled script {script_path} to run every {interval_minutes} minutes "
+            f"between {start_time} and {end_time} with job ID: {job_id}"
+        )
 
     def schedule_function(
         self,
@@ -338,14 +414,13 @@ class Scheduler:
             args: Positional arguments to pass to the function
             kwargs: Keyword arguments to pass to the function
         """
-        job_name = name or f"function_{func.__name__}"
         args = args or tuple()
         kwargs = kwargs or dict()
+        job_name = name or f"function_{func.__name__}"
 
-        # Create a wrapper function that executes the function in a thread
         def execute_function() -> None:
-            logger.info(f"▶️ Executing scheduled function: {func.__name__}")
             try:
+                logger.info(f"▶️ Executing scheduled function: {func.__name__}")
                 task = self.__executor.background(func, *args, **kwargs)
                 task.await_result()  # Wait for completion to catch any errors
                 logger.success(f"✅ Function {func.__name__} executed successfully")
@@ -367,6 +442,82 @@ class Scheduler:
 
         self.add_job(job)
         logger.info(f"📅 Scheduled function {func.__name__} with job ID: {job_id}")
+
+    def schedule_function_in_time_window(
+        self,
+        func: Callable[..., Any],
+        job_id: str,
+        interval_minutes: int,
+        start_time: time,
+        end_time: time,
+        name: Optional[str] = None,
+        enabled: bool = True,
+        max_instances: int = 1,
+        args: Optional[tuple[Any, ...]] = None,
+        kwargs: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """
+        🕒 Schedule a function to run within a specific time window.
+
+        Args:
+            func: The function to schedule
+            job_id: Unique identifier for the job
+            interval_minutes: How often to run the job (in minutes)
+            start_time: The time of day when the job should start running
+            end_time: The time of day when the job should stop running
+            name: Optional name for the job (defaults to function name)
+            enabled: Whether the job is enabled
+            max_instances: Maximum number of concurrent instances
+            args: Positional arguments to pass to the function
+            kwargs: Keyword arguments to pass to the function
+        """
+        assert interval_minutes >= 1, "Interval must be at least 1 minute"
+        assert end_time > start_time, "end_time must be after start_time"
+
+        func_args = args or tuple()
+        func_kwargs = kwargs or dict()
+        job_name = name or func.__name__
+        trigger = IntervalTrigger(minutes=interval_minutes)
+
+        def execute_function() -> None:
+            """Execute the function if within the time window."""
+            current_time = datetime.now().time()
+            if job.start_time and current_time < job.start_time:
+                logger.info(f"⏳ Waiting for {job.start_time} for job {job.name}")
+                return
+
+            if job.end_time and current_time > job.end_time:
+                logger.info(f"⏹️ Job {job.name} has reached end time {job.end_time}")
+                return
+
+            try:
+                logger.info(f"▶️ Executing scheduled function: {func.__name__}")
+                task = self.__executor.background(func, *func_args, **func_kwargs)
+                task.await_result()  # Wait for completion to catch any errors
+                logger.success(f"✅ Function {func.__name__} executed successfully")
+                self.__summary.add_job(job_id, job_name, success=True)
+            except Exception as e:
+                logger.error(f"❌ Error executing job {job.name}: {e}")
+                self.__summary.add_job(job_id, job_name, success=False, error=e)
+                raise  # Re-raise the exception to maintain the original behavior
+
+        # Create and add the job
+        job = Job(
+            id=job_id,
+            name=job_name,
+            trigger=trigger,
+            enabled=enabled,
+            end_time=end_time,
+            start_time=start_time,
+            func=execute_function,
+            max_instances=max_instances,
+        )
+
+        self.add_job(job)
+        logger.info(
+            f"🕒 Scheduled job {job.name} to run every {interval_minutes} minutes "
+            f"between {start_time} and {end_time} with job ID: {job_id}"
+        )
 
     def list_jobs(self) -> list[dict[str, Any]]:
         """

@@ -1,10 +1,11 @@
 try:
+    from datetime import time
     from functools import wraps
     from typing import Any
 
     from apscheduler.triggers.base import BaseTrigger
     from loguru import logger
-    from pydantic import BaseModel, field_validator
+    from pydantic import BaseModel, ValidationInfo, field_validator
     from pydantic.config import ConfigDict
 
     from scriptman.core._summary import JobSummaryService
@@ -29,6 +30,10 @@ class Job(BaseModel):
         max_instances (int, optional): The maximum number of instances allowed for the
             job. Defaults to 1.
         enabled (bool, optional): Whether the job is enabled. Defaults to True.
+        start_time (time, optional): The time of day when the job should start running.
+            If None, the job can run at any time.
+        end_time (time, optional): The time of day when the job should stop running.
+            If None, the job can run until the next trigger.
     """
 
     id: str
@@ -37,6 +42,8 @@ class Job(BaseModel):
     enabled: bool = True
     trigger: BaseTrigger
     max_instances: int = 1
+    start_time: time | None = None
+    end_time: time | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("id", "name", mode="before")
@@ -51,6 +58,14 @@ class Job(BaseModel):
     def positive_integer(cls, v: int) -> int:
         if v < 1:
             raise ValueError("Max instances must be a positive integer")
+        return v
+
+    @field_validator("end_time", mode="after")
+    @classmethod
+    def validate_time_window(cls, v: time | None, info: ValidationInfo) -> time | None:
+        start_time = info.data.get("start_time")
+        if start_time and v and v <= start_time:
+            raise ValueError("end_time must be after start_time")
         return v
 
     def __call__(self, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> Any:

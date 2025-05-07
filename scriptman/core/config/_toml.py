@@ -81,15 +81,36 @@ class TOMLConfigManager(ConfigManager[dict[str, Any]]):
 
             if self.section:
                 section_data = self.get_section_data(data)
-                section_data[key] = value
+                self._set_nested_value(section_data, key, value)
                 data = self.update_section_data(data, section_data)
             else:
-                data[key] = value
+                self._set_nested_value(data, key, value)
 
             self.file_handler.write(self.file_path, data)
             logger.debug(f"Written to TOML file: {key} = {value}")
         except Exception as e:
             logger.error(f"Failed to write to TOML file: {e}")
+
+    def _set_nested_value(self, data: dict[str, Any], key: str, value: Any) -> None:
+        """
+        Set a value in a nested dictionary structure based on dot notation.
+
+        Args:
+            data (dict[str, Any]): The dictionary to modify
+            key (str): The dot-notation key (e.g. "go_app.time_and_attendance.api_key")
+            value (Any): The value to set
+        """
+        parts = key.split(".")
+        current = data
+
+        # Navigate through the nested structure
+        for part in parts[:-1]:
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+
+        # Set the final value
+        current[parts[-1]] = value
 
     def _remove_from_file(self, key: str) -> None:
         """🗑️ Remove configuration from TOML file."""

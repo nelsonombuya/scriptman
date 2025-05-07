@@ -1,5 +1,5 @@
 try:
-    from datetime import datetime, time
+    from datetime import datetime, time, timezone
     from pathlib import Path
     from threading import RLock, Thread
     from typing import Any, Callable, Optional
@@ -324,6 +324,7 @@ class Scheduler:
         name: Optional[str] = None,
         enabled: bool = True,
         max_instances: int = 1,
+        timezone: Optional[timezone] = None,
     ) -> None:
         """
         🕒 Schedule a script to run within a specific time window.
@@ -337,6 +338,7 @@ class Scheduler:
             name: Optional name for the job (defaults to script name)
             enabled: Whether the job is enabled
             max_instances: Maximum number of concurrent instances
+            timezone: Optional timezone for the time window (defaults to system timezone)
         """
         assert interval_minutes >= 1, "Interval must be at least 1 minute"
         assert end_time > start_time, "end_time must be after start_time"
@@ -350,7 +352,7 @@ class Scheduler:
 
         def execute_script() -> None:
             """Execute the script if within the time window."""
-            current_time = datetime.now().time()
+            current_time = datetime.now(timezone).time()
             if job.start_time and current_time < job.start_time:
                 logger.info(f"⏳ Waiting for {job.start_time} for job {job.name}")
                 return
@@ -379,6 +381,7 @@ class Scheduler:
             trigger=trigger,
             enabled=enabled,
             end_time=end_time,
+            time_zone=timezone,
             func=execute_script,
             start_time=start_time,
             max_instances=max_instances,
@@ -455,6 +458,7 @@ class Scheduler:
         max_instances: int = 1,
         args: Optional[tuple[Any, ...]] = None,
         kwargs: Optional[dict[str, Any]] = None,
+        timezone: Optional[timezone] = None,
     ) -> None:
         """
         🕒 Schedule a function to run within a specific time window.
@@ -470,6 +474,7 @@ class Scheduler:
             max_instances: Maximum number of concurrent instances
             args: Positional arguments to pass to the function
             kwargs: Keyword arguments to pass to the function
+            timezone: Optional timezone for the time window (defaults to system timezone)
         """
         assert interval_minutes >= 1, "Interval must be at least 1 minute"
         assert end_time > start_time, "end_time must be after start_time"
@@ -481,7 +486,7 @@ class Scheduler:
 
         def execute_function() -> None:
             """Execute the function if within the time window."""
-            current_time = datetime.now().time()
+            current_time = datetime.now(timezone).time()
             if job.start_time and current_time < job.start_time:
                 logger.info(f"⏳ Waiting for {job.start_time} for job {job.name}")
                 return
@@ -508,6 +513,7 @@ class Scheduler:
             trigger=trigger,
             enabled=enabled,
             end_time=end_time,
+            time_zone=timezone,
             start_time=start_time,
             func=execute_function,
             max_instances=max_instances,

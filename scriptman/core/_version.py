@@ -18,7 +18,7 @@ class Version(BaseModel):
     """
 
     major: int = Field(default=2, description="Major version number")
-    minor: int = Field(default=6, description="Minor version number")
+    minor: int = Field(default=7, description="Minor version number")
     commit: int = Field(default=438, description="Commit count")
 
     @property

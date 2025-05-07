@@ -1,5 +1,5 @@
 try:
-    from datetime import time
+    from datetime import time, timezone
     from functools import wraps
     from typing import Any
 
@@ -34,6 +34,8 @@ class Job(BaseModel):
             If None, the job can run at any time.
         end_time (time, optional): The time of day when the job should stop running.
             If None, the job can run until the next trigger.
+        time_zone (timezone, optional): The timezone for the time window. If None, uses
+            the system timezone.
     """
 
     id: str
@@ -44,6 +46,7 @@ class Job(BaseModel):
     max_instances: int = 1
     start_time: time | None = None
     end_time: time | None = None
+    time_zone: timezone | None = None
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("id", "name", mode="before")

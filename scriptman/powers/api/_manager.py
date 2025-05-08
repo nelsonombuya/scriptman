@@ -3,7 +3,7 @@ try:
     from contextlib import asynccontextmanager
     from pathlib import Path
     from socket import AF_INET, SOCK_STREAM, socket
-    from typing import Any, AsyncGenerator, Callable, Optional, cast
+    from typing import Any, AsyncGenerator, Callable, Optional
 
     from fastapi import APIRouter, FastAPI
     from fastapi.responses import JSONResponse
@@ -12,8 +12,8 @@ try:
 
     from scriptman.core.config import config
     from scriptman.powers.api._middleware import FastAPIMiddleware
-    from scriptman.powers.api._templates import api_route, async_api_route
-    from scriptman.powers.generics import AsyncFunc, Func, P, SyncFunc
+    from scriptman.powers.api._templates import api_route
+    from scriptman.powers.generics import Func, P
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -74,20 +74,13 @@ class APIManager:
         """
 
         def decorator(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
-            template_func: AsyncFunc[P, JSONResponse] | SyncFunc[P, JSONResponse]
-
-            if iscoroutinefunction(func):
-                template_func = async_api_route(cast(AsyncFunc[P, dict[str, Any]], func))
-            else:
-                template_func = api_route(cast(SyncFunc[P, dict[str, Any]], func))
-
+            template_func: Func[P, JSONResponse] = api_route(func)
             self.app.add_api_route(
                 endpoint=template_func,
                 methods=methods,
                 path=path,
                 **kwargs,
             )
-
             return template_func
 
         return decorator

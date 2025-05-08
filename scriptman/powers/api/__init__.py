@@ -23,7 +23,7 @@ try:
         EntityModelT,
         ResponseModelT,
     )
-    from scriptman.powers.api._templates import api_route, async_api_route
+    from scriptman.powers.api._templates import api_route
 
 except ImportError as e:
     raise ImportError(
@@ -282,7 +282,6 @@ __all__: list[str] = [
     "EntityModelT",
     "BaseAPIClient",
     "RequestHandler",
-    "async_api_route",
     "BaseEntityModel",
     "EntityIdentifier",
     "DefaultRequestHandler",

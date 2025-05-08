@@ -1,9 +1,10 @@
 try:
+    from asyncio import iscoroutinefunction
     from datetime import datetime, time, timezone
     from functools import wraps
     from pathlib import Path
     from threading import RLock, Thread
-    from typing import Any, Callable, Optional, Union, cast
+    from typing import Any, Callable, Optional, cast
 
     from apscheduler.schedulers.background import BackgroundScheduler
     from apscheduler.schedulers.base import BaseScheduler
@@ -14,7 +15,7 @@ try:
 
     from scriptman.core._scripts import Scripts
     from scriptman.core._summary import JobSummaryService
-    from scriptman.powers.generics import Func, P, R
+    from scriptman.powers.generics import P, R
     from scriptman.powers.scheduler._models import Job
     from scriptman.powers.task import TaskExecutor
 
@@ -624,96 +625,72 @@ class Scheduler:
 
     def schedule(
         self,
-        trigger: Union[BaseTrigger, str, dict[str, Any]],
+        trigger: BaseTrigger,
         job_id: Optional[str] = None,
         name: Optional[str] = None,
         enabled: bool = True,
         max_instances: int = 1,
         time_window: Optional[tuple[time, time]] = None,
         timezone: Optional[timezone] = None,
-    ) -> Callable[[Func[P, R]], Func[P, R]]:
+    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """
-        ✨ A decorator that schedules a function to run based on the provided trigger.
+        📅 Schedule a function to run at specified intervals.
 
         Args:
-            trigger: Can be:
-                - A BaseTrigger instance
-                - A cron expression string (e.g. "*/5 * * * *")
-                - A dict with trigger configuration
-            job_id: Unique identifier for the job (defaults to function name)
-            name: Human-readable name for the job (defaults to function name)
-            enabled: Whether the job should be active
-            max_instances: Maximum concurrent instances of this job
-            time_window: Optional tuple of (start_time, end_time) to run within
-            timezone: Optional timezone for the trigger
+            trigger: The trigger for the job (e.g., CronTrigger, IntervalTrigger)
+            job_id: Unique identifier for the job. If None, will be generated from
+                the function's name.
+            name: Display name for the job. If None, will be generated from function name.
+            enabled: Whether the job should be enabled immediately.
+            max_instances: Maximum number of instances of the job that can run
+                concurrently.
+            time_window: Optional tuple of (start_time, end_time) to restrict job
+                execution.
+            timezone: Optional timezone for the job.
 
         Returns:
-            The decorated function
-
-        Example:
-            ```python
-            @scheduler.schedule(trigger="*/5 * * * *")  # Run every 5 minutes
-            def my_function():
-                print("Running...")
-
-            @scheduler.schedule(
-                trigger={"type": "interval", "minutes": 10},
-                time_window=(time(9), time(17))  # Run between 9 AM and 5 PM
-            )
-            async def my_async_function():
-                print("Running async...")
-            ```
+            A decorator that schedules the function to run according to the trigger.
         """
 
-        def decorator(func: Func[P, R]) -> Func[P, R]:
+        def decorator(func: Callable[P, R]) -> Callable[P, R]:
             # Generate default job_id and name from function name if not provided
             _job_id = job_id or f"{func.__name__}_job"
-            _name = name or func.__name__
-
-            # Convert string trigger to CronTrigger
-            if isinstance(trigger, str):
-                _trigger = CronTrigger.from_crontab(trigger)
-            # Convert dict trigger to appropriate trigger type
-            elif isinstance(trigger, dict):
-                trigger_type = trigger.pop("type", "interval")
-                if trigger_type == "interval":
-                    _trigger = IntervalTrigger(**trigger)
-                elif trigger_type == "cron":
-                    _trigger = CronTrigger(**trigger)
-                else:
-                    raise ValueError(f"Unknown trigger type: {trigger_type}")
-            else:
-                _trigger = trigger
+            _name = name or func.__name__.replace("_", " ").title()
 
             @wraps(func)
-            def wrapper(*args: Any, **kwargs: Any) -> Any:
-                return func(*args, **kwargs)
+            def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                if iscoroutinefunction(func):
+                    logger.debug("🔄 Executing async scheduled function")
+                    return cast(R, TaskExecutor.await_async(func(*args, **kwargs)))
+                else:
+                    logger.debug("🔄 Executing sync scheduled function")
+                    return func(*args, **kwargs)
 
             # Schedule the function
             if time_window:
                 start_time, end_time = time_window
                 self.schedule_function_in_time_window(
+                    name=_name,
                     func=wrapper,
                     job_id=_job_id,
+                    enabled=enabled,
+                    timezone=timezone,
+                    end_time=end_time,
                     interval_minutes=1,  # Default interval, can be overridden by trigger
                     start_time=start_time,
-                    end_time=end_time,
-                    name=_name,
-                    enabled=enabled,
                     max_instances=max_instances,
-                    timezone=timezone,
                 )
             else:
                 self.schedule_function(
+                    name=_name,
                     func=wrapper,
                     job_id=_job_id,
-                    trigger=_trigger,
-                    name=_name,
+                    trigger=trigger,
                     enabled=enabled,
                     max_instances=max_instances,
                 )
 
-            return cast(Func[P, R], wrapper)
+            return wrapper
 
         return decorator
 

@@ -1,10 +1,13 @@
+from asyncio import iscoroutinefunction
 from functools import wraps
-from typing import Callable, Optional, Type, Union
+from time import sleep
+from typing import Callable, Optional, Type, Union, cast
 
 from loguru import logger
 
 from scriptman.core.config import config
-from scriptman.powers.generics import AsyncFunc, P, R, SyncFunc
+from scriptman.powers.generics import P, R
+from scriptman.powers.task import TaskExecutor
 
 
 def retry(
@@ -13,9 +16,9 @@ def retry(
     min_delay: float = config.settings.get("retry.min_delay", 1),
     max_delay: float = config.settings.get("retry.max_delay", 10),
     retry_on: Optional[Union[Type[Exception], tuple[Type[Exception], ...]]] = None,
-) -> Callable[[SyncFunc[P, R]], SyncFunc[P, R]]:
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
-    🔁 A retry decorator for synchronous functions.
+    🔁 A unified retry decorator for both synchronous and asynchronous functions.
 
     Args:
         max_retries (int): Maximum number of retry attempts.
@@ -26,20 +29,25 @@ def retry(
             Exception or tuple of exceptions to retry on.
 
     Returns:
-        A decorator that applies retry logic to a sync function.
+        A decorator that applies retry logic to either a sync or async function.
     """
-    from time import sleep
+    __validate_retry_params(base_delay, min_delay, max_delay, max_retries)
 
-    _validate_retry_params(base_delay, min_delay, max_delay, max_retries)
-
-    def decorator(func: SyncFunc[P, R]) -> SyncFunc[P, R]:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @wraps(func)
-        def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             for attempt in range(max_retries + 1):
                 try:
-                    return func(*args, **kwargs)
+                    if iscoroutinefunction(func):
+                        logger.debug("🔄 Trying async function")
+                        result = TaskExecutor.await_async(func(*args, **kwargs))
+                    else:
+                        logger.debug("🔄 Trying sync function")
+                        result = func(*args, **kwargs)
+
+                    return cast(R, result)
                 except Exception as e:
-                    delay = _get_delay(
+                    delay = __get_delay(
                         e,
                         retry_on,
                         attempt,
@@ -51,61 +59,12 @@ def retry(
                     sleep(delay)
             raise RuntimeError(f"❌ Failed after {max_retries} attempts")
 
-        return sync_wrapper
+        return wrapper
 
     return decorator
 
 
-def async_retry(
-    max_retries: int = config.settings.get("retry.max_retries", 1),
-    base_delay: float = config.settings.get("retry.base_delay", 1),
-    min_delay: float = config.settings.get("retry.min_delay", 1),
-    max_delay: float = config.settings.get("retry.max_delay", 10),
-    retry_on: Optional[Union[Type[Exception], tuple[Type[Exception], ...]]] = None,
-) -> Callable[[AsyncFunc[P, R]], AsyncFunc[P, R]]:
-    """
-    🔁 A retry decorator for asynchronous functions.
-
-    Args:
-        max_retries (int): Maximum number of retry attempts.
-        base_delay (float): Base delay for exponential backoff.
-        min_delay (float): Minimum delay between retries.
-        max_delay (float): Maximum delay between retries.
-        retry_on (Optional[Union[Type[Exception], tuple[Type[Exception], ...]]]):
-            Exception or tuple of exceptions to retry on.
-
-    Returns:
-        A decorator that applies retry logic to an async function.
-    """
-    from asyncio import sleep
-
-    _validate_retry_params(base_delay, min_delay, max_delay, max_retries)
-
-    def decorator(func: AsyncFunc[P, R]) -> AsyncFunc[P, R]:
-        @wraps(func)
-        async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            for attempt in range(max_retries + 1):
-                try:
-                    return await func(*args, **kwargs)
-                except Exception as e:
-                    delay = _get_delay(
-                        e,
-                        retry_on,
-                        attempt,
-                        max_retries,
-                        base_delay,
-                        min_delay,
-                        max_delay,
-                    )
-                    await sleep(delay)
-            raise RuntimeError(f"❌ Failed after {max_retries} attempts")
-
-        return async_wrapper
-
-    return decorator
-
-
-def _validate_retry_params(
+def __validate_retry_params(
     base_delay: float, min_delay: float, max_delay: float, max_retries: int
 ) -> None:
     """Validate the retry parameters."""
@@ -116,7 +75,7 @@ def _validate_retry_params(
     assert max_ge_min, f"max_delay ({max_delay}) must be >= min_delay ({min_delay})"
 
 
-def _get_delay(
+def __get_delay(
     e: Exception,
     retry_on: Optional[Union[Type[Exception], tuple[Type[Exception], ...]]],
     attempt: int,

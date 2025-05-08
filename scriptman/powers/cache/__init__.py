@@ -1,4 +1,5 @@
 try:
+    from asyncio import iscoroutinefunction
     from functools import wraps
     from hashlib import md5
     from inspect import ismethod
@@ -11,7 +12,8 @@ try:
     from scriptman.core.config import config
     from scriptman.powers.cache._backend import CacheBackend
     from scriptman.powers.cache._diskcache import DiskCacheBackend, FanoutCacheBackend
-    from scriptman.powers.generics import AsyncFunc, P, R, SyncFunc
+    from scriptman.powers.generics import P, R
+    from scriptman.powers.task import TaskExecutor
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError as e:
     raise ImportError(
@@ -124,9 +126,10 @@ class CacheManager:
     def cache_result(
         ttl: Optional[int] = config.settings.get("cache.ttl"),
         **backend_kwargs: Any,
-    ) -> Callable[[SyncFunc[P, R]], SyncFunc[P, R]]:
+    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """
-        📦 Decorator for caching function results. Works with synchronous functions.
+        📦 Decorator for caching function results. Works with both sync and async
+        functions.
 
         NOTE: This only works for JSON Serializable arguments and returns.
 
@@ -137,13 +140,13 @@ class CacheManager:
                 backend's set method when storing values.
 
         Returns:
-            Callable[[SyncFunc[P, R]], SyncFunc[P, R]]: Decorated function.
+            A decorator that caches the function's results.
         """
         cache = CacheManager.get_instance()
 
-        def decorator(func: SyncFunc[P, R]) -> SyncFunc[P, R]:
+        def decorator(func: Callable[P, R]) -> Callable[P, R]:
             @wraps(func)
-            def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                 key = cache.generate_callable_key(func, args, kwargs)
 
                 with cache._track_operation():
@@ -152,7 +155,12 @@ class CacheManager:
                         return cast(R, result)
 
                     logger.info(f"❔ Cache miss for key: {key}")
-                    result = func(*args, **kwargs)
+                    if iscoroutinefunction(func):
+                        logger.debug("🔄 Executing async cached function")
+                        result = TaskExecutor.await_async(func(*args, **kwargs))
+                    else:
+                        logger.debug("🔄 Executing sync cached function")
+                        result = func(*args, **kwargs)
 
                     if not result:
                         logger.debug(f"❔ Skipping cache for key {key}: result is empty")
@@ -166,57 +174,7 @@ class CacheManager:
 
                     return cast(R, result)
 
-            return sync_wrapper
-
-        return decorator
-
-    @staticmethod
-    def async_cache_result(
-        ttl: Optional[int] = config.settings.get("cache.ttl"),
-        **backend_kwargs: Any,
-    ) -> Callable[[AsyncFunc[P, R]], AsyncFunc[P, R]]:
-        """
-        📦 Decorator for caching function results. Works with both asynchronous functions.
-
-        NOTE: This only works for JSON Serializable arguments and returns.
-
-        Args:
-            ttl (Optional[int]): The number of seconds until the key expires.
-                Defaults to None.
-            **backend_kwargs: Additional keyword arguments to be passed to the cache
-                backend's set method when storing values.
-
-        Returns:
-            Callable[[AsyncFunc[P, R]], AsyncFunc[P, R]]: Decorated function.
-        """
-        cache: CacheManager = CacheManager.get_instance()
-
-        def decorator(func: AsyncFunc[P, R]) -> AsyncFunc[P, R]:
-            @wraps(func)
-            async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-                key = cache.generate_callable_key(func, args, kwargs)
-
-                with cache._track_operation():
-                    if result := cache.get(key=key):
-                        logger.debug(f"✅ Cache hit for key: {key}")
-                        return cast(R, result)
-
-                    logger.info(f"❔ Cache miss for key: {key}")
-                    result = await func(*args, **kwargs)
-
-                    if not result:
-                        logger.debug(f"❔ Skipping cache for key {key}: result is empty")
-                        return cast(R, result)
-
-                    if cache.set(key=key, value=result, ttl=ttl, **backend_kwargs):
-                        ttl_str = TimeCalculator.calculate_time_taken(0, float(ttl or 0))
-                        logger.debug(f"✅ Stored {key} in cache for {ttl_str}")
-                    else:
-                        logger.error(f"❌ Failed to store {key} in cache")
-
-                    return cast(R, result)
-
-            return async_wrapper
+            return wrapper
 
         return decorator
 

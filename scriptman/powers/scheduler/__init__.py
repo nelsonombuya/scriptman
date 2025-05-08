@@ -1,8 +1,9 @@
 try:
     from datetime import datetime, time, timezone
+    from functools import wraps
     from pathlib import Path
     from threading import RLock, Thread
-    from typing import Any, Callable, Optional
+    from typing import Any, Callable, Optional, Union, cast
 
     from apscheduler.schedulers.background import BackgroundScheduler
     from apscheduler.schedulers.base import BaseScheduler
@@ -13,6 +14,7 @@ try:
 
     from scriptman.core._scripts import Scripts
     from scriptman.core._summary import JobSummaryService
+    from scriptman.powers.generics import Func, P, R
     from scriptman.powers.scheduler._models import Job
     from scriptman.powers.task import TaskExecutor
 
@@ -619,6 +621,101 @@ class Scheduler:
                 self.__scheduler.shutdown()
         except Exception as e:
             logger.warning(f"❌ Error shutting down scheduler: {e}")
+
+    def schedule(
+        self,
+        trigger: Union[BaseTrigger, str, dict[str, Any]],
+        job_id: Optional[str] = None,
+        name: Optional[str] = None,
+        enabled: bool = True,
+        max_instances: int = 1,
+        time_window: Optional[tuple[time, time]] = None,
+        timezone: Optional[timezone] = None,
+    ) -> Callable[[Func[P, R]], Func[P, R]]:
+        """
+        ✨ A decorator that schedules a function to run based on the provided trigger.
+
+        Args:
+            trigger: Can be:
+                - A BaseTrigger instance
+                - A cron expression string (e.g. "*/5 * * * *")
+                - A dict with trigger configuration
+            job_id: Unique identifier for the job (defaults to function name)
+            name: Human-readable name for the job (defaults to function name)
+            enabled: Whether the job should be active
+            max_instances: Maximum concurrent instances of this job
+            time_window: Optional tuple of (start_time, end_time) to run within
+            timezone: Optional timezone for the trigger
+
+        Returns:
+            The decorated function
+
+        Example:
+            ```python
+            @scheduler.schedule(trigger="*/5 * * * *")  # Run every 5 minutes
+            def my_function():
+                print("Running...")
+
+            @scheduler.schedule(
+                trigger={"type": "interval", "minutes": 10},
+                time_window=(time(9), time(17))  # Run between 9 AM and 5 PM
+            )
+            async def my_async_function():
+                print("Running async...")
+            ```
+        """
+
+        def decorator(func: Func[P, R]) -> Func[P, R]:
+            # Generate default job_id and name from function name if not provided
+            _job_id = job_id or f"{func.__name__}_job"
+            _name = name or func.__name__
+
+            # Convert string trigger to CronTrigger
+            if isinstance(trigger, str):
+                _trigger = CronTrigger.from_crontab(trigger)
+            # Convert dict trigger to appropriate trigger type
+            elif isinstance(trigger, dict):
+                trigger_type = trigger.pop("type", "interval")
+                if trigger_type == "interval":
+                    _trigger = IntervalTrigger(**trigger)
+                elif trigger_type == "cron":
+                    _trigger = CronTrigger(**trigger)
+                else:
+                    raise ValueError(f"Unknown trigger type: {trigger_type}")
+            else:
+                _trigger = trigger
+
+            @wraps(func)
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
+                return func(*args, **kwargs)
+
+            # Schedule the function
+            if time_window:
+                start_time, end_time = time_window
+                self.schedule_function_in_time_window(
+                    func=wrapper,
+                    job_id=_job_id,
+                    interval_minutes=1,  # Default interval, can be overridden by trigger
+                    start_time=start_time,
+                    end_time=end_time,
+                    name=_name,
+                    enabled=enabled,
+                    max_instances=max_instances,
+                    timezone=timezone,
+                )
+            else:
+                self.schedule_function(
+                    func=wrapper,
+                    job_id=_job_id,
+                    trigger=_trigger,
+                    name=_name,
+                    enabled=enabled,
+                    max_instances=max_instances,
+                )
+
+            return cast(Func[P, R], wrapper)
+
+        return decorator
 
 
 # Creating the singleton instance

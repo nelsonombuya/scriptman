@@ -34,6 +34,9 @@ class APIManager:
     _instance: Optional["APIManager"] = None
     _startup_handlers: list[Func[..., None]] = []
     _shutdown_handlers: list[Func[..., None]] = []
+    _queued_routes: list[
+        tuple[str, list[str], Func[..., JSONResponse], dict[str, Any]]
+    ] = []
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "APIManager":
         if cls._instance is None:
@@ -66,6 +69,7 @@ class APIManager:
     ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
         """
         Decorator for adding routes directly to the API.
+        Routes are queued and will be added during application startup.
 
         Args:
             path: URL path for the route
@@ -75,12 +79,8 @@ class APIManager:
 
         def decorator(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
             template_func: Func[P, JSONResponse] = api_route(func)
-            self.app.add_api_route(
-                endpoint=template_func,
-                methods=methods,
-                path=path,
-                **kwargs,
-            )
+            self._queued_routes.append((path, methods, template_func, kwargs))
+            logger.info(f"Queued route {path} with methods {methods}")
             return template_func
 
         return decorator
@@ -141,6 +141,19 @@ class APIManager:
         Yields:
             None: Used to indicate the lifespan management context.
         """
+        # Add queued routes during startup
+        for path, methods, template_func, kwargs in self._queued_routes:
+            self.app.add_api_route(
+                endpoint=template_func,
+                methods=methods,
+                path=path,
+                **kwargs,
+            )
+            logger.info(f"Added queued route {path} with methods {methods}")
+
+        # Clear the queue after adding routes
+        self._queued_routes.clear()
+
         for handler in self._startup_handlers:  # Startup
             await handler() if iscoroutinefunction(handler) else handler()
 

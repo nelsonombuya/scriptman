@@ -609,6 +609,22 @@ class Scheduler:
             return True
         return False
 
+    def fast_api_startup_handler(self) -> None:
+        """
+        🔄 Start the scheduler service when FastAPI starts
+
+        NOTE: You can use this function as a FastAPI startup handler.
+        """
+        self.start_service(block=False)
+
+    def fast_api_shutdown_handler(self) -> None:
+        """
+        🔄 Stop the scheduler service when FastAPI shuts down
+
+        NOTE: You can use this function as a FastAPI shutdown handler.
+        """
+        self.stop_service()
+
     @property
     def is_service_running(self) -> bool:
         """Check if the scheduler service is running"""

@@ -90,10 +90,10 @@ def api_route(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
     standardized request/response handling.
 
     Args:
-        func (SyncFunc): The synchronous function to wrap.
+        func (Func): The synchronous function to wrap.
 
     Returns:
-        SyncFunc: Wrapped function with error and success handling.
+        Func: Wrapped function with error and success handling.
     """
 
     @wraps(func)

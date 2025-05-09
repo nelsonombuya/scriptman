@@ -106,6 +106,17 @@ def api_route(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
             else:
                 result = cast(dict[str, Any], func(*args, **kwargs))
 
+            if isinstance(result, dict):
+                for key, value in result.items():
+                    try:
+                        dumps(value)
+                    except (TypeError, OverflowError):
+                        logger.debug(
+                            "Converting non-serializable value "
+                            f"for key '{key}' to string"
+                        )
+                        result[key] = str(value)
+
             response = create_successful_response(request=request, response=result)
             return JSONResponse(content=response, status_code=response["status_code"])
         except Exception as e:

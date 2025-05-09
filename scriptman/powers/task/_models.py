@@ -9,10 +9,27 @@ from scriptman.powers.generics import T
 
 
 class TaskException(Exception):
+    """🚨 Serializable exception wrapper for task failures"""
+
     def __init__(self, exception: Exception) -> None:
-        self.message = str(exception)
-        super().__init__(exception)
         self.exception = exception
+        self.message = str(exception)
+        super().__init__(self.message)
+        self.exception_type = exception.__class__.__name__
+        self.stacktrace = getattr(exception, "__traceback__", None)
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __reduce__(
+        self,
+    ) -> tuple[type["TaskException"], tuple[Exception], dict[str, Any]]:
+        """Enable pickling for this exception class"""
+        return (
+            self.__class__,
+            (Exception(self.message),),
+            {"exception_type": self.exception_type, "stacktrace": None},
+        )
 
 
 @dataclass

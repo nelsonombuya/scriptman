@@ -255,8 +255,8 @@ class TaskExecutor:
         Returns:
             The result of the coroutine
         """
-        loop = get_event_loop()
         try:
+            loop = get_event_loop()
             return loop.run_until_complete(awaitable)
         except RuntimeError as e:
             if "no current event loop" in str(e):

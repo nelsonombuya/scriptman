@@ -7,6 +7,7 @@ try:
     from fastapi import status
     from fastapi.responses import JSONResponse
     from loguru import logger
+    from pydantic import BaseModel
 
     from scriptman.powers.api._models import APIRequest, APIResponse
     from scriptman.powers.api.exceptions import APIException
@@ -106,16 +107,20 @@ def api_route(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
             else:
                 result = cast(dict[str, Any], func(*args, **kwargs))
 
+            # TODO: Improve Pickling of Stuff
             if isinstance(result, dict):
                 for key, value in result.items():
                     try:
                         dumps(value)
                     except (TypeError, OverflowError):
                         logger.debug(
-                            "Converting non-serializable value "
+                            f"Converting non-serializable value {value} "
                             f"for key '{key}' to string"
                         )
-                        result[key] = str(value)
+                        if isinstance(value, BaseModel):
+                            result[key] = value.model_dump_json()
+                        else:
+                            result[key] = str(value)
 
             response = create_successful_response(request=request, response=result)
             return JSONResponse(content=response, status_code=response["status_code"])

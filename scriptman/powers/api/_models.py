@@ -6,7 +6,7 @@ try:
 
     from loguru import logger
     from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-    from pydantic.types import IncEx
+    from pydantic.main import IncEx
     from typing_extensions import Annotated
 
     from scriptman.powers.api._handlers import HTTPMethod

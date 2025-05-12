@@ -1,8 +1,7 @@
 try:
-    from asyncio import iscoroutinefunction
     from functools import wraps
     from hashlib import md5
-    from inspect import ismethod
+    from inspect import iscoroutinefunction, ismethod
     from threading import Lock
     from typing import Any, Callable, Optional, cast
 

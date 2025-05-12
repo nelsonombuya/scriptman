@@ -1,6 +1,6 @@
-from asyncio import get_event_loop, iscoroutinefunction
+from asyncio import get_event_loop
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from inspect import signature
+from inspect import iscoroutinefunction, signature
 from time import perf_counter
 from typing import Any, Awaitable, Callable, Literal, Optional
 
@@ -36,6 +36,7 @@ class TaskExecutor:
     - Elegant handling of errors with customizable exception behavior 🛡️
     - Comprehensive task monitoring with duration and status tracking 📊
     - Resource cleanup and management 🧹
+    - Named threads for better debugging and monitoring 🔍
 
     Examples:
         # Run a single task in background
@@ -70,8 +71,13 @@ class TaskExecutor:
             thread_pool_size: Maximum number of threads for I/O-bound tasks
             process_pool_size: Maximum number of processes for CPU-bound tasks
         """
-        self._thread_pool = ThreadPoolExecutor(max_workers=thread_pool_size)
-        self._process_pool = ProcessPoolExecutor(max_workers=process_pool_size)
+        self._thread_pool = ThreadPoolExecutor(
+            max_workers=thread_pool_size,
+            thread_name_prefix="scriptman-task",
+        )
+        self._process_pool = ProcessPoolExecutor(
+            max_workers=process_pool_size,
+        )
 
     def background(self, func: Callable[P, R], *args: Any, **kwargs: Any) -> Task[R]:
         """

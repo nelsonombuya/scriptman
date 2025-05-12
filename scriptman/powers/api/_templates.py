@@ -1,6 +1,6 @@
 try:
-    from asyncio import iscoroutinefunction
     from functools import wraps
+    from inspect import iscoroutinefunction
     from json import dumps, loads
     from typing import Any, cast
 
@@ -85,7 +85,9 @@ def create_error_response(request: APIRequest, e: Exception) -> dict[str, Any]:
     return APIResponse.from_api_exception(request, e).model_dump()
 
 
-def api_route(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
+def api_route(
+    request: APIRequest, func: Func[P, dict[str, Any]]
+) -> Func[P, JSONResponse]:
     """
     🔄 Decorator to wrap synchronous or asynchronous API route functions with
     standardized request/response handling.
@@ -99,7 +101,6 @@ def api_route(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
 
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
-        request = APIRequest()
         try:
             if iscoroutinefunction(func):
                 result = TaskExecutor.await_async(func(*args, **kwargs))
@@ -123,7 +124,7 @@ def pickle_values(data: dict[str, Any]) -> dict[str, Any]:
     for key, value in data.items():
         try:
             logger.debug(f"Pickling value {value} for key '{key}'")
-            result[key] = dumps(value)
+            dumps(value)  # Try if the value is picklable
         except (TypeError, OverflowError):
             if isinstance(value, BaseModel):
                 result[key] = loads(value.model_dump_json())

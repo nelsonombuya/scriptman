@@ -1,7 +1,7 @@
 try:
-    from asyncio import iscoroutinefunction
     from datetime import datetime, time, timezone
     from functools import wraps
+    from inspect import iscoroutinefunction
     from pathlib import Path
     from threading import RLock, Thread
     from typing import Any, Callable, Optional, cast

@@ -1,6 +1,6 @@
 try:
-    from asyncio import iscoroutinefunction
     from contextlib import asynccontextmanager
+    from inspect import iscoroutinefunction
     from pathlib import Path
     from socket import AF_INET, SOCK_STREAM, socket
     from typing import Any, AsyncGenerator, Callable, Optional
@@ -13,6 +13,7 @@ try:
 
     from scriptman.core.config import config
     from scriptman.powers.api._middleware import FastAPIMiddleware
+    from scriptman.powers.api._models import APIRequest
     from scriptman.powers.api._templates import api_route
     from scriptman.powers.generics import Func, P
 except ImportError as e:
@@ -79,7 +80,8 @@ class APIManager:
         """
 
         def decorator(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
-            template_func: Func[P, JSONResponse] = api_route(func)
+            request = APIRequest(url=path, type=methods[0], args=kwargs)
+            template_func: Func[P, JSONResponse] = api_route(request, func)
             self._queued_routes.append((path, methods, template_func, kwargs))
             logger.info(f"Queued route {path} with methods {methods}")
             return template_func

@@ -9,7 +9,6 @@ try:
     from pydantic.main import IncEx
     from typing_extensions import Annotated
 
-    from scriptman.powers.api._handlers import HTTPMethod
     from scriptman.powers.api.exceptions import APIException
 except ImportError as e:
     raise ImportError(
@@ -26,15 +25,16 @@ class APIRequest(BaseModel):
     Attributes:
         request_id (str): The unique identifier for the request.
         timestamp (str): The timestamp when the request was created.
+        type (str): The type of the request.
+        url (str): The URL of the request.
+        args (dict[str, Any]): The arguments of the request.
     """
 
     request_id: str = Field(default_factory=lambda: str(uuid4()))
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
-    request_url: Optional[str] = Field(default=None)
-    request_type: Optional[HTTPMethod] = Field(default=None)
-    request_body: Optional[dict[str, Any]] = Field(default=None)
-    request_params: Optional[dict[str, Any]] = Field(default=None)
-    request_headers: Optional[dict[str, str]] = Field(default=None)
+    type: str = Field(description="The type of the request.")
+    url: str = Field(description="The URL of the request.")
+    args: dict[str, Any] = Field(default_factory=dict)
     model_config = ConfigDict(extra="ignore")
 
 
@@ -159,7 +159,7 @@ class EntityIdentifierField:
 EntityIdentifier = Annotated[str, EntityIdentifierField]
 
 
-class BaseEntityModel(BaseModel):  # TODO: Review this entire model
+class BaseEntityModel(BaseModel):
     """
     🏗️ BaseEntityModel
 
@@ -201,7 +201,7 @@ class BaseEntityModel(BaseModel):  # TODO: Review this entire model
             super().__init__(**data)
         except Exception as e:
             identifier_fields = self.get_identifier_fields()
-            identifier = self.get_identifier(identifier_fields[0])
+            identifier = self.get_identifier(identifier_fields[0], data)
             self.log_validation_error(e, identifier, data)
             raise e
 
@@ -239,14 +239,21 @@ class BaseEntityModel(BaseModel):  # TODO: Review this entire model
             if EntityIdentifierField in getattr(field_type, "__metadata__", ())
         ]
 
-    def get_identifier(self, field_name: Optional[str] = None) -> str:
+    def get_identifier(
+        self, field_name: Optional[str] = None, data: Optional[dict[str, Any]] = None
+    ) -> str:
         """🆔 Returns the entity's identifier value."""
-        if self._identifier_field is None:
+        if self._identifier_field is None and field_name is None:
             logger.warning(
                 f"🔍 Entity {self.__class__.__name__} has no identifier field. "
                 "This is likely due to the model not being initialized correctly."
             )
             return "<unknown_identifier>"
+
+        if data:
+            return str(
+                data.get(field_name or self._identifier_field or "<unknown_identifier>")
+            )
 
         return str(
             getattr(
@@ -309,6 +316,11 @@ class BaseEntityModel(BaseModel):  # TODO: Review this entire model
                     f"Class {cls.__name__} has no identifier field. "
                     "This is likely due to the model not being initialized correctly."
                 )
+
+            # HACK: Convert to dictionary if it's a model instance
+            if getattr(values, "model_dump", None):
+                values = getattr(values, "model_dump")()
+
             entity_identifier = values.get(
                 cls._identifier_field,
                 "unknown",  # Fallback if somehow the identifier isn't set

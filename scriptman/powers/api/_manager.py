@@ -192,8 +192,9 @@ class APIManager:
         final_port = self._port = port or self._port
 
         logger.info("🔧 Configuring logging")
-        message_format = f"%(asctime)s | \033[1m{'UVICORN':<8}\033[0m | %(message)s"
-        LOGGING_CONFIG["formatters"]["default"]["fmt"] = message_format
+        fmt = f"\033[92m%(asctime)s\033[0m | \033[1m{'UVICORN':<8}\033[0m | %(message)s"
+        LOGGING_CONFIG["formatters"]["default"]["datefmt"] = "%Y-%m-%d %H:%M:%S"
+        LOGGING_CONFIG["formatters"]["default"]["fmt"] = fmt
 
         logger.info(f"📡 Starting API server at http://{final_host}:{final_port}")
         run_uvicorn_server(self.app, host=final_host, port=final_port, **kwargs)

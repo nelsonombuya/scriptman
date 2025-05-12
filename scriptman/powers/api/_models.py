@@ -1,12 +1,12 @@
 try:
     from datetime import datetime
     from decimal import Decimal
-    from typing import Any, ClassVar, Optional, TypeVar, cast, get_type_hints
+    from typing import Any, Callable, ClassVar, Literal, Optional, TypeVar
     from uuid import uuid4
 
-    from email_validator import EmailNotValidError, validate_email
     from loguru import logger
     from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+    from pydantic.types import IncEx
     from typing_extensions import Annotated
 
     from scriptman.powers.api._handlers import HTTPMethod
@@ -231,6 +231,8 @@ class BaseEntityModel(BaseModel):  # TODO: Review this entire model
     @classmethod
     def get_identifier_fields(cls) -> list[str]:
         """🆔 Returns the identifier fields of the class."""
+        from typing import get_type_hints
+
         return [
             field_name
             for field_name, field_type in get_type_hints(cls, include_extras=True).items()
@@ -283,6 +285,8 @@ class BaseEntityModel(BaseModel):  # TODO: Review this entire model
         Returns:
             Validated email or None if invalid
         """
+        from email_validator import EmailNotValidError, validate_email
+
         if not email or not isinstance(email, str) or not email.strip():
             return None
 
@@ -349,15 +353,65 @@ class BaseEntityModel(BaseModel):  # TODO: Review this entire model
     def round_to_dp(value: Optional[Decimal], dp: int = 2) -> Optional[Decimal]:
         return round(value, dp) if value is not None else None
 
-    def model_serialize(self, **kwargs: Any) -> dict[str, Any]:
-        """🔄 Serialize the model to a dictionary.
+    def model_serialize(
+        self,
+        include: IncEx | None = None,
+        exclude: IncEx | None = None,
+        context: Any | None = None,
+        by_alias: bool | None = None,
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
+        round_trip: bool = False,
+        warnings: bool | Literal["none", "warn", "error"] = True,
+        fallback: Callable[[Any], Any] | None = None,
+        serialize_as_any: bool = False,
+    ) -> dict[str, Any]:
+        """
+        🔄 Serialize the model to a dictionary.
 
         Args:
-            **kwargs: Keyword arguments to pass to the model_dump_json method.
+            include: Field(s) to include in the JSON output.
+            exclude: Field(s) to exclude from the JSON output.
+            context: Additional context to pass to the serializer.
+            by_alias: Whether to serialize using field aliases.
+            exclude_unset: Whether to exclude fields that have not been explicitly set.
+            exclude_defaults: Whether to exclude fields that are set to their default
+                value.
+            exclude_none: Whether to exclude fields that have a value of `None`.
+            round_trip: If True, dumped values should be valid as input for non-idempotent
+                types such as Json[T].
+            warnings: How to handle serialization errors. False/"none" ignores them,
+                True/"warn" logs errors, "error" raises a
+                [`PydanticSerializationError`][pydantic_core.PydanticSerializationError].
+            fallback: A function to call when an unknown value is encountered. If not
+                provided, a
+                [`PydanticSerializationError`][pydantic_core.PydanticSerializationError]
+                error is raised.
+            serialize_as_any: Whether to serialize fields with duck-typing serialization
+                behavior.
 
         Returns:
             dict[str, Any]: The serialized model as a dictionary.
         """
         from json import loads
+        from typing import cast
 
-        return cast(dict[str, Any], loads(self.model_dump_json(**kwargs)))
+        return cast(
+            dict[str, Any],
+            loads(
+                self.model_dump_json(
+                    include=include,
+                    exclude=exclude,
+                    context=context,
+                    by_alias=by_alias,
+                    warnings=warnings,
+                    fallback=fallback,
+                    round_trip=round_trip,
+                    exclude_none=exclude_none,
+                    exclude_unset=exclude_unset,
+                    exclude_defaults=exclude_defaults,
+                    serialize_as_any=serialize_as_any,
+                )
+            ),
+        )

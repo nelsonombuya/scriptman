@@ -1,7 +1,7 @@
 try:
     from asyncio import iscoroutinefunction
     from functools import wraps
-    from json import dumps
+    from json import dumps, loads
     from typing import Any, cast
 
     from fastapi import status
@@ -107,21 +107,7 @@ def api_route(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
             else:
                 result = cast(dict[str, Any], func(*args, **kwargs))
 
-            # TODO: Improve Pickling of Stuff
-            if isinstance(result, dict):
-                for key, value in result.items():
-                    try:
-                        dumps(value)
-                    except (TypeError, OverflowError):
-                        logger.debug(
-                            f"Converting non-serializable value {value} "
-                            f"for key '{key}' to string"
-                        )
-                        if isinstance(value, BaseModel):
-                            result[key] = value.model_dump_json()
-                        else:
-                            result[key] = str(value)
-
+            result = pickle_values(result)
             response = create_successful_response(request=request, response=result)
             return JSONResponse(content=response, status_code=response["status_code"])
         except Exception as e:
@@ -129,3 +115,18 @@ def api_route(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
             return JSONResponse(content=response, status_code=response["status_code"])
 
     return wrapper
+
+
+def pickle_values(data: dict[str, Any]) -> dict[str, Any]:
+    """📦 Pickles values in a dictionary."""
+    result = {}
+    for key, value in data.items():
+        try:
+            logger.debug(f"Pickling value {value} for key '{key}'")
+            result[key] = dumps(value)
+        except (TypeError, OverflowError):
+            if isinstance(value, BaseModel):
+                result[key] = loads(value.model_dump_json())
+            else:
+                result[key] = str(value)
+    return result

@@ -9,6 +9,7 @@ try:
     from fastapi.responses import JSONResponse
     from loguru import logger
     from uvicorn import run as run_uvicorn_server
+    from uvicorn.config import LOGGING_CONFIG
 
     from scriptman.core.config import config
     from scriptman.powers.api._middleware import FastAPIMiddleware
@@ -187,6 +188,10 @@ class APIManager:
         """
         final_host = self._host = host or self._host
         final_port = self._port = port or self._port
+
+        logger.info("🔧 Configuring logging")
+        message_format = f"%(asctime)s | \033[1m{'UVICORN':<8}\033[0m | %(message)s"
+        LOGGING_CONFIG["formatters"]["default"]["fmt"] = message_format
 
         logger.info(f"📡 Starting API server at http://{final_host}:{final_port}")
         run_uvicorn_server(self.app, host=final_host, port=final_port, **kwargs)

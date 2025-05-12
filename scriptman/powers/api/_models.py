@@ -195,18 +195,23 @@ class BaseEntityModel(BaseModel):  # TODO: Review this entire model
 
     _identifier_field: ClassVar[str | None] = None
 
+    def __init__(self, **data: Any) -> None:
+        """🚀 Override init to catch and log validation errors."""
+        try:
+            super().__init__(**data)
+        except Exception as e:
+            identifier_fields = self.get_identifier_fields()
+            identifier = self.get_identifier(identifier_fields[0])
+            self.log_validation_error(e, identifier, data)
+            raise e
+
     @model_validator(mode="before")
     @classmethod
     def validate_identifier_field(cls, values: dict[str, Any]) -> dict[str, Any]:
         """🆔 Ensures that the inheriting class has defined an entity identifier field."""
         if cls._identifier_field is None:
             # Find the field marked with EntityIdentifierField
-            hints = get_type_hints(cls, include_extras=True)
-            identifier_fields = [
-                field_name
-                for field_name, field_type in hints.items()
-                if EntityIdentifierField in getattr(field_type, "__metadata__", ())
-            ]
+            identifier_fields = cls.get_identifier_fields()
 
             if not identifier_fields:
                 raise ValueError(
@@ -223,14 +228,30 @@ class BaseEntityModel(BaseModel):  # TODO: Review this entire model
 
         return values
 
-    def get_identifier(self) -> str:
+    @classmethod
+    def get_identifier_fields(cls) -> list[str]:
+        """🆔 Returns the identifier fields of the class."""
+        return [
+            field_name
+            for field_name, field_type in get_type_hints(cls, include_extras=True).items()
+            if EntityIdentifierField in getattr(field_type, "__metadata__", ())
+        ]
+
+    def get_identifier(self, field_name: Optional[str] = None) -> str:
         """🆔 Returns the entity's identifier value."""
         if self._identifier_field is None:
             logger.warning(
                 f"🔍 Entity {self.__class__.__name__} has no identifier field. "
                 "This is likely due to the model not being initialized correctly."
             )
-        return str(getattr(self, self._identifier_field or "<unknown_identifier>"))
+            return "<unknown_identifier>"
+
+        return str(
+            getattr(
+                self,
+                field_name or self._identifier_field or "<unknown_identifier>",
+            )
+        )
 
     @model_validator(mode="before")
     @classmethod
@@ -306,11 +327,14 @@ class BaseEntityModel(BaseModel):  # TODO: Review this entire model
 
         return values
 
-    def log_validation_error(self, error: Exception) -> None:
+    def log_validation_error(
+        self, error: Exception, identifier: str, data: dict[str, Any]
+    ) -> None:
         """📃 Centralized validation error logging."""
         logger.error(
             f"Validation error for {self.__class__.__name__} "
-            f"with identifier '{self.get_identifier()}': {str(error)}"
+            f"with identifier '{identifier}': {str(error)}\n"
+            f"Data: {data}"
         )
 
     @staticmethod
@@ -324,14 +348,6 @@ class BaseEntityModel(BaseModel):  # TODO: Review this entire model
     @staticmethod
     def round_to_dp(value: Optional[Decimal], dp: int = 2) -> Optional[Decimal]:
         return round(value, dp) if value is not None else None
-
-    def __init__(self, **data: Any) -> None:
-        """🚀 Override init to catch and log validation errors."""
-        try:
-            super().__init__(**data)
-        except Exception as e:
-            self.log_validation_error(e)
-            raise e
 
     def model_serialize(self, **kwargs: Any) -> dict[str, Any]:
         """🔄 Serialize the model to a dictionary.

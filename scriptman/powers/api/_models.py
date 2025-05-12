@@ -9,6 +9,7 @@ try:
     from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
     from typing_extensions import Annotated
 
+    from scriptman.powers.api._handlers import HTTPMethod
     from scriptman.powers.api.exceptions import APIException
 except ImportError as e:
     raise ImportError(
@@ -29,6 +30,11 @@ class APIRequest(BaseModel):
 
     request_id: str = Field(default_factory=lambda: str(uuid4()))
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+    request_url: Optional[str] = Field(default=None)
+    request_type: Optional[HTTPMethod] = Field(default=None)
+    request_body: Optional[dict[str, Any]] = Field(default=None)
+    request_params: Optional[dict[str, Any]] = Field(default=None)
+    request_headers: Optional[dict[str, str]] = Field(default=None)
     model_config = ConfigDict(extra="ignore")
 
 
@@ -50,12 +56,12 @@ class APIResponse(BaseModel):
     """
 
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
-    response_time: Optional[float] = None
+    response_time: Optional[float] = Field(default=None)
     message: str
     status_code: int
     request: APIRequest
-    response: Optional[dict[str, Any]] = None
-    stacktrace: Optional[list[dict[str, str | int | None]]] = None
+    response: Optional[dict[str, Any]] = Field(default=None)
+    stacktrace: Optional[list[dict[str, str | int | None]]] = Field(default=None)
 
     def __init__(
         self,
@@ -109,7 +115,7 @@ class APIResponse(BaseModel):
         try:
             datetime.fromisoformat(v)
         except ValueError:
-            raise ValueError("Invalid timestamp format")
+            raise ValueError(f"Invalid timestamp format: {v}")
         return v
 
     @field_validator("status_code", mode="before")
@@ -117,7 +123,7 @@ class APIResponse(BaseModel):
     def not_invalid_status_code(cls, v: int) -> int:
         """Ensure that the status code field is not an invalid status code."""
         if v < 100 or v > 599:
-            raise ValueError("Invalid status code")
+            raise ValueError(f"Invalid status code: {v}")
         return v
 
     @staticmethod
@@ -132,11 +138,11 @@ class APIResponse(BaseModel):
             Response: The converted Response object.
         """
         return APIResponse(
-            message=exception.message,
-            status_code=exception.status_code,
             request=request,
+            message=exception.message,
             response=exception.response,
             stacktrace=exception.stacktrace,
+            status_code=exception.status_code,
         )
 
 
@@ -153,7 +159,7 @@ class EntityIdentifierField:
 EntityIdentifier = Annotated[str, EntityIdentifierField]
 
 
-class BaseEntityModel(BaseModel):
+class BaseEntityModel(BaseModel):  # TODO: Review this entire model
     """
     🏗️ BaseEntityModel
 
@@ -219,13 +225,12 @@ class BaseEntityModel(BaseModel):
 
     def get_identifier(self) -> str:
         """🆔 Returns the entity's identifier value."""
-        identifier_field = self._identifier_field or "<unknown_identifier>"
         if self._identifier_field is None:
             logger.warning(
                 f"🔍 Entity {self.__class__.__name__} has no identifier field. "
                 "This is likely due to the model not being initialized correctly."
             )
-        return str(getattr(self, identifier_field, "<unknown_identifier>"))
+        return str(getattr(self, self._identifier_field or "<unknown_identifier>"))
 
     @model_validator(mode="before")
     @classmethod
@@ -262,7 +267,6 @@ class BaseEntityModel(BaseModel):
 
         try:
             return validate_email(email).normalized
-
         except (EmailNotValidError, ValueError) as e:
             logger.warning(
                 f"{cls.__name__} with identifier '{entity_identifier}' has invalid "
@@ -274,10 +278,19 @@ class BaseEntityModel(BaseModel):
     @classmethod
     def validate_email_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
         """📧 Validate all email fields in the model."""
-        entity_identifier = values.get(
-            cls._identifier_field or "identifier",
-            "unknown",  # Fallback if somehow the identifier isn't set
-        )
+        try:
+            if cls._identifier_field is None:
+                raise ValueError(
+                    f"Class {cls.__name__} has no identifier field. "
+                    "This is likely due to the model not being initialized correctly."
+                )
+            entity_identifier = values.get(
+                cls._identifier_field,
+                "unknown",  # Fallback if somehow the identifier isn't set
+            )
+        except Exception as e:
+            logger.error(f"Error getting entity identifier for {cls.__name__}: {str(e)}")
+            entity_identifier = "unknown"
 
         # Find all email fields (those ending with 'email' or 'mail')
         email_fields = [

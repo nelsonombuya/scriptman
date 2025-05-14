@@ -48,7 +48,7 @@ except ImportError:
 Cache powers
 """
 try:
-    from scriptman.powers.cache import cache
+    from scriptman.powers.cache import CacheManager, cache
 except ImportError:
     logger.debug("Cache powers not available")
 
@@ -84,7 +84,7 @@ except ImportError:
 Scheduler powers
 """
 try:
-    from scriptman.powers.scheduler import scheduler
+    from scriptman.powers.scheduler import Scheduler, scheduler
 except ImportError:
     logger.debug("Scheduler powers not available")
 
@@ -137,6 +137,7 @@ __all__: list[str] = [
     "PostOnlyRequestHandler",
     # Cache
     "cache",
+    "CacheManager",
     # Database
     "DatabaseHandler",
     "SQLAlchemyHandler",
@@ -145,6 +146,7 @@ __all__: list[str] = [
     "ETL",
     # Scheduler
     "scheduler",
+    "Scheduler",
     # Selenium
     "SeleniumInstance",
 ]

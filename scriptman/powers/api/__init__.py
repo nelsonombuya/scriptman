@@ -281,6 +281,7 @@ __all__: list[str] = [
     "exceptions",
     "EntityModelT",
     "BaseAPIClient",
+    "ResponseModelT",
     "RequestHandler",
     "BaseEntityModel",
     "EntityIdentifier",

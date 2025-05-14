@@ -15,9 +15,9 @@ try:
 
     from scriptman.core._scripts import Scripts
     from scriptman.core._summary import JobSummaryService
+    from scriptman.powers.concurrency import TaskExecutor
     from scriptman.powers.generics import P, R
     from scriptman.powers.scheduler._models import Job
-    from scriptman.powers.task import TaskExecutor
 
 except ImportError as e:
     raise ImportError(

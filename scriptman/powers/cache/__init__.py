@@ -11,8 +11,8 @@ try:
     from scriptman.core.config import config
     from scriptman.powers.cache._backend import CacheBackend
     from scriptman.powers.cache._diskcache import DiskCacheBackend, FanoutCacheBackend
+    from scriptman.powers.concurrency import TaskExecutor
     from scriptman.powers.generics import P, R
-    from scriptman.powers.task import TaskExecutor
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError as e:
     raise ImportError(

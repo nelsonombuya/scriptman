@@ -292,6 +292,8 @@ class OperationTracker:
             self.cache_manager._active_operations -= 1
 
 
+cache: CacheManager = CacheManager.get_instance()
+
 __all__: list[str] = [
     "CacheManager",
     "OperationTracker",

@@ -69,7 +69,7 @@ class APIManager:
 
     def route(
         self, path: str, methods: list[str] = ["GET"], **kwargs: Any
-    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
+    ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding routes directly to the API.
         Routes are queued and will be added during application startup.
@@ -91,7 +91,7 @@ class APIManager:
 
     def get(
         self, path: str, **kwargs: Any
-    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
+    ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding GET routes to the API.
 
@@ -103,7 +103,7 @@ class APIManager:
 
     def post(
         self, path: str, **kwargs: Any
-    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
+    ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding POST routes to the API.
 
@@ -115,7 +115,7 @@ class APIManager:
 
     def put(
         self, path: str, **kwargs: Any
-    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
+    ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding PUT routes to the API.
 
@@ -127,7 +127,7 @@ class APIManager:
 
     def delete(
         self, path: str, **kwargs: Any
-    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
+    ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding DELETE routes to the API.
 
@@ -139,7 +139,7 @@ class APIManager:
 
     def patch(
         self, path: str, **kwargs: Any
-    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
+    ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding PATCH routes to the API.
 

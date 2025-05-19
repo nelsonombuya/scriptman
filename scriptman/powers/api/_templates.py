@@ -86,7 +86,7 @@ def create_error_response(request: APIRequest, e: Exception) -> dict[str, Any]:
 
 
 def api_route(
-    request: APIRequest, func: Func[P, dict[str, Any]]
+    request: APIRequest, func: Func[P, dict[str, Any] | BaseModel]
 ) -> Func[P, JSONResponse]:
     """
     🔄 Decorator to wrap synchronous or asynchronous API route functions with
@@ -118,16 +118,19 @@ def api_route(
     return wrapper
 
 
-def pickle_values(data: dict[str, Any]) -> dict[str, Any]:
+def pickle_values(data: dict[str, Any] | BaseModel) -> dict[str, Any]:
     """📦 Pickles values in a dictionary."""
     result = {}
-    for key, value in data.items():
-        try:
-            logger.debug(f"Pickling value {value} for key '{key}'")
-            dumps(value)  # Try if the value is picklable
-        except (TypeError, OverflowError):
-            if isinstance(value, BaseModel):
-                result[key] = loads(value.model_dump_json())
-            else:
-                result[key] = str(value)
+    if isinstance(data, dict):
+        for key, value in data.items():
+            try:
+                logger.debug(f"Pickling value {value} for key '{key}'")
+                dumps(value)  # Try if the value is picklable
+            except (TypeError, OverflowError):
+                if isinstance(value, BaseModel):
+                    result[key] = loads(value.model_dump_json())
+                else:
+                    result[key] = str(value)
+    elif isinstance(data, BaseModel):
+        result = loads(data.model_dump_json())
     return result

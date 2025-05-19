@@ -8,6 +8,7 @@ try:
     from fastapi import APIRouter, FastAPI
     from fastapi.responses import JSONResponse
     from loguru import logger
+    from pydantic import BaseModel
     from uvicorn import run as run_uvicorn_server
     from uvicorn.config import LOGGING_CONFIG
 
@@ -79,7 +80,7 @@ class APIManager:
             **kwargs: Additional FastAPI route options
         """
 
-        def decorator(func: Func[P, dict[str, Any]]) -> Func[P, JSONResponse]:
+        def decorator(func: Func[P, dict[str, Any] | BaseModel]) -> Func[P, JSONResponse]:
             request = APIRequest(url=path, type=methods[0], args=kwargs)
             template_func: Func[P, JSONResponse] = api_route(request, func)
             self._queued_routes.append((path, methods, template_func, kwargs))

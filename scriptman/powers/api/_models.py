@@ -209,6 +209,10 @@ class BaseEntityModel(BaseModel):
     @classmethod
     def validate_identifier_field(cls, values: dict[str, Any]) -> dict[str, Any]:
         """🆔 Ensures that the inheriting class has defined an entity identifier field."""
+        return cls.set_identifier_field(values)
+
+    @classmethod
+    def set_identifier_field(cls, values: dict[str, Any]) -> dict[str, Any]:
         if cls._identifier_field is None:
             # Find the field marked with EntityIdentifierField
             identifier_fields = cls.get_identifier_fields()
@@ -311,6 +315,8 @@ class BaseEntityModel(BaseModel):
     def validate_email_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
         """📧 Validate all email fields in the model."""
         try:
+            values = cls.set_identifier_field(values)
+
             if cls._identifier_field is None:
                 raise ValueError(
                     f"Class {cls.__name__} has no identifier field. "

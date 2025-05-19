@@ -39,8 +39,8 @@ try:
         RequestHandler,
         ResponseModelT,
         api,
-        exceptions,
     )
+    from scriptman.powers.api import exceptions as api_exceptions
 except ImportError:
     logger.debug("API powers not available")
 
@@ -125,10 +125,10 @@ __all__: list[str] = [
     # API
     "api",
     "HTTPMethod",
-    "exceptions",
     "EntityModelT",
     "BaseAPIClient",
     "ResponseModelT",
+    "api_exceptions",
     "RequestHandler",
     "BaseEntityModel",
     "EntityIdentifier",

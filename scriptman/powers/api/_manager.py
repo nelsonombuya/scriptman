@@ -88,6 +88,66 @@ class APIManager:
 
         return decorator
 
+    def get(
+        self, path: str, **kwargs: Any
+    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
+        """
+        Decorator for adding GET routes to the API.
+
+        Args:
+            path: URL path for the route
+            **kwargs: Additional FastAPI route options
+        """
+        return self.route(path, methods=["GET"], **kwargs)
+
+    def post(
+        self, path: str, **kwargs: Any
+    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
+        """
+        Decorator for adding POST routes to the API.
+
+        Args:
+            path: URL path for the route
+            **kwargs: Additional FastAPI route options
+        """
+        return self.route(path, methods=["POST"], **kwargs)
+
+    def put(
+        self, path: str, **kwargs: Any
+    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
+        """
+        Decorator for adding PUT routes to the API.
+
+        Args:
+            path: URL path for the route
+            **kwargs: Additional FastAPI route options
+        """
+        return self.route(path, methods=["PUT"], **kwargs)
+
+    def delete(
+        self, path: str, **kwargs: Any
+    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
+        """
+        Decorator for adding DELETE routes to the API.
+
+        Args:
+            path: URL path for the route
+            **kwargs: Additional FastAPI route options
+        """
+        return self.route(path, methods=["DELETE"], **kwargs)
+
+    def patch(
+        self, path: str, **kwargs: Any
+    ) -> Callable[[Func[P, dict[str, Any]]], Func[P, JSONResponse]]:
+        """
+        Decorator for adding PATCH routes to the API.
+
+        Args:
+            path: URL path for the route
+            **kwargs: Additional FastAPI route options
+        """
+        return self.route(path, methods=["PATCH"], **kwargs)
+
     def configure(
         self,
         title: str = "ScriptMan API",

@@ -42,7 +42,7 @@ try:
     )
     from scriptman.powers.api import exceptions as api_exceptions
 except ImportError:
-    logger.debug("API powers not available")
+    logger.debug("API Powers Not Available. Install with `pip install scriptman[api]`")
 
 """
 Cache powers
@@ -50,7 +50,9 @@ Cache powers
 try:
     from scriptman.powers.cache import CacheManager, cache
 except ImportError:
-    logger.debug("Cache powers not available")
+    logger.debug(
+        "Cache Powers Not Available. Install with `pip install scriptman[cache]`"
+    )
 
 """
 Database powers
@@ -61,14 +63,21 @@ try:
     try:
         from scriptman.powers.database._sqlalchemy import SQLAlchemyHandler
     except ImportError:
-        logger.debug("SQLAlchemy powers not available")
+        logger.debug(
+            "SQLAlchemy Powers Not Available. "
+            "Install with `pip install scriptman[sqlalchemy]`"
+        )
 
     try:
         from scriptman.powers.database._pyodbc import PyODBCHandler
     except ImportError:
-        logger.debug("PyODBC powers not available")
+        logger.debug(
+            "PyODBC Powers Not Available. Install with `pip install scriptman[pyodbc]`"
+        )
 except ImportError:
-    logger.debug("Database powers not available")
+    logger.debug(
+        "Database Powers Not Available. Install with `pip install scriptman[database]`"
+    )
 
 
 """
@@ -77,7 +86,7 @@ ETL powers
 try:
     from scriptman.powers.etl import ETL
 except ImportError:
-    logger.debug("ETL powers not available")
+    logger.debug("ETL Powers Not Available. Install with `pip install scriptman[etl]`")
 
 
 """
@@ -86,7 +95,9 @@ Scheduler powers
 try:
     from scriptman.powers.scheduler import Scheduler, scheduler
 except ImportError:
-    logger.debug("Scheduler powers not available")
+    logger.debug(
+        "Scheduler Powers Not Available. Install with `pip install scriptman[scheduler]`"
+    )
 
 
 """
@@ -95,7 +106,9 @@ Selenium powers
 try:
     from scriptman.powers.selenium import SeleniumInstance
 except ImportError:
-    logger.debug("Selenium powers not available")
+    logger.debug(
+        "Selenium Powers Not Available. Install with `pip install scriptman[selenium]`"
+    )
 
 
 __all__: list[str] = [

@@ -149,6 +149,7 @@ class Tasks(Generic[T]):
     def await_results(
         self,
         *,
+        lazy: Literal[False] = False,
         raise_exceptions: Literal[True] = True,
         only_successful_results: Literal[True] = True,
     ) -> list[T]:
@@ -159,6 +160,7 @@ class Tasks(Generic[T]):
     def await_results(
         self,
         *,
+        lazy: Literal[False] = False,
         raise_exceptions: Literal[True] = True,
         only_successful_results: Literal[False] = False,
     ) -> list[T]:
@@ -169,6 +171,7 @@ class Tasks(Generic[T]):
     def await_results(
         self,
         *,
+        lazy: Literal[False] = False,
         raise_exceptions: Literal[False] = False,
         only_successful_results: Literal[True] = True,
     ) -> list[T]:
@@ -179,6 +182,7 @@ class Tasks(Generic[T]):
     def await_results(
         self,
         *,
+        lazy: Literal[False] = False,
         raise_exceptions: Literal[False] = False,
         only_successful_results: Literal[False] = False,
     ) -> list[T | TaskException]:
@@ -188,26 +192,93 @@ class Tasks(Generic[T]):
         """
         ...
 
+    @overload
     def await_results(
         self,
         *,
+        lazy: Literal[True] = True,
+        raise_exceptions: Literal[True] = True,
+        only_successful_results: Literal[True] = True,
+    ) -> Iterator[T]:
+        """
+        ⏱ Yield results from tasks as they complete, raising an exception if any
+        fail
+        """
+        ...
+
+    @overload
+    def await_results(
+        self,
+        *,
+        lazy: Literal[True] = True,
+        raise_exceptions: Literal[True] = True,
+        only_successful_results: Literal[False] = False,
+    ) -> Iterator[T]:
+        """
+        ⏱ Yield results from tasks as they complete, raising an exception if any fail
+        """
+        ...
+
+    @overload
+    def await_results(
+        self,
+        *,
+        lazy: Literal[True] = True,
+        raise_exceptions: Literal[False] = False,
+        only_successful_results: Literal[True] = True,
+    ) -> Iterator[T]:
+        """
+        ⏱ Yield results from tasks as they complete, only yielding successful results
+        """
+        ...
+
+    @overload
+    def await_results(
+        self,
+        *,
+        lazy: Literal[True] = True,
+        raise_exceptions: Literal[False] = False,
+        only_successful_results: Literal[False] = False,
+    ) -> Iterator[T | TaskException]:
+        """
+        ⏱ Yield results from tasks as they complete, yielding TaskException for failed
+        tasks
+        """
+        ...
+
+    def await_results(
+        self,
+        *,
+        lazy: bool = False,
         raise_exceptions: bool = True,
         only_successful_results: bool = False,
-    ) -> list[T] | list[T | TaskException]:
+    ) -> list[T] | list[T | TaskException] | Iterator[T] | Iterator[T | TaskException]:
         """
         ⌚ Await and return results from all tasks
 
         Args:
+            lazy: Whether to yield results as they complete instead of returning a list
             raise_exceptions: Whether to raise exceptions that occurred during execution
             only_successful_results: Whether to filter out TaskException results
 
         Returns:
-            List of task results in the same order as the tasks.
-            If raise_exceptions is False, failed tasks will be TaskException objects.
+            If lazy is False:
+                List of task results in the same order as the tasks.
+                If raise_exceptions is False, failed tasks will be TaskException objects.
+            If lazy is True:
+                Iterator yielding results as tasks complete (not in order).
+                If raise_exceptions is False, failed tasks will yield TaskException
+                    objects.
 
         Raises:
             Exception: If any task failed and raise_exceptions is True
         """
+        if lazy:
+            return self._await_results_lazy(
+                raise_exceptions=raise_exceptions,
+                only_successful_results=only_successful_results,
+            )
+
         done, not_done = wait(
             fs=[task._future for task in self._tasks],
             return_when=ALL_COMPLETED if not raise_exceptions else FIRST_EXCEPTION,
@@ -230,6 +301,39 @@ class Tasks(Generic[T]):
             raise exceptions[0]  # Raise the first exception encountered
 
         return results
+
+    def _await_results_lazy(
+        self,
+        *,
+        raise_exceptions: bool,
+        only_successful_results: bool,
+    ) -> Iterator[T] | Iterator[T | TaskException]:
+        """
+        Internal method to yield results as tasks complete
+        """
+        exceptions: list[Exception] = []
+        futures: list[Future[T]] | set[Future[T]]
+        futures = [task._future for task in self._tasks]
+
+        while futures:
+            done, futures = wait(
+                fs=futures,
+                return_when=FIRST_EXCEPTION if raise_exceptions else ALL_COMPLETED,
+            )
+
+            for future in done:
+                task = next(t for t in self._tasks if t._future is future)
+                result = task.await_result(raise_exceptions=False)
+
+                if isinstance(result, TaskException):
+                    exceptions.append(result.exception)
+                    if not only_successful_results:
+                        yield result
+                else:
+                    yield result
+
+            if raise_exceptions and exceptions:
+                raise exceptions[0]  # Raise the first exception encountered
 
     @property
     def are_successful(self) -> bool:

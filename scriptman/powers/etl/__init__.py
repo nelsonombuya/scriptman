@@ -523,9 +523,9 @@ class ETL:
                 has_named_index: bool = False
             else:
                 index_cols = (
-                    self._data.index.names
+                    [str(_) for _ in self._data.index.names]
                     if isinstance(self._data.index, MultiIndex)
-                    else [self._data.index.name]
+                    else [str(self._data.index.name)]
                 )
                 has_named_index = True
 
@@ -851,7 +851,7 @@ class ETL:
             self.log.warning(f'Table "{table_name}" does not exist. Creating table...')
             db.create_table(
                 table_name=table_name,
-                keys=self._data.index.names,
+                keys=[str(_) for _ in self._data.index.names],
                 columns=db.get_table_data_types(self._data.reset_index(), force_nvarchar),
             )
             method = "insert"
@@ -941,7 +941,7 @@ class ETL:
             # Create the temporary table
             database_handler.create_table(
                 table_name=temp_table,
-                keys=self._data.index.names,
+                keys=[str(_) for _ in self._data.index.names],
                 columns=database_handler.get_table_data_types(
                     self._data.reset_index(), force_nvarchar
                 ),

@@ -257,6 +257,94 @@ class TaskExecutor:
 
         return batch
 
+    def race(
+        self,
+        tasks: list[tuple[Callable[P, R], tuple[Any, ...], dict[str, Any]]],
+        *,
+        preferred_task_idx: Optional[int] = None,
+        timeout: Optional[float] = None,
+    ) -> Task[R]:
+        """
+        🏃‍♂️ Race multiple tasks and return the first successful result.
+
+        Args:
+            tasks: List of (func, args, kwargs) tuples to race
+            preferred_task_idx: If all tasks fail, use this task's result. If None,
+                use the first task's result.
+            timeout: Maximum time to wait for a result
+
+        Returns:
+            Task: The winning task's result
+
+        Raises:
+            TimeoutError: If no task completes within the specified timeout
+
+        Example:
+            # Race two tasks and get first successful result
+            result = executor.race([
+                (check_signatures, (invoice_no,), {}),
+                (process_invoice, (invoice_no,), {})
+            ], timeout=5.0).await_result()  # Wait up to 5 seconds
+        """
+        from concurrent.futures import FIRST_COMPLETED, TimeoutError, wait
+
+        batch = Tasks[R]()
+        start_time = perf_counter()
+        for func, args, kwargs in tasks:
+            task_start = perf_counter()
+            future = self._thread_pool.submit(func, *args, **kwargs)
+            batch._tasks.append(Task(future, args, kwargs, task_start))
+
+        while batch._tasks:
+            # Calculate remaining timeout
+            if timeout is not None:
+                elapsed = perf_counter() - start_time
+                if elapsed >= timeout:
+                    raise TimeoutError(f"No task completed within {timeout} seconds")
+                remaining_timeout = timeout - elapsed
+            else:
+                remaining_timeout = None
+
+            try:
+                done, pending = wait(
+                    [task._future for task in batch._tasks],
+                    return_when=FIRST_COMPLETED,
+                    timeout=remaining_timeout,
+                )
+            except TimeoutError:
+                raise TimeoutError(f"No task completed within {timeout} seconds")
+
+            successful_tasks = [
+                task
+                for task in batch._tasks
+                if task._future in done and task.is_successful
+            ]
+
+            if successful_tasks:
+                return successful_tasks[0]
+
+            # If no successful tasks, check if we have a preferred task
+            if preferred_task_idx is not None:
+                preferred_task = batch._tasks[preferred_task_idx]
+                if preferred_task._future in done:
+                    return preferred_task
+                continue
+
+            # If no preferred task, return the first failed task
+            failed_tasks = [
+                task
+                for task in batch._tasks
+                if task._future in done and not task.is_successful
+            ]
+            if failed_tasks:
+                return failed_tasks[0]  # This will raise the task's exception
+
+            # Remove completed tasks from consideration
+            batch._tasks = [task for task in batch._tasks if task._future in pending]
+
+        # If we somehow get here (shouldn't happen), return the first task
+        return batch._tasks[0]
+
     def cleanup(self, wait: bool = True) -> None:
         """🧹 Clean up executor resources and shutdown thread/process pools.
 

@@ -1,7 +1,7 @@
 try:
     from functools import wraps
     from inspect import iscoroutinefunction
-    from json import dumps, loads
+    from json import dumps
     from typing import Any, cast
 
     from fastapi import status
@@ -120,7 +120,7 @@ def api_route(
 
 def pickle_values(data: dict[str, Any] | BaseModel) -> dict[str, Any]:
     """📦 Pickles values in a dictionary."""
-    result = {}
+    result: dict[str, Any] = {}
     if isinstance(data, dict):
         for key, value in data.items():
             try:
@@ -128,9 +128,26 @@ def pickle_values(data: dict[str, Any] | BaseModel) -> dict[str, Any]:
                 dumps(value)  # Try if the value is picklable
             except (TypeError, OverflowError):
                 if isinstance(value, BaseModel):
-                    result[key] = loads(value.model_dump_json())
+                    result[key] = pickle_values(value.model_dump())
+                elif isinstance(value, Exception):
+                    # Convert exception to a serializable format
+                    result[key] = {
+                        "type": value.__class__.__name__,
+                        "message": str(value),
+                        "args": value.args,
+                    }
+                elif isinstance(value, (list, tuple)):
+                    # Handle lists and tuples recursively
+                    result[key] = [
+                        (
+                            pickle_values(item)
+                            if isinstance(item, (dict, BaseModel))
+                            else str(item)
+                        )
+                        for item in value
+                    ]
                 else:
                     result[key] = str(value)
     elif isinstance(data, BaseModel):
-        result = loads(data.model_dump_json())
+        result = pickle_values(data.model_dump())
     return result

@@ -336,7 +336,7 @@ class ETLDatabase:
 
         # Build the query parts
         temp_schema = ", ".join([f"[{c}] {data_types[c]}" for c in columns_to_insert])
-        temp_schema += f", PRIMARY KEY ({', '.join(['[' + k + ']' for k in indices])})"
+        temp_schema += f", PRIMARY KEY ({', '.join([f'[{k}]' for k in indices])})"
         update = ", ".join([f"target.[{c}] = source.[{c}]" for c in columns_to_update])
 
         # Add COLLATE clause for string comparisons to handle collation conflicts
@@ -345,7 +345,7 @@ class ETLDatabase:
                 (
                     f"source.[{k}] COLLATE SQL_Latin1_General_CP1_CI_AS = "
                     f"target.[{k}] COLLATE SQL_Latin1_General_CP1_CI_AS"
-                    if data_types.get(k, "").startswith("NVARCHAR")
+                    if data_types.get(str(k), "").startswith("NVARCHAR")
                     else f"source.[{k}] = target.[{k}]"
                 )
                 for k in indices

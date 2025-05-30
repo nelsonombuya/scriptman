@@ -13,6 +13,7 @@ try:
     from scriptman.powers.cache._diskcache import DiskCacheBackend, FanoutCacheBackend
     from scriptman.powers.concurrency import TaskExecutor
     from scriptman.powers.generics import P, R
+    from scriptman.powers.serializer import SERIALIZE_FOR_CACHE, serialize
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError as e:
     raise ImportError(
@@ -223,7 +224,13 @@ class CacheManager:
             dict[Any, Any]: A sorted dictionary with the same keys and values as the
                 input dictionary.
         """
-        return dict(sorted(dictionary.items(), key=key, reverse=reverse))
+        return dict(
+            sorted(
+                dict(serialize(dictionary, **SERIALIZE_FOR_CACHE)).items(),
+                reverse=reverse,
+                key=key,
+            )
+        )
 
     def remove_self_or_cls_from_args(
         self, func: Callable[..., Any], args: tuple[Any, ...]
@@ -242,9 +249,12 @@ class CacheManager:
             tuple[Any, ...]: A tuple of arguments with `self` or `cls` removed if
                 applicable.
         """
-
-        return (
-            args[1:] if args and ismethod(getattr(args[0], func.__name__, None)) else args
+        return tuple(
+            serialize(
+                args[1:]
+                if args and ismethod(getattr(args[0], func.__name__, None))
+                else args
+            )
         )
 
     def get_function_name(self, func: Callable[..., Any]) -> str:

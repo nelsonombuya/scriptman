@@ -13,6 +13,7 @@ try:
     from scriptman.powers.api.exceptions import APIException
     from scriptman.powers.concurrency import TaskExecutor
     from scriptman.powers.generics import Func, P
+    from scriptman.powers.serializer import SERIALIZE_FOR_JSON, serialize
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -108,46 +109,13 @@ def api_route(
             else:
                 result = cast(dict[str, Any], func(*args, **kwargs))
 
-            result = pickle_values(result)
-            response = create_successful_response(request=request, response=result)
+            response = create_successful_response(
+                response=serialize(result, **SERIALIZE_FOR_JSON),
+                request=request,
+            )
             return JSONResponse(content=response, status_code=response["status_code"])
         except Exception as e:
             response = create_error_response(request=request, e=e)
             return JSONResponse(content=response, status_code=response["status_code"])
 
     return wrapper
-
-
-def pickle_values(data: dict[str, Any] | BaseModel) -> dict[str, Any]:
-    """📦 Pickles values in a dictionary."""
-    result: dict[str, Any] = {}
-    if isinstance(data, dict):
-        for key, value in data.items():
-            try:
-                logger.debug(f"Pickling value {value} for key '{key}'")
-                dumps(value)  # Try if the value is picklable
-            except (TypeError, OverflowError):
-                if isinstance(value, BaseModel):
-                    result[key] = pickle_values(value.model_dump())
-                elif isinstance(value, Exception):
-                    # Convert exception to a serializable format
-                    result[key] = {
-                        "type": value.__class__.__name__,
-                        "message": str(value),
-                        "args": value.args,
-                    }
-                elif isinstance(value, (list, tuple)):
-                    # Handle lists and tuples recursively
-                    result[key] = [
-                        (
-                            pickle_values(item)
-                            if isinstance(item, (dict, BaseModel))
-                            else str(item)
-                        )
-                        for item in value
-                    ]
-                else:
-                    result[key] = str(value)
-    elif isinstance(data, BaseModel):
-        result = pickle_values(data.model_dump())
-    return result

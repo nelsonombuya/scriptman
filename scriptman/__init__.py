@@ -20,6 +20,12 @@ from scriptman.powers.cleanup import CleanUp
 from scriptman.powers.concurrency import Task, TaskExecutor, Tasks
 from scriptman.powers.generics import AsyncFunc, Func, P, R, SyncFunc, T
 from scriptman.powers.retry import retry
+from scriptman.powers.serializer import (
+    SERIALIZE_FOR_CACHE,
+    SERIALIZE_FOR_JSON,
+    SERIALIZE_FOR_PICKLE,
+    serialize,
+)
 from scriptman.powers.time_calculator import TimeCalculator
 
 # Optional powers that depend on extra packages
@@ -157,6 +163,11 @@ __all__: list[str] = [
     "PyODBCHandler",
     # ETL
     "ETL",
+    # Serializer
+    "SERIALIZE_FOR_CACHE",
+    "SERIALIZE_FOR_JSON",
+    "SERIALIZE_FOR_PICKLE",
+    "serialize",
     # Scheduler
     "scheduler",
     "Scheduler",

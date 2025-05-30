@@ -215,6 +215,9 @@ class PyODBCHandler(DatabaseHandler):
                 mapper = partial(self._map_row_to_dict, cursor)
                 return [mapper(row) for row in cursor.fetchall()]
         except Error as error:
+            if "deadlock" in str(error).lower():
+                self.log.warning("Deadlock detected, retrying query...")
+                return self.execute_read_query(query, params)
             self.log.error(
                 f"Unable to execute read query: \n"
                 f"Error: {error} \n"
@@ -250,6 +253,9 @@ class PyODBCHandler(DatabaseHandler):
                     raise ValueError("No rows were affected by the query.")
                 return True
         except (Error, ValueError) as error:
+            if "deadlock" in str(error).lower():
+                self.log.warning("Deadlock detected, retrying query...")
+                return self.execute_write_query(query, params, check_affected_rows)
             self.log.error(
                 f"Unable to execute write query: \n"
                 f"Error: {error} \n"
@@ -284,14 +290,15 @@ class PyODBCHandler(DatabaseHandler):
             if not rows:
                 self.log.info("No rows to process in bulk operation")
                 return True
-
             with self.get_cursor() as cursor:
                 cursor.fast_executemany = True
                 self.log.info(f"Executing bulk operation for {len(rows)} rows...")
                 cursor.executemany(_query, _params_list)
             return True
-
         except Error as error:
+            if "deadlock" in str(error).lower():
+                self.log.warning("Deadlock detected, retrying query...")
+                return self.execute_write_bulk_query(query, rows)
             sample_rows = "\n\t".join(str(row) for row in rows[:5])
             if len(rows) > 5:
                 sample_rows += "\n\t... and more rows"

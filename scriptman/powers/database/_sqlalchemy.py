@@ -164,6 +164,9 @@ class SQLAlchemyHandler(DatabaseHandler):
             with self._engine.connect() as session:
                 return [dict(_._mapping) for _ in session.execute(text(query), params)]
         except SQLAlchemyError as error:
+            if "deadlock" in str(error).lower():
+                self.log.warning("Deadlock detected, retrying query...")
+                return self.execute_read_query(query, params)
             self.log.error(
                 f"Unable to execute read query: \n"
                 f"Error: {error} \n"
@@ -205,6 +208,9 @@ class SQLAlchemyHandler(DatabaseHandler):
                     raise ValueError("No rows were affected by the query.")
                 return True
         except (SQLAlchemyError, ValueError) as error:
+            if "deadlock" in str(error).lower():
+                self.log.warning("Deadlock detected, retrying query...")
+                return self.execute_write_query(query, params, check_affected_rows)
             self.log.error(
                 "Unable to execute write query: \n"
                 f"Error: {error} \n"
@@ -238,18 +244,18 @@ class SQLAlchemyHandler(DatabaseHandler):
             if not rows:
                 self.log.info("No rows to process in bulk operation")
                 return True
-
             with self._engine.begin() as session:
                 self.log.info(f"Executing bulk operation for {len(rows)} rows...")
                 session.execute(text(query), rows)
             self.log.success("Bulk operation completed successfully")
             return True
-
         except SQLAlchemyError as error:
+            if "deadlock" in str(error).lower():
+                self.log.warning("Deadlock detected, retrying query...")
+                return self.execute_write_bulk_query(query, rows)
             sample_rows = "\n\t".join(str(row) for row in rows[:5])
             if len(rows) > 5:
                 sample_rows += "\n\t... and more rows"
-
             self.log.error(
                 "Unable to bulk execute query: \n"
                 f"Error: {error} \n"

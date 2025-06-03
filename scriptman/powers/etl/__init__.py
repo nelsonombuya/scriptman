@@ -784,8 +784,8 @@ class ETL:
         batch_size: int = 1000,
         batch_execute: bool = True,
         force_nvarchar: bool = False,
-        method: Literal["truncate", "replace", "insert", "update", "upsert"] = "upsert",
         synchronize_schema: bool = True,
+        method: Literal["truncate", "replace", "insert", "update", "upsert"] = "upsert",
     ) -> bool:
         """
         📂 Loads the ETL data into a database table, with options for batch execution and
@@ -934,7 +934,7 @@ class ETL:
         """
         from uuid import uuid4
 
-        temp_table = f"temp_{table_name}_{uuid4()}".replace("-", "_")
+        temp_table = f"temp_{table_name}_{str(uuid4())[:8]}".replace("-", "_")
         merge_query = query.format(source_table=temp_table)
 
         try:

@@ -66,6 +66,22 @@ class ConfigModel(BaseModel):
         default=".venv",
         description="Path to the virtual environment relative to the project root",
     )
+    thread_pool_size: int = Field(
+        default=50,
+        description="Maximum number of threads for the global thread pool",
+    )
+    process_pool_size: int = Field(
+        default=4,
+        description="Maximum number of processes for the global process pool",
+    )
+    task_queue_size: int = Field(
+        default=100,
+        description="Maximum number of tasks that can be queued",
+    )
+    task_timeout: int = Field(
+        default=30,
+        description="Default timeout in seconds for task execution",
+    )
 
     @field_validator("logs_dir", "downloads_dir", mode="before")
     @classmethod

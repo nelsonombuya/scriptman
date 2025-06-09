@@ -1,5 +1,10 @@
 from asyncio import get_event_loop
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import (
+    ProcessPoolExecutor,
+    ThreadPoolExecutor,
+    TimeoutError,
+    wait,
+)
 from inspect import iscoroutinefunction, signature
 from time import perf_counter
 from typing import Any, Awaitable, Callable, Literal, Optional
@@ -372,7 +377,8 @@ class TaskExecutor:
 
     @staticmethod
     def await_async[R](awaitable: Awaitable[R]) -> R:
-        """⌚ Run an async coroutine synchronously and wait for the result.
+        """
+        ⌚ Run an async coroutine synchronously and wait for the result.
 
         Args:
             awaitable: The coroutine to execute
@@ -391,6 +397,29 @@ class TaskExecutor:
                 set_event_loop(loop)
                 return loop.run_until_complete(awaitable)
             raise e
+
+    @staticmethod
+    def wait(task: Task[R], timeout: Optional[float] = None) -> R:
+        """
+        ⌚ Run a task synchronously and wait for the result.
+
+        Args:
+            task: The task to be waited for.
+            timeout: The number of seconds to wait for the task before raising a timeout
+                error.
+
+        Returns:
+            The result of the task.
+
+        Raises:
+            TimeoutError: If the task doesn't complete within the specified about of time.
+        """
+        done, _ = wait([task._future], timeout=timeout)
+
+        if not done:
+            raise TimeoutError(f"Task timed out after {timeout} seconds")
+
+        return task.await_result()
 
     def __del__(self) -> None:
         """🧹 Clean up executor resources and shutdown thread/process pools."""

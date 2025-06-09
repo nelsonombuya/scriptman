@@ -68,7 +68,12 @@ class APIManager:
         )
 
     def route(
-        self, path: str, methods: list[str] = ["GET"], **kwargs: Any
+        self,
+        path: str,
+        methods: list[str] = ["GET"],
+        enqueue: bool = False,
+        timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding routes directly to the API.
@@ -77,77 +82,142 @@ class APIManager:
         Args:
             path: URL path for the route
             methods: HTTP methods to support
+            enqueue: Whether to queue requests for background processing
+            timeout: Maximum time in seconds to wait for task completion
             **kwargs: Additional FastAPI route options
         """
 
         def decorator(func: Func[P, dict[str, Any] | BaseModel]) -> Func[P, JSONResponse]:
             request = APIRequest(url=path, type=methods[0], args=kwargs)
-            template_func: Func[P, JSONResponse] = api_route(request, func)
-            self._queued_routes.append((path, methods, template_func, kwargs))
-            logger.info(f"Queued route {path} with methods {methods}")
-            return template_func
+            temp_func: Func[P, JSONResponse] = api_route(request, func, timeout, enqueue)
+            self._queued_routes.append((path, methods, temp_func, kwargs))
+            logger.info(
+                f"Queued route {path} with methods {methods} "
+                f"(enqueue={enqueue}, timeout={timeout})"
+            )
+            return temp_func
 
         return decorator
 
     def get(
-        self, path: str, **kwargs: Any
+        self,
+        path: str,
+        enqueue: bool = False,
+        timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding GET routes to the API.
 
         Args:
             path: URL path for the route
+            enqueue: Whether to queue requests for background processing
+            timeout: Maximum time in seconds to wait for task completion
             **kwargs: Additional FastAPI route options
         """
-        return self.route(path, methods=["GET"], **kwargs)
+        return self.route(
+            path,
+            methods=["GET"],
+            enqueue=enqueue,
+            timeout=timeout,
+            **kwargs,
+        )
 
     def post(
-        self, path: str, **kwargs: Any
+        self,
+        path: str,
+        enqueue: bool = False,
+        timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding POST routes to the API.
 
         Args:
             path: URL path for the route
+            enqueue: Whether to queue requests for background processing
+            timeout: Maximum time in seconds to wait for task completion
             **kwargs: Additional FastAPI route options
         """
-        return self.route(path, methods=["POST"], **kwargs)
+        return self.route(
+            path,
+            methods=["POST"],
+            enqueue=enqueue,
+            timeout=timeout,
+            **kwargs,
+        )
 
     def put(
-        self, path: str, **kwargs: Any
+        self,
+        path: str,
+        enqueue: bool = False,
+        timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding PUT routes to the API.
 
         Args:
             path: URL path for the route
+            enqueue: Whether to queue requests for background processing
+            timeout: Maximum time in seconds to wait for task completion
             **kwargs: Additional FastAPI route options
         """
-        return self.route(path, methods=["PUT"], **kwargs)
+        return self.route(
+            path,
+            methods=["PUT"],
+            enqueue=enqueue,
+            timeout=timeout,
+            **kwargs,
+        )
 
     def delete(
-        self, path: str, **kwargs: Any
+        self,
+        path: str,
+        enqueue: bool = False,
+        timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding DELETE routes to the API.
 
         Args:
             path: URL path for the route
+            enqueue: Whether to queue requests for background processing
+            timeout: Maximum time in seconds to wait for task completion
             **kwargs: Additional FastAPI route options
         """
-        return self.route(path, methods=["DELETE"], **kwargs)
+        return self.route(
+            path,
+            methods=["DELETE"],
+            enqueue=enqueue,
+            timeout=timeout,
+            **kwargs,
+        )
 
     def patch(
-        self, path: str, **kwargs: Any
+        self,
+        path: str,
+        enqueue: bool = False,
+        timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> Callable[[Func[P, dict[str, Any] | BaseModel]], Func[P, JSONResponse]]:
         """
         Decorator for adding PATCH routes to the API.
 
         Args:
             path: URL path for the route
+            enqueue: Whether to queue requests for background processing
+            timeout: Maximum time in seconds to wait for task completion
             **kwargs: Additional FastAPI route options
         """
-        return self.route(path, methods=["PATCH"], **kwargs)
+        return self.route(
+            path,
+            methods=["PATCH"],
+            enqueue=enqueue,
+            timeout=timeout,
+            **kwargs,
+        )
 
     def configure(
         self,

@@ -123,7 +123,10 @@ class TaskExecutor:
             result = task.await_result()
         """
         start_time = perf_counter()
-        future = self._thread_pool.submit(func, *args, **kwargs)
+        if iscoroutinefunction(func):
+            future = self._thread_pool.submit(self.await_async, func(*args, **kwargs))
+        else:
+            future = self._thread_pool.submit(func, *args, **kwargs)
         return Task[R](future, args, kwargs, start_time)
 
     def parallel(

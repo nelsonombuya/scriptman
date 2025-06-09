@@ -469,7 +469,7 @@ class ETL:
                 if case == "snake"
                 else self.__convert_to_camel_case
             )
-            flattened.columns = [  # type:ignore # Modifying types to avoid type errors
+            flattened.columns = [  # Modifying types to avoid type errors
                 case_func(f"{column.lower()}_{str(col).lower()}")
                 for col in flattened.columns
             ]

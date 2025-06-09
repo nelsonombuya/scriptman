@@ -26,17 +26,31 @@ class QueuedRequest:
 class APIQueueManager:
     """🚦 Manages API request queue and processing"""
 
+    _instance: Optional["APIQueueManager"] = None
+    _initialized: bool = False
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> "APIQueueManager":
+        if cls._instance is None:
+            cls._instance = super(APIQueueManager, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
     def __init__(self) -> None:
         """Initialize the queue manager"""
-        self._processing_task: Optional[Task[None]] = None
-        queue_size = config.settings.get("task_queue_size", 100)
-        self._queue: Queue[QueuedRequest] = Queue(maxsize=queue_size)
-        self._start_processing()
+        if not self._initialized:
+            self._processing_task: Optional[Task[None]] = None
+            queue_size = config.settings.get("task_queue_size", 100)
+            self._queue: Queue[QueuedRequest] = Queue(maxsize=queue_size)
+            self._started = False
+            self.__class__._initialized = True
 
-    def _start_processing(self) -> None:
+    async def start(self) -> None:
         """Start the queue processing task"""
-        if self._processing_task is None or self._processing_task.done():
+        if not self._started and (
+            self._processing_task is None or self._processing_task.done()
+        ):
             self._processing_task = create_task(self._process_queue())
+            self._started = True
+            logger.info("🚦 Started API queue manager")
 
     async def _process_queue(self) -> None:
         """Process queued requests"""
@@ -93,17 +107,20 @@ class APIQueueManager:
             kwargs: Keyword arguments for the function
             timeout: Maximum time to wait for execution
         """
+        if not self._started:
+            await self.start()
+
         executor = TaskExecutor(
             thread_pool_size=config.settings.get("thread_pool_size", 50),
             process_pool_size=config.settings.get("process_pool_size", 4),
         )
         queued_request = QueuedRequest(
+            request=request,
             func=func,
             args=args,
             kwargs=kwargs,
-            timeout=timeout,
-            request=request,
             executor=executor,
+            timeout=timeout,
         )
         try:
             await self._queue.put(queued_request)
@@ -122,6 +139,8 @@ class APIQueueManager:
                 await self._processing_task
             except Exception:
                 pass
+            logger.info("🛑 Shut down API queue manager")
+        self._started = False
 
 
 # Singleton instance

@@ -1,14 +1,20 @@
-from asyncio import Queue, QueueFull, Task, create_task
-from dataclasses import dataclass
-from typing import Any, Optional
+try:
+    from asyncio import CancelledError, Queue, QueueFull, Task, create_task, sleep
+    from dataclasses import dataclass
+    from typing import Any, Optional
 
-from loguru import logger
+    from loguru import logger
 
-from scriptman.core.config import config
-from scriptman.powers.api._models import APIRequest
-from scriptman.powers.api.exceptions import APIException
-from scriptman.powers.concurrency import TaskExecutor
-from scriptman.powers.generics import Func, P, R
+    from scriptman.core.config import config
+    from scriptman.powers.api._models import APIRequest
+    from scriptman.powers.api.exceptions import APIException
+    from scriptman.powers.concurrency import TaskExecutor
+    from scriptman.powers.generics import Func, P, R
+except ImportError as e:
+    raise ImportError(
+        f"An error occurred: {e} \n"
+        "Kindly install the dependencies using 'scriptman[api]'."
+    )
 
 
 @dataclass
@@ -41,20 +47,20 @@ class APIQueueManager:
             queue_size = config.settings.get("task_queue_size", 100)
             self._queue: Queue[QueuedRequest] = Queue(maxsize=queue_size)
             self._started = False
+            self._is_shutting_down = False
             self.__class__._initialized = True
 
     async def start(self) -> None:
         """Start the queue processing task"""
-        if not self._started and (
-            self._processing_task is None or self._processing_task.done()
-        ):
-            self._processing_task = create_task(self._process_queue())
+        if not self._started:
             self._started = True
+            self._is_shutting_down = False
+            self._processing_task = create_task(self._process_queue())
             logger.info("🚦 Started API queue manager")
 
     async def _process_queue(self) -> None:
         """Process queued requests"""
-        while True:
+        while not self._is_shutting_down:
             try:
                 queued_request = await self._queue.get()
                 try:
@@ -86,8 +92,14 @@ class APIQueueManager:
                 finally:
                     queued_request.executor.cleanup()
                     self._queue.task_done()
+            except CancelledError:
+                if not self._is_shutting_down:
+                    logger.warning("Queue processing was cancelled unexpectedly")
+                break
             except Exception as e:
                 logger.error(f"❌ Error in queue processing: {e}")
+                if not self._is_shutting_down:
+                    await sleep(1)  # Prevent tight loop on errors
 
     async def enqueue(
         self,
@@ -132,15 +144,28 @@ class APIQueueManager:
             )
 
     async def shutdown(self) -> None:
-        """Shutdown the queue manager"""
+        """Shutdown the queue manager gracefully"""
+        if not self._started:
+            return
+
+        logger.info("🛑 Shutting down API queue manager...")
+        self._is_shutting_down = True
+
+        # Wait for queue to be empty
+        if not self._queue.empty():
+            logger.info("⏳ Waiting for queued tasks to complete...")
+            await self._queue.join()
+
+        # Cancel the processing task
         if self._processing_task:
             self._processing_task.cancel()
             try:
                 await self._processing_task
-            except Exception:
+            except CancelledError:
                 pass
-            logger.info("🛑 Shut down API queue manager")
+
         self._started = False
+        logger.info("✅ API queue manager shutdown complete")
 
 
 # Singleton instance

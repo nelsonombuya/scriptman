@@ -1,14 +1,17 @@
 from asyncio import get_event_loop
 from concurrent.futures import (
+    Future,
     ProcessPoolExecutor,
     ThreadPoolExecutor,
     TimeoutError,
     wait,
 )
 from inspect import iscoroutinefunction, signature
-from time import perf_counter
+from threading import Event
+from time import perf_counter, sleep, time
 from typing import Any, Awaitable, Callable, Literal, Optional
 
+from loguru import logger
 from tqdm import tqdm
 
 from scriptman.powers.concurrency._models import Task, Tasks
@@ -79,6 +82,10 @@ class TaskExecutor:
         print(f"Completed: {batch.completed_count}/{batch.total_count}")
     """
 
+    # Class-level shutdown event shared across all instances
+    _shutdown_event: Event = Event()
+    _active_tasks: set[Task[Any]] = set()
+
     def __init__(
         self,
         thread_pool_size: Optional[int] = None,
@@ -91,13 +98,32 @@ class TaskExecutor:
             thread_pool_size: Maximum number of threads for I/O-bound tasks
             process_pool_size: Maximum number of processes for CPU-bound tasks
         """
-        self._thread_pool = ThreadPoolExecutor(
-            max_workers=thread_pool_size,
-            thread_name_prefix="scriptman-task",
-        )
-        self._process_pool = ProcessPoolExecutor(
-            max_workers=process_pool_size,
-        )
+        self._thread_pool = ThreadPoolExecutor(thread_pool_size, "task_executor")
+        self._process_pool = ProcessPoolExecutor(process_pool_size)
+
+    def _create_task(
+        self,
+        future: Future[R],
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        start_time: float,
+    ) -> Task[R]:
+        """
+        💪🏾 Helper method to create and track a task.
+
+        Args:
+            future: The future object for the task
+            args: Positional arguments for the task
+            kwargs: Keyword arguments for the task
+            start_time: When the task was started
+
+        Returns:
+            Task: The created task
+        """
+        task = Task(future, args, kwargs, start_time)
+        self._active_tasks.add(task)
+        future.add_done_callback(lambda _: self._active_tasks.discard(task))
+        return task
 
     def background(self, func: Callable[P, R], *args: Any, **kwargs: Any) -> Task[R]:
         """
@@ -109,7 +135,8 @@ class TaskExecutor:
             **kwargs: Keyword arguments for the function
 
         Returns:
-            Task: Container that can be awaited to get the result
+            Task: Container that can be awaited to get the result, or an empty task if
+                shutting down.
 
         Examples:
             # Start a task in the background
@@ -122,12 +149,17 @@ class TaskExecutor:
             # Get the result when needed
             result = task.await_result()
         """
+        if self._shutdown_event.is_set():
+            logger.warning("TaskExecutor is shutting down, returning empty Task.")
+            return Task(Future())
+
         start_time = perf_counter()
         if iscoroutinefunction(func):
             future = self._thread_pool.submit(self.await_async, func(*args, **kwargs))
         else:
             future = self._thread_pool.submit(func, *args, **kwargs)
-        return Task[R](future, args, kwargs, start_time)
+
+        return self._create_task(future, args, kwargs, start_time)
 
     def parallel(
         self,
@@ -162,6 +194,10 @@ class TaskExecutor:
             except TimeoutError:
                 print("Some tasks didn't complete in time")
         """
+        if self._shutdown_event.is_set():
+            logger.warning("TaskExecutor is shutting down, returning empty Tasks")
+            return Tasks()
+
         if scope == "multiprocessing":
             return self.multiprocess(tasks, show_progress)
         return self.multithread(tasks, show_progress)
@@ -196,13 +232,18 @@ class TaskExecutor:
             # Or ignore errors and get partial results
             results = batch.await_result(raise_exceptions=False)
         """
+        if self._shutdown_event.is_set():
+            logger.warning("TaskExecutor is shutting down, returning empty Tasks")
+            return Tasks()
+
         batch = Tasks[R]()
         iterator = tqdm(tasks, desc="Threading") if show_progress else tasks
 
         for func, args, kwargs in iterator:
             start_time = perf_counter()
             future = self._thread_pool.submit(func, *args, **kwargs)
-            batch._tasks.append(Task(future, args, kwargs, start_time))
+            task = self._create_task(future, args, kwargs, start_time)
+            batch._tasks.append(task)
 
         return batch
 
@@ -239,6 +280,10 @@ class TaskExecutor:
             except TimeoutError:
                 print("Some tasks didn't complete in time")
         """
+        if self._shutdown_event.is_set():
+            logger.warning("TaskExecutor is shutting down, returning empty Tasks")
+            return Tasks()
+
         # Check if any function is a method (which can't be pickled)
         for func, _, _ in tasks:
             param_names = list(signature(func).parameters.keys())
@@ -261,7 +306,8 @@ class TaskExecutor:
         for func, args, kwargs in iterator:
             start_time = perf_counter()
             future = self._process_pool.submit(func, *args, **kwargs)
-            batch._tasks.append(Task(future, args, kwargs, start_time))
+            task = self._create_task(future, args, kwargs, start_time)
+            batch._tasks.append(task)
 
         return batch
 
@@ -282,20 +328,12 @@ class TaskExecutor:
             timeout: Maximum time to wait for a result
 
         Returns:
-            Task: The winning task's result
-
-        Raises:
-            TimeoutError: If no task completes within the specified timeout
-            IndexError: If preferred_task_idx is out of range
-            ValueError: If tasks list is empty
-
-        Example:
-            # Race two tasks and get first successful result
-            result = executor.race([
-                (check_signatures, (invoice_no,), {}),
-                (process_invoice, (invoice_no,), {})
-            ], timeout=5.0).await_result()  # Wait up to 5 seconds
+            Task: The winning task's result, or an empty task if shutting down.
         """
+        if self._shutdown_event.is_set():
+            logger.warning("TaskExecutor is shutting down, returning None")
+            return Task(Future())
+
         from concurrent.futures import FIRST_COMPLETED, TimeoutError, wait
 
         assert tasks, "Tasks list cannot be empty"
@@ -311,10 +349,12 @@ class TaskExecutor:
         for idx, (func, args, kwargs) in enumerate(tasks):
             task_start = perf_counter()
             future = self._thread_pool.submit(func, *args, **kwargs)
-            batch._tasks.append(Task(future, args, kwargs, task_start))
+            task = self._create_task(future, args, kwargs, task_start)
+            batch._tasks.append(task)
 
             if preferred_task_idx == idx:
                 preferred_task = batch._tasks[idx]
+
         try:
             while batch._tasks:
                 # Calculate remaining timeout
@@ -368,15 +408,42 @@ class TaskExecutor:
             for task in batch._tasks:
                 if not task._future.done():
                     task._future.cancel()
+                    self._active_tasks.discard(task)
 
-    def cleanup(self, wait: bool = True) -> None:
-        """🧹 Clean up executor resources and shutdown thread/process pools.
+    def cleanup(self, wait: bool = True, timeout: Optional[float] = None) -> None:
+        """
+        🧹 Clean up executor resources and shutdown thread/process pools.
 
         Args:
             wait: Whether to wait for running tasks to complete
+            timeout: Maximum time to wait for tasks to complete (in seconds)
         """
-        self._thread_pool.shutdown(wait=wait)
-        self._process_pool.shutdown(wait=wait)
+        logger.info("🧹 Cleaning up TaskExecutor resources...")
+        self._shutdown_event.set()
+
+        # Wait for active tasks to complete if requested
+        if wait and self._active_tasks:
+            logger.info(f"⏳ Waiting for {len(self._active_tasks)} tasks to complete...")
+            start_time = time()
+            while self._active_tasks and (
+                timeout is None or (time() - start_time) < timeout
+            ):
+                # Remove completed tasks
+                self._active_tasks = {
+                    task for task in self._active_tasks if not task._future.done()
+                }
+                if self._active_tasks:
+                    sleep(0.1)  # Small delay to prevent CPU spinning
+
+            if self._active_tasks:
+                logger.warning(
+                    f"⚠️ {len(self._active_tasks)} tasks did not complete in time"
+                )
+
+        # Shutdown the pools
+        self._thread_pool.shutdown(wait=False)
+        self._process_pool.shutdown(wait=False)
+        logger.info("✅ TaskExecutor cleanup complete")
 
     @staticmethod
     def await_async[R](awaitable: Awaitable[R]) -> R:
@@ -426,7 +493,7 @@ class TaskExecutor:
 
     def __del__(self) -> None:
         """🧹 Clean up executor resources and shutdown thread/process pools."""
-        self.cleanup()
+        self.cleanup(wait=False)
 
 
 __all__: list[str] = ["TaskExecutor", "Task", "Tasks"]

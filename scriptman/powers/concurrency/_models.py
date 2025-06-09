@@ -32,7 +32,7 @@ class TaskException(Exception):
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class Task(Generic[T]):
     """📦 Container for a background task that can be awaited later"""
 
@@ -40,6 +40,16 @@ class Task(Generic[T]):
     _args: tuple[Any, ...] = field(default_factory=tuple)
     _kwargs: dict[str, Any] = field(default_factory=dict)
     _start_time: float = field(default_factory=perf_counter)
+
+    def __hash__(self) -> int:
+        """Make Task hashable based on the future object"""
+        return hash(self._future)
+
+    def __eq__(self, other: object) -> bool:
+        """Compare tasks based on their future objects"""
+        if not isinstance(other, Task):
+            return NotImplemented
+        return self._future is other._future
 
     @property
     def result(self) -> T:

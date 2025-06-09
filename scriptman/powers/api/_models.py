@@ -375,8 +375,8 @@ class BaseEntityModel(BaseModel):
         return value.strftime(format) if value is not None else None
 
     @staticmethod
-    def round_to_dp(value: Optional[Decimal], dp: int = 2) -> Optional[Decimal]:
-        return round(value, dp) if value is not None else None
+    def round_to_dp(value: Optional[Decimal], dp: int) -> Optional[Decimal]:
+        return value.quantize(Decimal("0." + "0" * dp)) if value is not None else None
 
     def model_serialize(
         self,

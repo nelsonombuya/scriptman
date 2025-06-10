@@ -82,6 +82,10 @@ class ConfigModel(BaseModel):
         default=30,
         description="Default timeout in seconds for task execution",
     )
+    max_concurrent_requests: int = Field(
+        default=25,
+        description="Maximum number of concurrent requests",
+    )
 
     @field_validator("logs_dir", "downloads_dir", mode="before")
     @classmethod

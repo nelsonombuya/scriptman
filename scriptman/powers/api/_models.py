@@ -1,6 +1,6 @@
 try:
     from datetime import datetime
-    from decimal import Decimal
+    from decimal import ROUND_HALF_EVEN, Decimal
     from typing import Any, Callable, ClassVar, Literal, Optional, TypeVar
     from uuid import uuid4
 
@@ -375,8 +375,34 @@ class BaseEntityModel(BaseModel):
         return value.strftime(format) if value is not None else None
 
     @staticmethod
-    def round_to_dp(value: Optional[Decimal], dp: int) -> Optional[Decimal]:
-        return value.quantize(Decimal("0." + "0" * dp)) if value is not None else None
+    def round_to_dp(
+        value: Optional[Decimal], dp: int, rounding: str = ROUND_HALF_EVEN
+    ) -> Optional[Decimal]:
+        """
+        🎯 Round a Decimal value to the specified number of decimal places using Banker's
+        rounding.
+
+        Args:
+            value: The Decimal value to round (can be None)
+            dp: Number of decimal places to round to (must be >= 0)
+            rounding: The rounding method to use (default is Banker's rounding)
+
+        Returns:
+            The rounded Decimal value or None if input was None
+
+        Raises:
+            ValueError: If dp is negative or value cannot be converted to Decimal
+
+        Note:
+            Uses ROUND_HALF_EVEN (Banker's rounding) for consistent financial calculations
+        """
+        if value is None:
+            return None
+
+        if dp < 0:
+            raise ValueError(f"Decimal places must be >= 0, got {dp}")
+
+        return value.quantize(Decimal(10) ** -dp, rounding=rounding)
 
     def model_serialize(
         self,

@@ -402,7 +402,7 @@ class BaseEntityModel(BaseModel):
         if dp < 0:
             raise ValueError(f"Decimal places must be >= 0, got {dp}")
 
-        return value.quantize(Decimal(10) ** -dp, rounding=rounding)
+        return Decimal(value).quantize(Decimal(10) ** -dp, rounding=rounding)
 
     def model_serialize(
         self,

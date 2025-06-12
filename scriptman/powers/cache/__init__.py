@@ -11,7 +11,6 @@ try:
     from scriptman.core.config import config
     from scriptman.powers.cache._backend import CacheBackend
     from scriptman.powers.cache._diskcache import DiskCacheBackend, FanoutCacheBackend
-    from scriptman.powers.concurrency import TaskExecutor
     from scriptman.powers.generics import P, R
     from scriptman.powers.serializer import SERIALIZE_FOR_CACHE, serialize
     from scriptman.powers.time_calculator import TimeCalculator
@@ -102,7 +101,11 @@ class CacheManager:
     @classmethod
     def get_instance(cls, *args: Any, **kwargs: Any) -> "CacheManager":
         """🚀 Get the singleton instance of CacheManager"""
-        return cls(*args, **kwargs)
+        if cls.__instance is None:
+            with cls.__lock:
+                if cls.__instance is None:
+                    cls.__instance = CacheManager(*args, **kwargs)
+        return cls.__instance
 
     def _track_operation(self) -> "OperationTracker":
         """🔎 Context manager to track active cache operations"""
@@ -121,6 +124,12 @@ class CacheManager:
         if "ttl" in backend_kwargs:
             backend_kwargs.pop("ttl")  # Remove the ttl from the backend kwargs
         return self.backend.set(key, value, ttl, **backend_kwargs)
+
+    def delete(self, key: str, **backend_kwargs: Any) -> bool:
+        """🔍 Delete a value from the cache."""
+        if key in backend_kwargs:
+            backend_kwargs.pop(key)  # Remove the key from the backend kwargs
+        return self.backend.delete(key, **backend_kwargs)
 
     @staticmethod
     def cache_result(
@@ -157,6 +166,8 @@ class CacheManager:
                     logger.info(f"❔ Cache miss for key: {key}")
                     if iscoroutinefunction(func):
                         logger.debug("🔄 Executing async cached function")
+                        from scriptman.powers.concurrency import TaskExecutor
+
                         result = TaskExecutor.await_async(func(*args, **kwargs))
                     else:
                         logger.debug("🔄 Executing sync cached function")

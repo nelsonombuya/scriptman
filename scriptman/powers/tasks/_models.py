@@ -87,6 +87,10 @@ class Task(Generic[T]):
             return NotImplemented
         return self._future is other._future
 
+    def __repr__(self) -> str:
+        """🔍 Get a string representation of the task"""
+        return f"Task(task_id={self._task_id}, args={self._args}, kwargs={self._kwargs})"
+
     @property
     def task_master(self) -> Optional["TaskMaster"]:
         """🎯 Get TaskMaster singleton instance if available"""

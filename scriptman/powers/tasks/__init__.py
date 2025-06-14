@@ -454,13 +454,13 @@ class TaskExecutor:
                     if task._future in done and task.is_successful
                 ]
                 if successful_tasks:
-                    logger.debug(f"🏆 Race won by task: {successful_tasks[0].task_id}")
+                    logger.debug(f"🏆 Race won by task: {successful_tasks[0]}")
                     return successful_tasks[0]
 
                 # If no successful tasks, check if we have a preferred task
                 if preferred_task is not None:
                     if preferred_task._future in done:
-                        logger.debug(f"🎯 Using preferred task: {preferred_task.task_id}")
+                        logger.debug(f"🎯 Using preferred task: {preferred_task}")
                         return preferred_task
 
                     # Remove all completed tasks except preferred task

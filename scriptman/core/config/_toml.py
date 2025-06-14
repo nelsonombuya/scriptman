@@ -25,9 +25,13 @@ class TomlHandler(FileHandler):
             Returns an empty dictionary if the file does not exist.
         """
         if not file_path.exists():
-            logger.warning(f"File {file_path} does not exist")
+            logger.warning(f"File {file_path} does not exist, returning empty config")
             return {}
-        return parse(file_path.read_text())
+        try:
+            return parse(file_path.read_text())
+        except Exception as e:
+            logger.error(f"Failed to parse TOML file {file_path}: {e}")
+            return {}
 
     def write(self, file_path: Path, data: dict[str, Any]) -> None:
         """
@@ -37,11 +41,14 @@ class TomlHandler(FileHandler):
             file_path (Path): The path to the TOML file to be written.
             data (dict[str, Any]): The data to be written to the TOML file.
         """
-        if not file_path.exists():
-            logger.warning(f"File {file_path} does not exist")
-            file_path.touch()
-        with file_path.open("w", encoding="utf-8") as f:
-            f.write(sub(r"\n{3,}", "\n\n", dumps(data)))
+        try:
+            if not file_path.exists():
+                logger.debug(f"Creating new TOML file at {file_path}")
+                file_path.touch()
+            with file_path.open("w", encoding="utf-8") as f:
+                f.write(sub(r"\n{3,}", "\n\n", dumps(data)))
+        except Exception as e:
+            logger.error(f"Failed to write TOML file {file_path}: {e}")
 
 
 class TOMLConfigManager(ConfigManager[dict[str, Any]]):

@@ -8,7 +8,7 @@ try:
     from requests import RequestException, Response
     from requests import request as raw_request
 
-    from scriptman.powers.api import exceptions
+    from scriptman.powers.api import _exceptions as api_exceptions
     from scriptman.powers.api._handlers import (
         DefaultRequestHandler,
         HTTPMethod,
@@ -228,7 +228,7 @@ class BaseAPIClient(ABC):
             response_data = e.response.json() if e.response else None
             self.log.debug(f"📤 Response Details: {dumps(response_data, indent=4)}")
 
-            raise exceptions.APIException(
+            raise api_exceptions.APIException(
                 exception=e,
                 message=f"Request to {url} failed with error: {e}",
                 response=e.response.json() if e.response else None,
@@ -237,7 +237,7 @@ class BaseAPIClient(ABC):
 
         except Exception as e:
             self.log.error(f"🔥 Request to {url} failed with error: {e}")
-            raise exceptions.APIException(
+            raise api_exceptions.APIException(
                 exception=e,
                 status_code=500,
                 message=f"Request to {url} failed with error: {e}",
@@ -264,7 +264,7 @@ class BaseAPIClient(ABC):
             return response_model.model_validate(response.json())
         except ValidationError as e:
             self.log.error(f"❌ Response validation failed: {e}")
-            raise exceptions.ValidationError(
+            raise api_exceptions.ValidationError(
                 f"❌ Response validation failed: {e}",
                 exception=e,
                 errors={
@@ -278,10 +278,10 @@ __all__: list[str] = [
     "api",
     "api_route",
     "HTTPMethod",
-    "exceptions",
     "EntityModelT",
     "BaseAPIClient",
     "ResponseModelT",
+    "api_exceptions",
     "RequestHandler",
     "BaseEntityModel",
     "EntityIdentifier",

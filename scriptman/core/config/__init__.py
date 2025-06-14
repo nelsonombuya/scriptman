@@ -30,14 +30,11 @@ class Config:
             cls.__instance.__initialized = False
         return cls.__instance
 
-    def __init__(
-        self, config: ConfigModel = ConfigModel(), version: Version = Version()
-    ) -> None:
+    def __init__(self, version: Version = Version()) -> None:
         """
         📝 Initialize configurations and create necessary directories.
 
         Args:
-            config (ConfigModel): Configuration settings.
             version (Version): Version information.
         """
         if self.__initialized:
@@ -51,8 +48,14 @@ class Config:
         config_file = self._get_config_file_path()
         secrets_file = self._get_secrets_file_path()
 
+        # Initialize settings
         section = "scriptman" if "pyproject" in config_file.name else None
         self.__settings = TOMLConfigManager(config_file, section)
+
+        # Initialize secrets
+        if not secrets_file.exists():
+            logger.debug(f"Secrets file not found at {secrets_file}, using empty config")
+            secrets_file.touch()
         self.__secrets = TOMLConfigManager(secrets_file)
 
         self._initialize_settings()

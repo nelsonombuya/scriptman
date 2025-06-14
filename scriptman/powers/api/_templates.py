@@ -10,9 +10,9 @@ try:
     from pydantic import BaseModel
 
     from scriptman.core.config import config
+    from scriptman.powers.api._exceptions import APIException
     from scriptman.powers.api._models import APIRequest, APIResponse
     from scriptman.powers.api._queue import queue_manager
-    from scriptman.powers.api.exceptions import APIException
     from scriptman.powers.concurrency import TaskExecutor
     from scriptman.powers.generics import Func, P
     from scriptman.powers.serializer import SERIALIZE_FOR_JSON, serialize

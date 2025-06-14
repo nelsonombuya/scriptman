@@ -33,6 +33,7 @@ from scriptman.powers.time_calculator import TimeCalculator
 API powers
 """
 try:
+    from scriptman.powers.api import _exceptions as api_exceptions
     from scriptman.powers.api import (
         BaseAPIClient,
         BaseEntityModel,
@@ -46,7 +47,6 @@ try:
         ResponseModelT,
         api,
     )
-    from scriptman.powers.api import exceptions as api_exceptions
 except ImportError:
     logger.debug("API Powers Not Available. Install with `pip install scriptman[api]`")
 

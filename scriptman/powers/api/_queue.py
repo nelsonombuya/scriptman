@@ -17,8 +17,8 @@ try:
     from loguru import logger
 
     from scriptman.core.config import config
+    from scriptman.powers.api._exceptions import APIException
     from scriptman.powers.api._models import APIRequest
-    from scriptman.powers.api.exceptions import APIException
     from scriptman.powers.generics import Func, P, R
 except ImportError as e:
     raise ImportError(

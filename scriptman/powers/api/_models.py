@@ -9,7 +9,7 @@ try:
     from pydantic.main import IncEx
     from typing_extensions import Annotated
 
-    from scriptman.powers.api.exceptions import APIException
+    from scriptman.powers.api._exceptions import APIException
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"

@@ -1,11 +1,24 @@
 from concurrent.futures import ALL_COMPLETED, FIRST_EXCEPTION, Future, wait
 from dataclasses import dataclass, field
-from time import perf_counter
-from typing import Any, Generic, Iterator, Literal, overload
+from time import perf_counter, time
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Iterator,
+    Literal,
+    Optional,
+    cast,
+    overload,
+)
 
 from loguru import logger
 
-from scriptman.powers.generics import T
+if TYPE_CHECKING:  # pragma: no cover # NOTE: Avoids circular imports
+    from scriptman.powers.cache import CacheManager
+    from scriptman.powers.tasks._task_master import TaskMaster
+
+from scriptman.powers.generics import Func, T
 
 
 class TaskException(Exception):
@@ -32,11 +45,34 @@ class TaskException(Exception):
         )
 
 
+@dataclass
+class TaskSubmission:
+    """📋 Internal representation of a submitted task"""
+
+    task_id: str
+    func: Func[..., Any]
+    args: tuple[Any, ...]
+    kwargs: dict[str, Any]
+    task_type: Literal["cpu", "io", "mixed"] = "mixed"
+    priority: int = 0
+    submit_time: float = field(default_factory=time)
+    promoted: bool = False
+
+    def __lt__(self, other: "TaskSubmission") -> bool:
+        """Priority comparison for queue ordering"""
+        if self.promoted != other.promoted:
+            return self.promoted > other.promoted  # Promoted tasks have higher priority
+        if self.priority != other.priority:
+            return self.priority > other.priority  # Higher priority values come first
+        return self.submit_time < other.submit_time  # FIFO for same priority
+
+
 @dataclass(frozen=True)
 class Task(Generic[T]):
-    """📦 Container for a background task that can be awaited later"""
+    """📦 Enhanced task container with automatic caching and promotion capabilities"""
 
     _future: Future[T]
+    _task_id: Optional[str] = None  # Task ID for caching and promotion
     _args: tuple[Any, ...] = field(default_factory=tuple)
     _kwargs: dict[str, Any] = field(default_factory=dict)
     _start_time: float = field(default_factory=perf_counter)
@@ -52,6 +88,32 @@ class Task(Generic[T]):
         return self._future is other._future
 
     @property
+    def task_master(self) -> Optional["TaskMaster"]:
+        """🎯 Get TaskMaster singleton instance if available"""
+        try:
+            # Import here to avoid circular imports
+            from scriptman.powers.tasks._task_master import TaskMaster
+
+            return TaskMaster.get_instance()
+        except (ImportError, AttributeError):
+            return None
+
+    @property
+    def cache_manager(self) -> Optional["CacheManager"]:
+        """💾 Get CacheManager instance if available"""
+        try:
+            from scriptman.powers.cache import CacheManager
+
+            return CacheManager.get_instance()
+        except ImportError:
+            return None
+
+    @property
+    def task_id(self) -> Optional[str]:
+        """🔍 Get the task ID"""
+        return self._task_id
+
+    @property
     def result(self) -> T:
         """🔍 Get the task result"""
         return self.await_result()
@@ -63,21 +125,28 @@ class Task(Generic[T]):
         return result.exception if isinstance(result, TaskException) else None
 
     @overload
-    def await_result(self, *, raise_exceptions: Literal[True] = True) -> T:
+    def await_result(
+        self, *, raise_exceptions: Literal[True] = True, timeout: Optional[float] = None
+    ) -> T:
         """⏱ Await and return the task result, raising an exception if it fails"""
         ...
 
     @overload
-    def await_result(self, *, raise_exceptions: Literal[False]) -> T | TaskException:
+    def await_result(
+        self, *, raise_exceptions: Literal[False], timeout: Optional[float] = None
+    ) -> T | TaskException:
         """⏱ Await and return the task result, returning the exception if it fails"""
         ...
 
-    def await_result(self, *, raise_exceptions: bool = True) -> T | TaskException:
+    def await_result(
+        self, *, raise_exceptions: bool = True, timeout: Optional[float] = None
+    ) -> T | TaskException:
         """
-        ⌚ Await and return the task result
+        ⌚ Enhanced await_result with automatic caching and task promotion
 
         Args:
             raise_exceptions: Whether to raise exceptions that occurred during execution
+            timeout: Maximum time to wait for the result
 
         Returns:
             The task result if successful, or the exception if failed
@@ -85,28 +154,118 @@ class Task(Generic[T]):
         Raises:
             Exception: If the task failed and raise_exceptions is True
         """
+        # Check cache first if we have a task_id
+        if self._task_id:
+            cached_result = self._get_cached_result()
+            if cached_result is not None:
+                # Clean up cache after retrieval
+                self._cleanup_cache()
+
+                if isinstance(cached_result, TaskException) and raise_exceptions:
+                    raise cached_result.exception
+                return cached_result
+
+            # Promote task to foreground for priority processing
+            self._promote_task()
+
         try:
-            return self._future.result()
+            return self._future.result(timeout=timeout)
         except Exception as e:
             logger.error(
-                f"Task failed with exception: {e}"
+                f"Task {self._task_id or 'unknown'} failed with exception: {e}"
                 f"\nArgs: {self._args}"
                 f"\nKwargs: {self._kwargs}"
             )
             if raise_exceptions:
-                raise e
+                raise TaskException(e)
             return TaskException(e)
+
+    def _get_cached_result(self) -> Optional[T | TaskException]:
+        """💾 Get result from cache (memory or disk)"""
+        if not self._task_id:
+            return None
+
+        # First try memory cache (faster, for non-picklable objects)
+        task_master = self.task_master
+        if (
+            task_master
+            and hasattr(task_master, "_memory_cache")
+            and self._task_id in task_master._memory_cache
+        ):
+            logger.debug(f"📦 Memory cache hit for task {self._task_id[:8]}")
+            return cast(T | TaskException, task_master._memory_cache[self._task_id])
+
+        # Then try disk cache (for picklable objects)
+        if cache_manager := self.cache_manager:
+            cached = cache_manager.get(self._task_id)
+            if cached is not None:
+                logger.debug(f"💾 Disk cache hit for task {self._task_id[:8]}")
+                return cast(T | TaskException, cached)
+
+        return None
+
+    def _cache_result(self, result: T | TaskException) -> None:
+        """💾 Cache result in appropriate storage"""
+        if not self._task_id:
+            return
+
+        # Try disk cache first (preferred for persistence)
+        if cache_manager := self.cache_manager:
+            try:
+                if cache_manager.set(self._task_id, result):
+                    logger.debug(f"💾 Cached task {self._task_id[:8]} result to disk")
+                    return
+            except Exception as e:
+                logger.debug(f"💾 Failed to cache to disk: {e}, falling back to memory")
+
+        # Fallback to memory cache for non-picklable objects
+        if task_master := self.task_master:
+            task_master._memory_cache[self._task_id] = result
+            logger.debug(f"📦 Cached task {self._task_id} result to memory")
+
+    def _cleanup_cache(self) -> None:
+        """🧹 Clean up cache after result retrieval"""
+        if not self._task_id:
+            return
+
+        # Clean memory cache
+        if task_master := self.task_master:
+            if self._task_id in task_master._memory_cache:
+                del task_master._memory_cache[self._task_id]
+                logger.debug(f"🧹 Cleaned memory cache for task {self._task_id}")
+
+        # Clean disk cache
+        if cache_manager := self.cache_manager:
+            try:
+                cache_manager.delete(self._task_id)
+                logger.debug(f"💾 Cleaned disk cache for task {self._task_id}")
+            except Exception as e:
+                logger.debug(f"Failed to clean disk cache: {e}")
+
+    def _promote_task(self) -> None:
+        """⚡ Promote task to foreground for priority processing"""
+        if not self._task_id:
+            return
+
+        if task_master := self.task_master:
+            task_master.promote_task(self._task_id)
 
     @property
     def is_done(self) -> bool:
         """✅ Whether the task has completed (successfully or with error)"""
+        # Check cache first
+        if self._task_id and self._get_cached_result() is not None:
+            return True
         return self._future.done()
 
     @property
     def is_successful(self) -> bool:
         """✅ Whether the task completed successfully"""
+        if not self.is_done:
+            return False
+
         result = self.await_result(raise_exceptions=False)
-        return self.is_done and not isinstance(result, TaskException)
+        return not isinstance(result, TaskException)
 
     @property
     def duration(self) -> float:

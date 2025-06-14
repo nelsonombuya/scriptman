@@ -6,8 +6,8 @@ from typing import Callable, Optional, Type, Union, cast
 from loguru import logger
 
 from scriptman.core.config import config
-from scriptman.powers.concurrency import TaskExecutor
 from scriptman.powers.generics import P, R
+from scriptman.powers.tasks import TaskExecutor
 
 
 def retry(

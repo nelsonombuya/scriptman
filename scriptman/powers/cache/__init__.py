@@ -115,6 +115,7 @@ class CacheManager:
         """🔍 Get a value from the cache."""
         if key in backend_kwargs:
             backend_kwargs.pop(key)  # Remove the key from the backend kwargs
+        logger.debug(f"🔍 Getting {key} from cache")
         return self.backend.get(key, **backend_kwargs)
 
     def set(
@@ -123,12 +124,14 @@ class CacheManager:
         """🔍 Set a value in the cache."""
         if "ttl" in backend_kwargs:
             backend_kwargs.pop("ttl")  # Remove the ttl from the backend kwargs
+        logger.debug(f"🔍 Setting {key} in cache with ttl {ttl}")
         return self.backend.set(key, value, ttl, **backend_kwargs)
 
     def delete(self, key: str, **backend_kwargs: Any) -> bool:
         """🔍 Delete a value from the cache."""
         if key in backend_kwargs:
             backend_kwargs.pop(key)  # Remove the key from the backend kwargs
+        logger.debug(f"🔍 Deleting {key} from cache")
         return self.backend.delete(key, **backend_kwargs)
 
     @staticmethod
@@ -167,7 +170,7 @@ class CacheManager:
                     logger.info(f"❔ Cache miss for key: {key}")
                     if iscoroutinefunction(func):
                         logger.debug("🔄 Executing async cached function")
-                        from scriptman.powers.concurrency import TaskExecutor
+                        from scriptman.powers.tasks import TaskExecutor
 
                         result = TaskExecutor.await_async(func(*args, **kwargs))
                     else:

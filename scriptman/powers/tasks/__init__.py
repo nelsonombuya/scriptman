@@ -14,8 +14,9 @@ from typing import Any, Awaitable, Callable, Literal, Optional
 from loguru import logger
 from tqdm import tqdm
 
-from scriptman.powers.concurrency._models import Task, Tasks
 from scriptman.powers.generics import P, R
+from scriptman.powers.tasks._models import Task, Tasks
+from scriptman.powers.tasks._task_master import TaskMaster
 
 
 class TaskExecutor:
@@ -47,18 +48,12 @@ class TaskExecutor:
     - Named threads for better debugging and monitoring 🔍
 
     TODO: Future Improvements
-    TODO: Task Prioritization: Add support for priority levels to process critical tasks
-        first
     TODO: Task Dependencies: Implement DAG-based task dependency management
     TODO: Task Retry Mechanism: Add automatic retry logic with configurable attempts and
         backoff
-    TODO: Task Timeout Control: Add per-task timeout settings
     TODO: Task Progress Callbacks: Support custom progress callbacks for flexible
         monitoring
-    TODO: Resource Usage Monitoring: Add CPU/memory usage tracking for tasks
     TODO: Task Cancellation: Implement ability to cancel specific running tasks
-    TODO: Task Result Caching: Add result caching for expensive operations
-    TODO: Task Scheduling: Add support for scheduling tasks for future execution
     TODO: Task Grouping: Implement ability to group related tasks together
 
     Examples:
@@ -120,7 +115,7 @@ class TaskExecutor:
         Returns:
             Task: The created task
         """
-        task = Task(future, args, kwargs, start_time)
+        task = Task(future, None, args, kwargs, start_time)
         self._active_tasks.add(task)
         future.add_done_callback(lambda _: self._active_tasks.discard(task))
         return task
@@ -496,4 +491,4 @@ class TaskExecutor:
         self.cleanup(wait=False)
 
 
-__all__: list[str] = ["TaskExecutor", "Task", "Tasks"]
+__all__: list[str] = ["TaskExecutor", "Task", "Tasks", "TaskMaster"]

@@ -12,7 +12,7 @@ dependencies = [
     "loguru>=0.7.3",
     "tomlkit>=0.13.2",
     "filelock>=3.16.1",
-    "pydantic[email]>=2.10.6",
+    "psutil (>=7.0.0,<8.0.0)",
     "types-tqdm>=4.67.0.20241221",
 ]
 

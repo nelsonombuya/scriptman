@@ -1,0 +1,24 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug File",
+      "type": "debugpy",
+      "request": "launch",
+      "justMyCode": false,
+      "program": "${workspaceFolder}/scriptman/__debug__.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Library __init__ File",
+      "type": "debugpy",
+      "request": "launch",
+      "justMyCode": false,
+      "program": "${workspaceFolder}/scriptman/__init__.py",
+      "console": "integratedTerminal"
+    }
+  ]
+}

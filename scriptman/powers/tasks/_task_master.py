@@ -203,21 +203,40 @@ class TaskMaster:
 
         def bridge_result(src_future: Future[R]) -> None:
             try:
+                # Check if target is already cancelled before doing anything
+                if target.cancelled():
+                    logger.debug(f"🚫 Target future already cancelled for task {task_id}")
+                    return
+
                 if src_future.cancelled():
-                    target.cancel()
+                    if not target.cancelled():
+                        target.cancel()
                 elif src_future.exception():
                     if isinstance(exception := src_future.exception(), Exception) and (
                         task := self.active_tasks.get(task_id)
                     ):
                         task._cache_result(TaskException(exception))
-                    target.set_exception(exception)
+
+                    # Check again before setting exception (race condition protection)
+                    if not target.cancelled() and not target.done():
+                        target.set_exception(exception)
                 else:
                     result = src_future.result()
                     if task := self.active_tasks.get(task_id):
                         task._cache_result(result)
-                    target.set_result(result)
+
+                    # Check again before setting result (race condition protection)
+                    if not target.cancelled() and not target.done():
+                        target.set_result(result)
+
             except Exception as e:
-                target.set_exception(e)
+                # Only try to set exception if target is still active
+                if not target.cancelled() and not target.done():
+                    try:
+                        target.set_exception(e)
+                    except Exception:
+                        # Target may have been cancelled between checks (ignore silently)
+                        logger.debug(f"🚫 Exception not set on completed task {task_id}")
             finally:
                 # Cleanup
                 with self._task_lock:
@@ -260,10 +279,13 @@ class TaskMaster:
         # Stop accepting new tasks
         start_time: float = time()
 
+        # Default timeout of 10 seconds to prevent infinite hangs
+        shutdown_timeout = timeout if timeout is not None else 10.0
+
         # Wait for pending tasks if requested
         if wait:
             while self.pending_submissions or self.active_tasks:
-                if timeout and (time() - start_time) > timeout:
+                if (time() - start_time) > shutdown_timeout:
                     logger.warning("⚠️ Shutdown timeout reached, forcing shutdown")
                     break
                 sleep(0.1)

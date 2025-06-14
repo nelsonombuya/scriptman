@@ -382,6 +382,9 @@ class TaskExecutor:
         """
         🏃‍♂️ Race multiple tasks and return the first successful result.
 
+        Note: Race method always uses direct thread pool execution for optimal
+        performance and to avoid resource contention, regardless of executor mode.
+
         Args:
             tasks: List of (func, args, kwargs) tuples to race
             preferred_task_idx: If all tasks fail, use this task's result. If None,
@@ -408,31 +411,20 @@ class TaskExecutor:
         start_time = perf_counter()
         preferred_task: Optional[Task[R]] = None
 
-        # Submit all tasks based on execution mode
-        if self.mode == "smart" and self._task_master:
-            # Use TaskMaster for intelligent task management
-            logger.debug(f"🏃‍♂️ Racing {len(tasks)} tasks using Smart mode")
-            for idx, (func, args, kwargs) in enumerate(tasks):
-                task: Task[R] = self._task_master.submit(func, *args, **kwargs)
-                batch._tasks.append(task)
+        # Always use direct thread pool execution for race operations
+        # This avoids resource contention and provides consistent, fast execution
+        if not self._thread_pool:
+            self._thread_pool = ThreadPoolExecutor(None, "task_executor")
 
-                if preferred_task_idx == idx:
-                    preferred_task = batch._tasks[idx]
-        else:
-            # Use direct execution with thread pool
-            if not self._thread_pool:
-                raise RuntimeError("TaskExecutor not initialized for direct mode")
+        logger.debug(f"🏃‍♂️ Racing {len(tasks)} tasks using Direct mode")
+        for idx, (func, args, kwargs) in enumerate(tasks):
+            task_start = perf_counter()
+            future = self._thread_pool.submit(func, *args, **kwargs)
+            task = self._create_task(future, args, kwargs, task_start)
+            batch._tasks.append(task)
 
-            logger.debug(f"🏃‍♂️ Racing {len(tasks)} tasks using Direct mode")
-
-            for idx, (func, args, kwargs) in enumerate(tasks):
-                task_start = perf_counter()
-                future = self._thread_pool.submit(func, *args, **kwargs)
-                task = self._create_task(future, args, kwargs, task_start)
-                batch._tasks.append(task)
-
-                if preferred_task_idx == idx:
-                    preferred_task = batch._tasks[idx]
+            if preferred_task_idx == idx:
+                preferred_task = batch._tasks[idx]
 
         try:
             while batch._tasks:

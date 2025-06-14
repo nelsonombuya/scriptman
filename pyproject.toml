@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.9.488"
+version = "2.9.496"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -14,6 +14,7 @@ dependencies = [
     "filelock>=3.16.1",
     "psutil (>=7.0.0,<8.0.0)",
     "types-tqdm>=4.67.0.20241221",
+    "types-psutil (>=7.0.0.20250601,<8.0.0.0)",
 ]
 
 [project.optional-dependencies]

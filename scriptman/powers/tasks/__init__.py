@@ -46,6 +46,12 @@ class TaskExecutor:
     - Comprehensive task monitoring with duration and status tracking 📊
     - Resource cleanup and management 🧹
     - Named threads for better debugging and monitoring 🔍
+    - Flexible execution modes: Smart mode (intelligent) or Direct mode (direct) 🎯
+
+    Execution Modes:
+    - Smart mode: Uses intelligent task management with caching, resource scaling,
+        and hybrid execution (default)
+    - Direct mode: Uses direct thread/process pools for traditional execution
 
     TODO: Future Improvements
     TODO: Task Dependencies: Implement DAG-based task dependency management
@@ -57,19 +63,20 @@ class TaskExecutor:
     TODO: Task Grouping: Implement ability to group related tasks together
 
     Examples:
-        # Run a single task in background
+        # Smart mode (intelligent management)
+        executor = TaskExecutor(mode="smart")
         task = executor.background(slow_function, arg1, arg2)
-        # Do other work...
         result = task.await_result()
 
-        # Run multiple I/O-bound tasks in parallel
+        # Direct mode (traditional execution)
+        executor = TaskExecutor(mode="direct")
         batch = executor.multithread([
             (fetch_url, ("https://api1.com",), {}),
             (fetch_url, ("https://api2.com",), {"timeout": 30}),
         ])
-        results = batch.await_result()  # List of results in same order
+        results = batch.await_result()
 
-        # Run CPU-intensive tasks with progress bar
+        # CPU-intensive tasks with progress bar
         batch = executor.multiprocess([
             (process_image, (image1,), {"quality": "high"}),
             (process_image, (image2,), {"quality": "medium"}),
@@ -83,18 +90,35 @@ class TaskExecutor:
 
     def __init__(
         self,
+        mode: Literal["smart", "direct"] = "smart",
         thread_pool_size: Optional[int] = None,
         process_pool_size: Optional[int] = None,
     ):
         """
-        🚀 Initialize the TaskExecutor with configurable pool sizes.
+        🚀 Initialize the TaskExecutor with configurable execution mode and pool sizes.
 
         Args:
+            mode: Execution mode ("smart" for intelligent management,
+                "direct" for direct execution)
             thread_pool_size: Maximum number of threads for I/O-bound tasks
+                (direct mode only)
             process_pool_size: Maximum number of processes for CPU-bound tasks
+                (direct mode only)
         """
-        self._thread_pool = ThreadPoolExecutor(thread_pool_size, "task_executor")
-        self._process_pool = ProcessPoolExecutor(process_pool_size)
+        self.mode = mode
+
+        if mode == "smart":
+            # Use TaskMaster for intelligent task management
+            self._task_master: Optional[TaskMaster] = TaskMaster.get_instance()
+            self._process_pool: Optional[ProcessPoolExecutor] = None
+            self._thread_pool: Optional[ThreadPoolExecutor] = None
+            logger.info("🎯 TaskExecutor initialized in Smart mode")
+        else:
+            # Use direct thread/process pools for direct execution
+            self._task_master = None
+            self._thread_pool = ThreadPoolExecutor(thread_pool_size, "task_executor")
+            self._process_pool = ProcessPoolExecutor(process_pool_size)
+            logger.info("🔧 TaskExecutor initialized in Direct mode")
 
     def _create_task(
         self,
@@ -134,7 +158,10 @@ class TaskExecutor:
                 shutting down.
 
         Examples:
-            # Start a task in the background
+            # Smart mode - intelligent management
+            task = executor.background(slow_function, "arg1", task_type="cpu", kwarg=123)
+
+            # Direct mode - direct execution
             task = executor.background(slow_function, "arg1", kwarg=123)
 
             # Check if it's done
@@ -148,13 +175,21 @@ class TaskExecutor:
             logger.warning("TaskExecutor is shutting down, returning empty Task.")
             return Task(Future())
 
-        start_time = perf_counter()
-        if iscoroutinefunction(func):
-            future = self._thread_pool.submit(self.await_async, func(*args, **kwargs))
+        if self.mode == "smart" and self._task_master:
+            # Use TaskMaster for intelligent task management
+            return self._task_master.submit(func, *args, **kwargs)
         else:
-            future = self._thread_pool.submit(func, *args, **kwargs)
+            # Use direct execution (original behavior)
+            if not self._thread_pool:
+                raise RuntimeError("TaskExecutor not initialized for direct mode.")
 
-        return self._create_task(future, args, kwargs, start_time)
+            start_time = perf_counter()
+            if iscoroutinefunction(func):
+                future = self._thread_pool.submit(self.await_async, func(*args, **kwargs))
+            else:
+                future = self._thread_pool.submit(func, *args, **kwargs)
+
+            return self._create_task(future, args, kwargs, start_time)
 
     def parallel(
         self,
@@ -231,16 +266,31 @@ class TaskExecutor:
             logger.warning("TaskExecutor is shutting down, returning empty Tasks")
             return Tasks()
 
-        batch = Tasks[R]()
-        iterator = tqdm(tasks, desc="Threading") if show_progress else tasks
+        if self.mode == "smart" and self._task_master:
+            # Use TaskMaster for intelligent task management
+            batch = Tasks[R]()
+            iterator = tqdm(tasks, desc="Smart Threading") if show_progress else tasks
 
-        for func, args, kwargs in iterator:
-            start_time = perf_counter()
-            future = self._thread_pool.submit(func, *args, **kwargs)
-            task = self._create_task(future, args, kwargs, start_time)
-            batch._tasks.append(task)
+            for func, args, kwargs in iterator:
+                task: Task[R] = self._task_master.submit(func, *args, **kwargs)
+                batch._tasks.append(task)
 
-        return batch
+            return batch
+        else:
+            # Use direct execution (original behavior)
+            if not self._thread_pool:
+                raise RuntimeError("TaskExecutor not initialized for direct mode")
+
+            batch = Tasks[R]()
+            iterator = tqdm(tasks, desc="Direct Threading") if show_progress else tasks
+
+            for func, args, kwargs in iterator:
+                start_time = perf_counter()
+                future = self._thread_pool.submit(func, *args, **kwargs)
+                task = self._create_task(future, args, kwargs, start_time)
+                batch._tasks.append(task)
+
+            return batch
 
     def multiprocess(
         self,
@@ -279,32 +329,48 @@ class TaskExecutor:
             logger.warning("TaskExecutor is shutting down, returning empty Tasks")
             return Tasks()
 
-        # Check if any function is a method (which can't be pickled)
-        for func, _, _ in tasks:
-            param_names = list(signature(func).parameters.keys())
-            if param_names and param_names[0] in ("self", "cls"):
-                raise ValueError(
-                    f"Cannot use multiprocess with instance or class method "
-                    f"{func.__name__}. Methods with 'self' or 'cls' parameters cannot be "
-                    "pickled for multiprocessing. Consider using a standalone function "
-                    "or static method."
-                )
-            if iscoroutinefunction(func):
-                raise ValueError(
-                    f"Cannot use multiprocess with coroutine function {func.__name__}. "
-                    "Async functions are not supported with multiprocessing."
-                )
+        if self.mode == "smart" and self._task_master:
+            # Use TaskMaster for intelligent task management
+            batch = Tasks[R]()
+            iterator = tqdm(tasks, desc="Smart Processing") if show_progress else tasks
 
-        batch = Tasks[R]()
-        iterator = tqdm(tasks, desc="Processing") if show_progress else tasks
+            for func, args, kwargs in iterator:
+                task: Task[R] = self._task_master.submit(func, *args, **kwargs)
+                batch._tasks.append(task)
 
-        for func, args, kwargs in iterator:
-            start_time = perf_counter()
-            future = self._process_pool.submit(func, *args, **kwargs)
-            task = self._create_task(future, args, kwargs, start_time)
-            batch._tasks.append(task)
+            return batch
+        else:
+            # Use direct execution (original behavior)
+            if not self._process_pool:
+                raise RuntimeError("TaskExecutor not initialized for direct mode")
 
-        return batch
+            # Check if any function is a method (which can't be pickled)
+            for func, _, _ in tasks:
+                param_names = list(signature(func).parameters.keys())
+                if param_names and param_names[0] in ("self", "cls"):
+                    raise ValueError(
+                        f"Cannot use multiprocess with instance or class method "
+                        f"{func.__name__}. Methods with 'self' or 'cls' parameters "
+                        "cannot be pickled for multiprocessing. Consider using a "
+                        "standalone function or static method."
+                    )
+                if iscoroutinefunction(func):
+                    raise ValueError(
+                        f"Cannot use multiprocess with coroutine function "
+                        f"{func.__name__}. Async functions are not supported with "
+                        "multiprocessing."
+                    )
+
+            batch = Tasks[R]()
+            iterator = tqdm(tasks, desc="Direct Processing") if show_progress else tasks
+
+            for func, args, kwargs in iterator:
+                start_time = perf_counter()
+                future = self._process_pool.submit(func, *args, **kwargs)
+                task = self._create_task(future, args, kwargs, start_time)
+                batch._tasks.append(task)
+
+            return batch
 
     def race(
         self,
@@ -341,14 +407,32 @@ class TaskExecutor:
         batch = Tasks[R]()
         start_time = perf_counter()
         preferred_task: Optional[Task[R]] = None
-        for idx, (func, args, kwargs) in enumerate(tasks):
-            task_start = perf_counter()
-            future = self._thread_pool.submit(func, *args, **kwargs)
-            task = self._create_task(future, args, kwargs, task_start)
-            batch._tasks.append(task)
 
-            if preferred_task_idx == idx:
-                preferred_task = batch._tasks[idx]
+        # Submit all tasks based on execution mode
+        if self.mode == "smart" and self._task_master:
+            # Use TaskMaster for intelligent task management
+            logger.debug(f"🏃‍♂️ Racing {len(tasks)} tasks using Smart mode")
+            for idx, (func, args, kwargs) in enumerate(tasks):
+                task: Task[R] = self._task_master.submit(func, *args, **kwargs)
+                batch._tasks.append(task)
+
+                if preferred_task_idx == idx:
+                    preferred_task = batch._tasks[idx]
+        else:
+            # Use direct execution with thread pool
+            if not self._thread_pool:
+                raise RuntimeError("TaskExecutor not initialized for direct mode")
+
+            logger.debug(f"🏃‍♂️ Racing {len(tasks)} tasks using Direct mode")
+
+            for idx, (func, args, kwargs) in enumerate(tasks):
+                task_start = perf_counter()
+                future = self._thread_pool.submit(func, *args, **kwargs)
+                task = self._create_task(future, args, kwargs, task_start)
+                batch._tasks.append(task)
+
+                if preferred_task_idx == idx:
+                    preferred_task = batch._tasks[idx]
 
         try:
             while batch._tasks:
@@ -378,11 +462,13 @@ class TaskExecutor:
                     if task._future in done and task.is_successful
                 ]
                 if successful_tasks:
+                    logger.debug(f"🏆 Race won by task: {successful_tasks[0].task_id}")
                     return successful_tasks[0]
 
                 # If no successful tasks, check if we have a preferred task
                 if preferred_task is not None:
                     if preferred_task._future in done:
+                        logger.debug(f"🎯 Using preferred task: {preferred_task.task_id}")
                         return preferred_task
 
                     # Remove all completed tasks except preferred task
@@ -397,7 +483,12 @@ class TaskExecutor:
                 batch._tasks = [task for task in batch._tasks if task._future in pending]
 
             # If we somehow get here (shouldn't happen), return the first task
-            return batch._tasks[0]
+            if batch._tasks:
+                return batch._tasks[0]
+            else:
+                # All tasks failed, return empty task
+                return Task(Future())
+
         finally:
             # Cancel any remaining tasks
             for task in batch._tasks:
@@ -436,8 +527,10 @@ class TaskExecutor:
                 )
 
         # Shutdown the pools
-        self._thread_pool.shutdown(wait=False)
-        self._process_pool.shutdown(wait=False)
+        if self._thread_pool:
+            self._thread_pool.shutdown(wait=False)
+        if self._process_pool:
+            self._process_pool.shutdown(wait=False)
         logger.info("✅ TaskExecutor cleanup complete")
 
     @staticmethod

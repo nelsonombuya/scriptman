@@ -91,7 +91,7 @@ class TaskMaster:
                     cls.__instance = TaskMaster()
         return cls.__instance
 
-    def submit(
+    def submit_with_properties(
         self,
         func: Func[P, R],
         task_type: Literal["cpu", "io", "mixed"] = "mixed",
@@ -99,7 +99,16 @@ class TaskMaster:
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> Task[R]:
-        """🚀 Submit a task for execution"""
+        """
+        🚀 Submit a task for execution
+
+        Args:
+            func: The function to execute
+            task_type: The type of task to execute
+            priority: The priority of the task
+            *args: The arguments to pass to the function
+            **kwargs: The keyword arguments to pass to the function
+        """
         if not self._running:
             logger.error("TaskMaster is shutting down, cannot submit tasks")
             raise RuntimeError("TaskMaster is shutting down, cannot submit tasks")
@@ -127,11 +136,23 @@ class TaskMaster:
 
         # Queue for processing
         self.task_queue.put(submission)
-
         logger.debug(
-            f"📥 Submitted task {task_id[:8]} (type={task_type}, priority={priority})"
+            f"📥 Submitted task {task_id} "
+            + f"(type={task_type}, "
+            + f"priority={priority})"
         )
         return task
+
+    def submit(self, func: Func[P, R], *args: P.args, **kwargs: P.kwargs) -> Task[R]:
+        """
+        🚀 Submit a task for execution
+
+        Args:
+            func: The function to execute
+            *args: The arguments to pass to the function
+            **kwargs: The keyword arguments to pass to the function
+        """
+        return self.submit_with_properties(func, "mixed", 0, *args, **kwargs)
 
     def promote_task(self, task_id: str) -> None:
         """⚡ Promote a task to foreground for priority processing"""

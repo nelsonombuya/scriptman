@@ -41,26 +41,27 @@ class QueuedRequest:
 class APIQueueManager:
     """🚦 Manages API request queue and processing"""
 
-    _instance: Optional["APIQueueManager"] = None
-    _initialized: bool = False
+    __instance: Optional["APIQueueManager"] = None
+    __initialized: bool = False
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "APIQueueManager":
-        if cls._instance is None:
-            cls._instance = super(APIQueueManager, cls).__new__(cls, *args, **kwargs)
-        return cls._instance
+        if cls.__instance is None:
+            cls.__instance = super(APIQueueManager, cls).__new__(cls, *args, **kwargs)
+            cls.__instance.__initialized = False
+        return cls.__instance
 
     def __init__(self) -> None:
         """Initialize the queue manager"""
-        if not self._initialized:
+        if not self.__initialized:
             queue_size = config.settings.get("task_queue_size", 100)
             self._queue: Queue[QueuedRequest] = Queue(maxsize=queue_size)
             max_concurrent_requests = config.settings.get("max_concurrent_requests", 25)
             self._semaphore = Semaphore(max_concurrent_requests)
             self._processing_task: Optional[Task[None]] = None
             self._active_tasks: set[Task[None]] = set()
-            self._started = False
             self._is_shutting_down = False
-            self.__class__._initialized = True
+            self._started = False
+            self.__initialized = True
 
     async def start(self) -> None:
         """Start the queue processing task"""

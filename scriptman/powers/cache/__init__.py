@@ -38,6 +38,7 @@ class CacheManager:
         with cls.__lock:
             if cls.__instance is None:
                 cls.__instance = super().__new__(cls, *args, **kwargs)
+                cls.__instance.__initialized = False
             return cls.__instance
 
     def __init__(self, backend: Optional[CacheBackend] = None):
@@ -102,9 +103,8 @@ class CacheManager:
     def get_instance(cls, *args: Any, **kwargs: Any) -> "CacheManager":
         """🚀 Get the singleton instance of CacheManager"""
         if cls.__instance is None:
-            with cls.__lock:
-                if cls.__instance is None:
-                    cls.__instance = CacheManager(*args, **kwargs)
+            cls.__instance = CacheManager(*args, **kwargs)
+            cls.__instance.__initialized = True
         return cls.__instance
 
     def _track_operation(self) -> "OperationTracker":
@@ -314,18 +314,7 @@ class OperationTracker:
             self.cache_manager._active_operations -= 1
 
 
-class _CacheLazy:
-    """
-    This will lazily load cache at runtime
-
-    NOTE: This is needed to avoid import timing issues with config.settings.
-    """
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(CacheManager.get_instance(), name)
-
-
-cache: CacheManager = cast(CacheManager, _CacheLazy())
+cache: CacheManager = CacheManager.get_instance()
 
 __all__: list[str] = [
     "cache",

@@ -59,20 +59,21 @@ class JobSummary:
 
 
 class JobSummaryService:
-    _instance: Optional["JobSummaryService"] = None
-    _initialized: bool = False
+    __instance: Optional["JobSummaryService"] = None
+    __initialized: bool = False
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "JobSummaryService":
-        if cls._instance is None:
-            cls._instance = super(JobSummaryService, cls).__new__(cls, *args, **kwargs)
-        return cls._instance
+        if cls.__instance is None:
+            cls.__instance = super(JobSummaryService, cls).__new__(cls, *args, **kwargs)
+            cls.__instance.__initialized = False
+        return cls.__instance
 
     def __init__(self) -> None:
-        if not self._initialized:
+        if not self.__initialized:
             self._current_date = datetime.now().date().isoformat()
             self._summaries: dict[str, dict[str, Any]] = {}
             self._load_existing_summaries()
-            self._initialized = True
+            self.__initialized = True
 
     def _load_existing_summaries(self) -> None:
         """Load existing summaries from JSON files."""

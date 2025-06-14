@@ -31,10 +31,11 @@ class APIManager:
     Provides centralized configuration and startup management.
     """
 
-    _initialized: bool = False
+    __initialized: bool = False
+    __instance: Optional["APIManager"] = None
+
     _app: Optional[FastAPI] = None
     _routers: list[APIRouter] = []
-    _instance: Optional["APIManager"] = None
     _startup_handlers: list[Func[..., None]] = []
     _shutdown_handlers: list[Func[..., None]] = []
     _queued_routes: list[
@@ -42,17 +43,18 @@ class APIManager:
     ] = []
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "APIManager":
-        if cls._instance is None:
-            cls._instance = super(APIManager, cls).__new__(cls, *args, **kwargs)
-        return cls._instance
+        if cls.__instance is None:
+            cls.__instance = super(APIManager, cls).__new__(cls, *args, **kwargs)
+            cls.__instance.__initialized = False
+        return cls.__instance
 
     def __init__(self) -> None:
-        if not self._initialized:
+        if not self.__initialized:
             self._port = config.secrets.get("api.port", self._find_available_port())
             self._host = config.secrets.get("api.host", "0.0.0.0")
             self._add_queue_manager_handlers()
             self._configured = False
-            self._initialized = True
+            self.__initialized = True
 
     def _add_queue_manager_handlers(self) -> None:
         """Add queue manager startup and shutdown handlers"""

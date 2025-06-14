@@ -40,10 +40,10 @@ class CacheManager:
                 cls.__instance = super().__new__(cls, *args, **kwargs)
             return cls.__instance
 
-    def __init__(self, backend: CacheBackend = FanoutCacheBackend()):
+    def __init__(self, backend: Optional[CacheBackend] = None):
         if not self.__initialized:
             with self.__lock:
-                self.__backend = backend
+                self.__backend = backend or FanoutCacheBackend()
                 self.__initialized = True
 
     @property
@@ -133,8 +133,7 @@ class CacheManager:
 
     @staticmethod
     def cache_result(
-        ttl: Optional[int] = config.settings.get("cache.ttl"),
-        **backend_kwargs: Any,
+        ttl: Optional[int] = None, **backend_kwargs: Any
     ) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """
         📦 Decorator for caching function results. Works with both sync and async
@@ -144,7 +143,8 @@ class CacheManager:
 
         Args:
             ttl (Optional[int]): The number of seconds until the key expires.
-                Defaults to None.
+                If None, will use config.settings.get("cache.ttl") at runtime. If this is
+                not set, will cache indefinitely.
             **backend_kwargs: Additional keyword arguments to be passed to the cache
                 backend's set method when storing values.
 
@@ -157,6 +157,7 @@ class CacheManager:
             @wraps(func)
             def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                 key = cache.generate_callable_key(func, args, kwargs)
+                _ttl = ttl if ttl is not None else config.settings.get("cache.ttl")
 
                 with cache._track_operation():
                     if result := cache.get(key=key):
@@ -177,8 +178,8 @@ class CacheManager:
                         logger.debug(f"❔ Skipping cache for key {key}: result is empty")
                         return cast(R, result)
 
-                    if cache.set(key=key, value=result, ttl=ttl, **backend_kwargs):
-                        ttl_str = TimeCalculator.calculate_time_taken(0, float(ttl or 0))
+                    if cache.set(key=key, value=result, ttl=_ttl, **backend_kwargs):
+                        ttl_str = TimeCalculator.calculate_time_taken(0, float(_ttl or 0))
                         logger.debug(f"✅ Stored {key} in cache for {ttl_str}")
                     else:
                         logger.error(f"❌ Failed to store {key} in cache")
@@ -313,12 +314,24 @@ class OperationTracker:
             self.cache_manager._active_operations -= 1
 
 
-cache: CacheManager = CacheManager.get_instance()
+class _CacheLazy:
+    """
+    This will lazily load cache at runtime
+
+    NOTE: This is needed to avoid import timing issues with config.settings.
+    """
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(CacheManager.get_instance(), name)
+
+
+cache: CacheManager = cast(CacheManager, _CacheLazy())
 
 __all__: list[str] = [
+    "cache",
     "CacheManager",
-    "OperationTracker",
     "CacheBackend",
+    "OperationTracker",
     "DiskCacheBackend",
     "FanoutCacheBackend",
 ]

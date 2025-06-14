@@ -119,14 +119,14 @@ except ImportError:
 
 __all__: list[str] = [
     # Core functionality
-    # Config
-    "config",
-    # Logger
-    "logger",
+    # Cleanup
+    "CleanUp",
     # Concurrency
     "TaskExecutor",
     "Task",
     "Tasks",
+    # Config
+    "config",
     # Generics
     "T",
     "P",
@@ -134,10 +134,15 @@ __all__: list[str] = [
     "AsyncFunc",
     "SyncFunc",
     "Func",
+    # Logger
+    "logger",
     # Retry
     "retry",
-    # Cleanup
-    "CleanUp",
+    # Serializer
+    "SERIALIZE_FOR_CACHE",
+    "SERIALIZE_FOR_JSON",
+    "SERIALIZE_FOR_PICKLE",
+    "serialize",
     # Time calculator
     "TimeCalculator",
     # Optional functionality
@@ -163,11 +168,6 @@ __all__: list[str] = [
     "PyODBCHandler",
     # ETL
     "ETL",
-    # Serializer
-    "SERIALIZE_FOR_CACHE",
-    "SERIALIZE_FOR_JSON",
-    "SERIALIZE_FOR_PICKLE",
-    "serialize",
     # Scheduler
     "scheduler",
     "Scheduler",

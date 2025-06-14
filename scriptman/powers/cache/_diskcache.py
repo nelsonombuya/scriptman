@@ -8,7 +8,6 @@ try:
     from diskcache import FanoutCache
     from loguru import logger
 
-    from scriptman.core.config import config
     from scriptman.powers.cache._backend import CacheBackend
 except ImportError as e:
     raise ImportError(
@@ -30,9 +29,17 @@ class EvictionPolicy(Enum):
 class DiskCacheBackend(CacheBackend, ABC):
     """Abstract Base Class for DiskCache implementations of the cache backend."""
 
-    _cache_dir: Path = Path(
-        config.settings.get("cache.dir", Path(__file__).parent.parent.parent / "cache")
-    )
+    @classmethod
+    def get_cache_dir(cls) -> Path:
+        """Lazy initialization of cache directory to avoid circular imports"""
+        from scriptman.core.config import config
+
+        return Path(
+            config.settings.get(
+                "cache.dir",
+                Path(__file__).parent.parent.parent / "cache",
+            )
+        )
 
     def get(self, key: str, retry: bool = True, **kwargs: Any) -> Any:
         return self.cache.get(key=key, retry=retry, **kwargs)
@@ -50,7 +57,7 @@ class DiskCacheBackend(CacheBackend, ABC):
         now = datetime.now()
 
         # Remove all *.db files not modified in the past 24 hours
-        for file in DiskCacheBackend._cache_dir.glob("*.db"):
+        for file in DiskCacheBackend.get_cache_dir().glob("*.db"):
             file_mod_time = datetime.fromtimestamp(file.stat().st_mtime)
             if (now - file_mod_time).total_seconds() > 24 * 60 * 60:
                 try:
@@ -60,7 +67,7 @@ class DiskCacheBackend(CacheBackend, ABC):
                     logger.error(f"💥 Error removing file {file}: {e}")
 
         # Remove all empty folders
-        for folder in DiskCacheBackend._cache_dir.glob("*"):
+        for folder in DiskCacheBackend.get_cache_dir().glob("*"):
             if folder.is_dir() and len(list(folder.iterdir())) == 0:
                 try:
                     folder.rmdir()
@@ -81,7 +88,7 @@ class FanoutCacheBackend(DiskCacheBackend):
         **kwargs: Any,
     ):
         self._cache = FanoutCache(
-            directory=directory or self._cache_dir,
+            directory=directory or DiskCacheBackend.get_cache_dir(),
             eviction_policy=eviction_policy.value,
             statistics=statistics,
             shards=shards,

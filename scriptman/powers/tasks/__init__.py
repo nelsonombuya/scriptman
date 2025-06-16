@@ -1,4 +1,3 @@
-from asyncio import get_event_loop
 from concurrent.futures import (
     Future,
     ProcessPoolExecutor,
@@ -536,17 +535,17 @@ class TaskExecutor:
         Returns:
             The result of the coroutine
         """
+        from asyncio import get_event_loop, new_event_loop, set_event_loop
+
         try:
             loop = get_event_loop()
-            return loop.run_until_complete(awaitable)
         except RuntimeError as e:
-            if "no current event loop" in str(e):
-                from asyncio import new_event_loop, set_event_loop
-
+            if "no current event loop" in str(e).lower():
                 loop = new_event_loop()
                 set_event_loop(loop)
-                return loop.run_until_complete(awaitable)
-            raise e
+            else:
+                raise e
+        return loop.run_until_complete(awaitable)
 
     @staticmethod
     def wait(task: Task[R], timeout: Optional[float] = None) -> R:

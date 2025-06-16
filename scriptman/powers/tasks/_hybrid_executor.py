@@ -1,4 +1,5 @@
 from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
+from inspect import iscoroutinefunction
 from pickle import PicklingError, dumps
 from threading import RLock
 from time import time
@@ -6,7 +7,7 @@ from typing import Any, Optional
 
 from loguru import logger
 
-from scriptman.powers.generics import Func, P, R
+from scriptman.powers.generics import AsyncFunc, Func, P, R
 from scriptman.powers.tasks._models import TaskSubmission
 
 
@@ -43,35 +44,59 @@ class HybridExecutor:
             self.active_tasks.add(task_submission.task_id)
             self.last_activity = time()  # Update last activity time
 
-            # Choose executor based on task type
-            if task_submission.task_type == "cpu" and self.process_pool:
-                # CPU-intensive tasks prefer processes
-                if self._can_use_processes(task_submission.func):
-                    future = self.process_pool.submit(
-                        task_submission.func,
-                        *task_submission.args,
-                        **task_submission.kwargs,
-                    )
+            # Handle async functions
+            if iscoroutinefunction(task_submission.func):
+                # Always use thread pool for async functions
+                future = self.thread_pool.submit(
+                    self._run_async,
+                    task_submission.func,
+                    *task_submission.args,
+                    **task_submission.kwargs,
+                )
+            else:
+                # Choose executor based on task type for sync functions
+                if task_submission.task_type == "cpu" and self.process_pool:
+                    # CPU-intensive tasks prefer processes
+                    if self._can_use_processes(task_submission.func):
+                        future = self.process_pool.submit(
+                            task_submission.func,
+                            *task_submission.args,
+                            **task_submission.kwargs,
+                        )
+                    else:
+                        # Fallback to threads if function can't be pickled
+                        future = self.thread_pool.submit(
+                            task_submission.func,
+                            *task_submission.args,
+                            **task_submission.kwargs,
+                        )
                 else:
-                    # Fallback to threads if function can't be pickled
+                    # I/O and mixed tasks use threads
                     future = self.thread_pool.submit(
                         task_submission.func,
                         *task_submission.args,
                         **task_submission.kwargs,
                     )
-            else:
-                # I/O and mixed tasks use threads
-                future = self.thread_pool.submit(
-                    task_submission.func,
-                    *task_submission.args,
-                    **task_submission.kwargs,
-                )
 
             # Add completion callback
             future.add_done_callback(
                 lambda f: self._task_completed(task_submission.task_id)
             )
             return future
+
+    def _run_async(self, func: AsyncFunc[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+        """Run an async function in a thread"""
+        from asyncio import get_event_loop, new_event_loop, set_event_loop
+
+        try:
+            loop = get_event_loop()
+        except RuntimeError as e:
+            if "no current event loop" in str(e).lower():
+                loop = new_event_loop()
+                set_event_loop(loop)
+            else:
+                raise e
+        return loop.run_until_complete(func(*args, **kwargs))
 
     def _can_use_processes(self, func: Func[P, R]) -> bool:
         """🔍 Check if function can be used with multiprocessing"""

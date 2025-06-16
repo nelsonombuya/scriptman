@@ -34,6 +34,10 @@ class DynamicPoolManager:
     def get_available_executor(self) -> HybridExecutor:
         """🔍 Get an available executor or create a new one"""
         with self._lock:
+            # Ensure we have at least one executor
+            if not self.executors:
+                return self.spawn_new_executor()
+
             # Find executor with lowest load
             best_executor = min(self.executors, key=lambda e: e.get_load())
 
@@ -67,8 +71,8 @@ class DynamicPoolManager:
             if len(self.executors) <= 1:
                 return  # Keep at least one executor
 
-            idle_executors = [e for e in self.executors if e.is_idle()]
-            for executor in idle_executors:
+            # Remove idle executors except the first one
+            for executor in [e for e in self.executors[1:] if e.is_idle()]:
                 self.executors.remove(executor)
                 executor.shutdown(wait=False)
                 logger.info("Cleaned up idle executor")

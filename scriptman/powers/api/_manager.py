@@ -52,16 +52,8 @@ class APIManager:
         if not self.__initialized:
             self._port = config.secrets.get("api.port", self._find_available_port())
             self._host = config.secrets.get("api.host", "0.0.0.0")
-            self._add_queue_manager_handlers()
             self._configured = False
             self.__initialized = True
-
-    def _add_queue_manager_handlers(self) -> None:
-        """Add queue manager startup and shutdown handlers"""
-        from scriptman.powers.api._queue import queue_manager
-
-        self.add_startup_handler(queue_manager.start)
-        self.add_shutdown_handler(queue_manager.shutdown)
 
     @staticmethod
     def _find_available_port(start_port: int = 8000, max_attempts: int = 100) -> int:

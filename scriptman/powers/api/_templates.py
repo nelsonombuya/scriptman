@@ -1,6 +1,5 @@
 try:
     from functools import wraps
-    from inspect import iscoroutinefunction
     from json import dumps
     from typing import Any, Optional
 
@@ -12,7 +11,6 @@ try:
     from scriptman.core.config import config
     from scriptman.powers.api._exceptions import APIException
     from scriptman.powers.api._models import APIRequest, APIResponse
-    from scriptman.powers.api._queue import queue_manager
     from scriptman.powers.generics import Func, P
     from scriptman.powers.serializer import SERIALIZE_FOR_JSON, serialize
     from scriptman.powers.tasks import TaskExecutor
@@ -57,13 +55,13 @@ def create_timeout_response(request: APIRequest, task_id: str) -> dict[str, Any]
     Returns:
         dict[str, Any]: Formatted timeout API response data.
     """
-    logger.warning(f"⏳ Request task {task_id} timed out. Continuing in background...")
+    logger.info(f"⏳ Request task {task_id} is enqueued. Continuing in background...")
     logger.debug(f"📤 Request details: \n{dumps(request.model_dump(), indent=4)}")
     return APIResponse(
         request=request,
         status_code=status.HTTP_202_ACCEPTED,
-        response={"status": "processing", "task_id": task_id},
-        message="Request is taking longer than expected. Please try again later.",
+        message="Request has been queued for processing.",
+        response={"status": "queued", "task_id": task_id},
     ).model_dump(exclude={"stacktrace"})
 
 
@@ -113,48 +111,26 @@ def api_route(
     @wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
         try:
+            _executor = TaskExecutor()
+            _task = _executor.background(func, *args, **kwargs)
             _timeout = config.settings.get("task_timeout", timeout)
 
             if enqueue:
-                await queue_manager.enqueue(
-                    func=func,
-                    args=args,
-                    kwargs=kwargs,
+                response = create_timeout_response(
+                    task_id=_task.task_id or request.request_id,
                     request=request,
-                    timeout=_timeout,
                 )
-
-                # Return immediate response indicating request is queued
-                response = APIResponse(
-                    request=request,
-                    status_code=status.HTTP_202_ACCEPTED,
-                    message="Request has been queued for processing.",
-                    response={"status": "queued", "request_id": request.request_id},
-                ).model_dump(exclude={"stacktrace"})
             else:
-                executor = TaskExecutor(
-                    thread_pool_size=config.settings.get("thread_pool_size", 50),
-                    process_pool_size=config.settings.get("process_pool_size", 4),
+                result = _executor.wait(_task, float(_timeout))
+                response = create_successful_response(
+                    response=serialize(result, **SERIALIZE_FOR_JSON),
+                    request=request,
                 )
-                try:
-                    if iscoroutinefunction(func):
-                        # For async functions, execute directly with await_async
-                        result = TaskExecutor.await_async(func(*args, **kwargs))
-                    else:
-                        # For sync functions, use TaskExecutor's background with timeout
-                        task = executor.background(func, *args, **kwargs)
-                        result = executor.wait(task, float(_timeout))
-
-                    response = create_successful_response(
-                        response=serialize(result, **SERIALIZE_FOR_JSON),
-                        request=request,
-                    )
-                finally:
-                    executor.cleanup()
-
-            return JSONResponse(content=response, status_code=response["status_code"])
+                _executor.cleanup(wait=True)
         except Exception as e:
             response = create_error_response(request=request, e=e)
-            return JSONResponse(content=response, status_code=response["status_code"])
+            _executor.cleanup(wait=False)
+
+        return JSONResponse(content=response, status_code=response["status_code"])
 
     return wrapper

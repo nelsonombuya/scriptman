@@ -309,10 +309,3 @@ class PyODBCHandler(DatabaseHandler):
                 f"Rows: {sample_rows} \n"
             )
             raise DatabaseError("Unable to bulk execute query", error)
-
-    def __del__(self) -> None:
-        """
-        Destructor to disconnect from the database when the instance is
-        destroyed.
-        """
-        self.disconnect()

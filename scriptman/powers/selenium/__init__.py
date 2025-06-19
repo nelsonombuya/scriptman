@@ -5,7 +5,7 @@ try:
     from time import sleep
     from typing import Literal, Optional
 
-    from loguru import logger
+    from loguru import Logger, logger
     from selenium.webdriver.common.action_chains import ActionChains
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
@@ -43,6 +43,7 @@ class SeleniumInstance(ABC):
                 for the instance, such that if one fails, it will try the next one.
                 Defaults to None.
         """
+        self._log: Logger = logger
         self._queue: Optional[list[Browsers]] = browser_queue
         self._browser: SeleniumBrowser[Driver] = BrowserMap.get(browser, Chrome)()
 
@@ -88,7 +89,7 @@ class SeleniumInstance(ABC):
         Returns:
             bool: True if the interaction was successful, False otherwise.
         """
-        logger.debug(
+        self._log.debug(
             f"Interacting with element: {xpath} (mode: {mode}) "
             f"Timeout: {timeout} "
             f"Rest: {rest}."
@@ -167,7 +168,12 @@ class SeleniumInstance(ABC):
         """
         🧹 Close the WebDriver instance when the InteractionHandler instance is deleted.
         """
-        self.driver.quit()
+        name = self.__class__.__name__
+        try:
+            self._log.info(f"Shutting down SeleniumInstance {name}")
+            self.driver.quit()
+        except Exception as e:
+            self._log.error(f"Failed to close SeleniumInstance {name} : {e}")
 
 
 __all__: list[str] = [

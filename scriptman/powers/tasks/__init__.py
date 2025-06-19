@@ -10,7 +10,7 @@ from threading import Event
 from time import perf_counter, sleep, time
 from typing import Any, Awaitable, Callable, Literal, Optional
 
-from loguru import logger
+from loguru import Logger, logger
 from tqdm import tqdm
 
 from scriptman.powers.generics import P, R
@@ -104,20 +104,21 @@ class TaskExecutor:
             process_pool_size: Maximum number of processes for CPU-bound tasks
                 (direct mode only)
         """
-        self.mode = mode
+        self._log: Logger = logger
+        self._mode: Literal["smart", "direct"] = mode
 
         if mode == "smart":
             # Use TaskMaster for intelligent task management
             self._task_master: Optional[TaskMaster] = TaskMaster.get_instance()
             self._process_pool: Optional[ProcessPoolExecutor] = None
             self._thread_pool: Optional[ThreadPoolExecutor] = None
-            logger.info("🎯 TaskExecutor initialized in Smart mode")
+            self._log.info("🎯 TaskExecutor initialized in Smart mode")
         else:
             # Use direct thread/process pools for direct execution
             self._task_master = None
             self._thread_pool = ThreadPoolExecutor(thread_pool_size, "task_executor")
             self._process_pool = ProcessPoolExecutor(process_pool_size)
-            logger.info("🔧 TaskExecutor initialized in Direct mode")
+            self._log.info("🔧 TaskExecutor initialized in Direct mode")
 
     def _create_task(
         self,
@@ -171,10 +172,10 @@ class TaskExecutor:
             result = task.await_result()
         """
         if self._shutdown_event.is_set():
-            logger.warning("TaskExecutor is shutting down, returning empty Task.")
+            self._log.warning("TaskExecutor is shutting down, returning empty Task.")
             return Task(Future())
 
-        if self.mode == "smart" and self._task_master:
+        if self._mode == "smart" and self._task_master:
             # Use TaskMaster for intelligent task management
             return self._task_master.submit(func, *args, **kwargs)
         else:
@@ -224,7 +225,7 @@ class TaskExecutor:
                 print("Some tasks didn't complete in time")
         """
         if self._shutdown_event.is_set():
-            logger.warning("TaskExecutor is shutting down, returning empty Tasks")
+            self._log.warning("TaskExecutor is shutting down, returning empty Tasks")
             return Tasks()
 
         if scope == "multiprocessing":
@@ -262,10 +263,10 @@ class TaskExecutor:
             results = batch.await_result(raise_exceptions=False)
         """
         if self._shutdown_event.is_set():
-            logger.warning("TaskExecutor is shutting down, returning empty Tasks")
+            self._log.warning("TaskExecutor is shutting down, returning empty Tasks")
             return Tasks()
 
-        if self.mode == "smart" and self._task_master:
+        if self._mode == "smart" and self._task_master:
             # Use TaskMaster for intelligent task management
             batch = Tasks[R]()
             iterator = tqdm(tasks, desc="Smart Threading") if show_progress else tasks
@@ -325,10 +326,10 @@ class TaskExecutor:
                 print("Some tasks didn't complete in time")
         """
         if self._shutdown_event.is_set():
-            logger.warning("TaskExecutor is shutting down, returning empty Tasks")
+            self._log.warning("TaskExecutor is shutting down, returning empty Tasks")
             return Tasks()
 
-        if self.mode == "smart" and self._task_master:
+        if self._mode == "smart" and self._task_master:
             # Use TaskMaster for intelligent task management
             batch = Tasks[R]()
             iterator = tqdm(tasks, desc="Smart Processing") if show_progress else tasks
@@ -394,7 +395,7 @@ class TaskExecutor:
             Task: The winning task's result, or an empty task if shutting down.
         """
         if self._shutdown_event.is_set():
-            logger.warning("TaskExecutor is shutting down, returning None")
+            self._log.warning("TaskExecutor is shutting down, returning None")
             return Task(Future())
 
         from concurrent.futures import FIRST_COMPLETED, TimeoutError, wait
@@ -415,7 +416,7 @@ class TaskExecutor:
         if not self._thread_pool:
             self._thread_pool = ThreadPoolExecutor(None, "task_executor")
 
-        logger.debug(f"🏃‍♂️ Racing {len(tasks)} tasks using Direct mode")
+        self._log.debug(f"🏃‍♂️ Racing {len(tasks)} tasks using Direct mode")
         for idx, (func, args, kwargs) in enumerate(tasks):
             task_start = perf_counter()
             future = self._thread_pool.submit(func, *args, **kwargs)
@@ -453,13 +454,13 @@ class TaskExecutor:
                     if task._future in done and task.is_successful
                 ]
                 if successful_tasks:
-                    logger.debug(f"🏆 Race won by task: {successful_tasks[0]}")
+                    self._log.debug(f"🏆 Race won by task: {successful_tasks[0]}")
                     return successful_tasks[0]
 
                 # If no successful tasks, check if we have a preferred task
                 if preferred_task is not None:
                     if preferred_task._future in done:
-                        logger.debug(f"🎯 Using preferred task: {preferred_task}")
+                        self._log.debug(f"🎯 Using preferred task: {preferred_task}")
                         return preferred_task
 
                     # Remove all completed tasks except preferred task
@@ -495,12 +496,14 @@ class TaskExecutor:
             wait: Whether to wait for running tasks to complete
             timeout: Maximum time to wait for tasks to complete (in seconds)
         """
-        logger.info("🧹 Cleaning up TaskExecutor resources...")
+        self._log.info("🧹 Cleaning up TaskExecutor resources...")
         self._shutdown_event.set()
 
         # Wait for active tasks to complete if requested
         if wait and self._active_tasks:
-            logger.info(f"⏳ Waiting for {len(self._active_tasks)} tasks to complete...")
+            self._log.info(
+                f"⏳ Waiting for {len(self._active_tasks)} tasks to complete..."
+            )
             start_time = time()
             while self._active_tasks and (
                 timeout is None or (time() - start_time) < timeout
@@ -513,7 +516,7 @@ class TaskExecutor:
                     sleep(0.1)  # Small delay to prevent CPU spinning
 
             if self._active_tasks:
-                logger.warning(
+                self._log.warning(
                     f"⚠️ {len(self._active_tasks)} tasks did not complete in time"
                 )
 
@@ -522,7 +525,7 @@ class TaskExecutor:
             self._thread_pool.shutdown(wait=False)
         if self._process_pool:
             self._process_pool.shutdown(wait=False)
-        logger.info("✅ TaskExecutor cleanup complete")
+        self._log.info("✅ TaskExecutor cleanup complete")
 
     @staticmethod
     def await_async[R](awaitable: Awaitable[R]) -> R:
@@ -572,7 +575,11 @@ class TaskExecutor:
 
     def __del__(self) -> None:
         """🧹 Clean up executor resources and shutdown thread/process pools."""
-        self.cleanup(wait=False)
+        try:
+            self._log.info("Shutting down TaskExecutor Instance")
+            self.cleanup()
+        except Exception as e:
+            self._log.error(f"Unable to shut down TaskExecutor Instance: {e}")
 
 
 __all__: list[str] = ["TaskExecutor", "Task", "Tasks", "TaskMaster"]

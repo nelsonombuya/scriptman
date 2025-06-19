@@ -637,7 +637,7 @@ class Scheduler:
                 logger.info("👋 Goodbye! Shutting down the scheduler...")
                 self.__scheduler.shutdown()
         except Exception as e:
-            logger.warning(f"❌ Error shutting down scheduler: {e}")
+            logger.error(f"❌ Error shutting down scheduler: {e}")
 
     def schedule(
         self,

@@ -1,10 +1,12 @@
 {
   "cSpell.words": [
+    "crdownload",
     "DUMPFILE",
     "executemany",
     "mariadb",
     "mysql",
     "postgresql",
-    "scriptman"
+    "scriptman",
+    "tarteaucitron"
   ]
 }

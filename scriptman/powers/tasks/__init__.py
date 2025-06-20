@@ -10,7 +10,7 @@ from threading import Event
 from time import perf_counter, sleep, time
 from typing import Any, Awaitable, Callable, Literal, Optional
 
-from loguru import Logger, logger
+from loguru import logger
 from tqdm import tqdm
 
 from scriptman.powers.generics import P, R
@@ -104,8 +104,8 @@ class TaskExecutor:
             process_pool_size: Maximum number of processes for CPU-bound tasks
                 (direct mode only)
         """
-        self._log: Logger = logger
-        self._mode: Literal["smart", "direct"] = mode
+        self._mode = mode
+        self._log = logger
 
         if mode == "smart":
             # Use TaskMaster for intelligent task management

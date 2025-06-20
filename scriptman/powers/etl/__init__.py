@@ -951,10 +951,13 @@ class ETL:
         Returns:
             bool: True if the data was merged successfully.
         """
-        from time import time
         from uuid import uuid4
 
-        temp_table = f"temp_{table_name}_{int(time())}_{str(uuid4())}".replace("-", "_")
+        temp_table = f"temp_{table_name}_{str(uuid4())[:8]}".replace("-", "_")
+        while database_handler.table_exists(temp_table):
+            self.log.warning(f"Temporary table {temp_table} already exists. Retrying...")
+            temp_table = f"temp_{table_name}_{str(uuid4())[:8]}".replace("-", "_")
+
         self._temp_tables.add((database_handler, temp_table))
         merge_query = query.format(source_table=temp_table)
 

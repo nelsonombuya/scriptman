@@ -784,25 +784,30 @@ class DatabaseHandler(ABC):
             self.log.error(f"Unable to disconnect from the database: {error}")
 
     @staticmethod
-    def is_pool_timeout_error(error: Exception) -> bool:
+    def retry_conditions(error: Exception) -> bool:
         """
-        🔍 Check if the error is related to connection pool timeout.
+        🔍 Check if the error is related to connection pool timeout or deadlock.
 
         Args:
             error: The exception to check
 
         Returns:
-            bool: True if it's a pool timeout error
+            bool: True if it's a pool timeout error or deadlock
         """
         return any(
             keyword in str(error).lower()
             for keyword in [
-                "queuepool limit",
-                "connection timed out",
-                "timeout",
                 "pool",
-                "connection pool exhausted",
+                "timeout",
+                "deadlock",
+                "dead lock",
+                "dead lock",
+                "deadlocked",
+                "dead locked",
                 "max connections",
+                "queuepool limit",
                 "too many connections",
+                "connection timed out",
+                "connection pool exhausted",
             ]
         )

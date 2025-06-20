@@ -1,3 +1,4 @@
+from atexit import register
 from concurrent.futures import (
     Future,
     ProcessPoolExecutor,
@@ -6,9 +7,11 @@ from concurrent.futures import (
     wait,
 )
 from inspect import iscoroutinefunction, signature
-from threading import Event
+from signal import SIGINT, SIGTERM, Signals, signal
+from threading import Event, RLock
 from time import perf_counter, sleep, time
 from typing import Any, Awaitable, Callable, Literal, Optional
+from weakref import WeakSet
 
 from loguru import logger
 from tqdm import tqdm
@@ -16,6 +19,112 @@ from tqdm import tqdm
 from scriptman.powers.generics import P, R
 from scriptman.powers.tasks._models import Task, Tasks
 from scriptman.powers.tasks._task_master import TaskMaster
+
+
+class GlobalShutdownCoordinator:
+    """🌐 Global shutdown coordinator for all TaskExecutor instances"""
+
+    __instance: Optional["GlobalShutdownCoordinator"] = None
+    __initialized: bool = False
+    __lock: RLock = RLock()
+
+    def __new__(cls) -> "GlobalShutdownCoordinator":
+        """Create or return singleton instance"""
+        if cls.__instance is None:
+            with cls.__lock:
+                if cls.__instance is None:
+                    cls.__instance = super().__new__(cls)
+        return cls.__instance
+
+    def __init__(self) -> None:
+        """Initialize the coordinator"""
+        if self.__initialized:
+            return
+
+        self._executors: WeakSet[TaskExecutor] = WeakSet()
+        self._shutdown_in_progress: bool = False
+        self._signal_handlers_installed: bool = False
+
+        # Install signal handlers
+        self._install_signal_handlers()
+
+        # Register atexit handler
+        register(self._graceful_shutdown_all)
+
+        self.__initialized = True
+        logger.debug("🌐 Global shutdown coordinator initialized")
+
+    def register_executor(self, executor: "TaskExecutor") -> None:
+        """Register a TaskExecutor instance for global shutdown"""
+        with self.__lock:
+            self._executors.add(executor)
+            logger.debug(f"📝 Registered TaskExecutor (total: {len(self._executors)})")
+
+    def unregister_executor(self, executor: "TaskExecutor") -> None:
+        """Unregister a TaskExecutor instance"""
+        with self.__lock:
+            self._executors.discard(executor)
+            logger.debug(f"📝 Unregistered TaskExecutor (total: {len(self._executors)})")
+
+    def _install_signal_handlers(self) -> None:
+        """Install signal handlers for graceful shutdown"""
+        if self._signal_handlers_installed:
+            return
+
+        try:
+            # Handle SIGINT (Ctrl+C) and SIGTERM
+            signal(SIGINT, self._signal_handler)
+            signal(SIGTERM, self._signal_handler)
+            self._signal_handlers_installed = True
+            logger.debug("🛡️ Signal handlers installed for graceful shutdown")
+        except (ValueError, OSError):
+            # Signal handling might not be available in all environments
+            logger.debug(
+                "⚠️ Could not install signal handlers "
+                "(not available in this environment)"
+            )
+
+    def _signal_handler(self, signum: int, frame: Any) -> None:
+        """Handle shutdown signals"""
+        signal_name = Signals(signum).name
+        logger.info(f"🛑 Received {signal_name}, initiating graceful shutdown...")
+        self._graceful_shutdown_all()
+
+    def _graceful_shutdown_all(self) -> None:
+        """Gracefully shutdown all registered TaskExecutor instances"""
+        with self.__lock:
+            if self._shutdown_in_progress:
+                return  # Already shutting down
+
+            self._shutdown_in_progress = True
+
+        # Get a copy of executors to avoid modification during iteration
+        executors_to_shutdown = list(self._executors)
+
+        if not executors_to_shutdown:
+            logger.debug("🌐 No TaskExecutor instances to shutdown")
+            return
+
+        logger.info(
+            f"🌐 Gracefully shutting down {len(executors_to_shutdown)} "
+            f"TaskExecutor instances..."
+        )
+
+        # Shutdown all executors with a reasonable timeout
+        for executor in executors_to_shutdown:
+            try:
+                if not executor._is_shutdown:
+                    executor.cleanup(
+                        wait=True, timeout=5.0
+                    )  # 5 second timeout per executor
+            except Exception as e:
+                logger.warning(f"⚠️ Error shutting down TaskExecutor: {e}")
+
+        logger.info("✅ Global TaskExecutor shutdown complete")
+
+
+# Global coordinator instance
+_global_coordinator = GlobalShutdownCoordinator()
 
 
 class TaskExecutor:
@@ -83,10 +192,6 @@ class TaskExecutor:
         print(f"Completed: {batch.completed_count}/{batch.total_count}")
     """
 
-    # Class-level shutdown event shared across all instances
-    _shutdown_event: Event = Event()
-    _active_tasks: set[Task[Any]] = set()
-
     def __init__(
         self,
         mode: Literal["smart", "direct"] = "smart",
@@ -106,6 +211,12 @@ class TaskExecutor:
         """
         self._mode = mode
         self._log = logger
+        self._is_shutdown: bool = False
+        self._shutdown_event: Event = Event()
+        self._active_tasks: set[Task[Any]] = set()
+
+        # Register with global shutdown coordinator for signal handling
+        _global_coordinator.register_executor(self)
 
         if mode == "smart":
             # Use TaskMaster for intelligent task management
@@ -496,8 +607,15 @@ class TaskExecutor:
             wait: Whether to wait for running tasks to complete
             timeout: Maximum time to wait for tasks to complete (in seconds)
         """
+        if self._is_shutdown:
+            return  # Already cleaned up
+
         self._log.info("🧹 Cleaning up TaskExecutor resources...")
         self._shutdown_event.set()
+        self._is_shutdown = True
+
+        # Unregister from global shutdown coordinator
+        _global_coordinator.unregister_executor(self)
 
         # Wait for active tasks to complete if requested
         if wait and self._active_tasks:
@@ -550,6 +668,27 @@ class TaskExecutor:
                 raise e
         return loop.run_until_complete(awaitable)
 
+    def shutdown(self, wait: bool = True, timeout: Optional[float] = None) -> None:
+        """
+        🛑 Explicitly shutdown this TaskExecutor instance.
+
+        This is the recommended way to shutdown a TaskExecutor instead of
+        relying on garbage collection.
+
+        Args:
+            wait: Whether to wait for running tasks to complete
+            timeout: Maximum time to wait for tasks to complete (in seconds)
+        """
+        self.cleanup(wait=wait, timeout=timeout)
+
+    def __enter__(self) -> "TaskExecutor":
+        """🚪 Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """🚪 Exit context manager and cleanup resources."""
+        self.cleanup()
+
     @staticmethod
     def wait(task: Task[R], timeout: Optional[float] = None) -> R:
         """
@@ -576,10 +715,14 @@ class TaskExecutor:
     def __del__(self) -> None:
         """🧹 Clean up executor resources and shutdown thread/process pools."""
         try:
-            self._log.info("Shutting down TaskExecutor Instance")
-            self.cleanup()
-        except Exception as e:
-            self._log.error(f"Unable to shut down TaskExecutor Instance: {e}")
+            # Only cleanup if not already shutdown and resources exist
+            if not getattr(self, "_is_shutdown", True) and hasattr(self, "_thread_pool"):
+                # Use non-blocking cleanup during garbage collection
+                self.cleanup(wait=False, timeout=0)
+        except Exception:
+            # Silently handle exceptions during garbage collection
+            # Logging during __del__ can cause issues
+            pass
 
 
 __all__: list[str] = ["TaskExecutor", "Task", "Tasks", "TaskMaster"]

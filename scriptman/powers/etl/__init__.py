@@ -951,14 +951,14 @@ class ETL:
         Returns:
             bool: True if the data was merged successfully.
         """
+        from time import time
         from uuid import uuid4
 
-        temp_table = f"temp_{table_name}_{str(uuid4())[:8]}".replace("-", "_")
+        temp_table = f"temp_{table_name}_{int(time())}_{str(uuid4())}".replace("-", "_")
         self._temp_tables.add((database_handler, temp_table))
         merge_query = query.format(source_table=temp_table)
 
         try:
-            # Create the temporary table
             database_handler.create_table(
                 table_name=temp_table,
                 keys=[str(_) for _ in self._data.index.names],
@@ -967,7 +967,6 @@ class ETL:
                 ),
             )
 
-            # Insert the data into the temporary table
             temp_query, temp_values = database_handler.generate_prepared_insert_query(
                 temp_table, self._data, force_nvarchar
             )
@@ -989,7 +988,6 @@ class ETL:
             if not allow_fallback:
                 raise error
 
-            # If the merge fails, retry using insert/update
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
             return self.insert_or_update(
                 table_name=table_name,

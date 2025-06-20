@@ -41,7 +41,7 @@ class ETLDatabase:
         self.db = database_handler
         self.log = logger.bind(
             database=self.db.database_name,
-            handler=self.__class__.__name__,
+            handler=self.db.__class__.__name__,
         )
 
         if auto_upgrade_to_etl and not self.db._is_etl_mode:

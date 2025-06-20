@@ -16,6 +16,7 @@ def retry(
     min_delay: float = config.settings.get("retry.min_delay", 1),
     max_delay: float = config.settings.get("retry.max_delay", 10),
     retry_on: Optional[Union[Type[Exception], tuple[Type[Exception], ...]]] = None,
+    retry_condition: Optional[Callable[[Exception], bool]] = None,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     🔁 A unified retry decorator for both synchronous and asynchronous functions.
@@ -27,6 +28,9 @@ def retry(
         max_delay (float): Maximum delay between retries.
         retry_on (Optional[Union[Type[Exception], tuple[Type[Exception], ...]]]):
             Exception or tuple of exceptions to retry on.
+        retry_condition (Optional[Callable[[Exception], bool]]):
+            A function that takes an exception and returns True if retry should happen.
+            If provided, this takes precedence over retry_on.
 
     Returns:
         A decorator that applies retry logic to either a sync or async function.
@@ -50,6 +54,7 @@ def retry(
                     delay = __get_delay(
                         e,
                         retry_on,
+                        retry_condition,
                         attempt,
                         max_retries,
                         base_delay,
@@ -78,14 +83,19 @@ def __validate_retry_params(
 def __get_delay(
     e: Exception,
     retry_on: Optional[Union[Type[Exception], tuple[Type[Exception], ...]]],
+    retry_condition: Optional[Callable[[Exception], bool]],
     attempt: int,
     max_retries: int,
     base_delay: float,
     min_delay: float,
     max_delay: float,
 ) -> float:
-    # If a specific exception type is set and e is not it, do not retry
-    if retry_on is not None and not isinstance(e, retry_on):
+    if retry_condition is not None:
+        should_retry = retry_condition(e)
+        if not should_retry:
+            logger.debug(f"⚠ Retry condition returned False for exception: {e}")
+            raise e
+    elif retry_on is not None and not isinstance(e, retry_on):
         logger.debug(f"⚠ Skipping retry for exception: {e}")
         raise e
 

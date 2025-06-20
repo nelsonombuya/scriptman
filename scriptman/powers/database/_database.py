@@ -43,6 +43,34 @@ class DatabaseHandler(ABC):
         self.password = password
         self.log = logger.bind(database=self.database, handler=self.__class__.__name__)
 
+    @abstractmethod
+    @classmethod
+    def for_etl(cls, *args: Any, **kwargs: Any) -> "DatabaseHandler":
+        """
+        🚀 Create a database handler for ETL mode with optimized settings for heavy ETL
+        workloads. You can add arbitrary arguments to the method to pass to the database
+        handler constructor.
+
+        Args:
+            *args: Variable length argument list for the database handler.
+            **kwargs: Arbitrary keyword arguments for the database handler.
+
+        Returns:
+            DatabaseHandler: The database handler for ETL mode.
+        """
+        pass
+
+    @abstractmethod
+    def upgrade_to_etl(self) -> "DatabaseHandler":
+        """
+        🚀 Upgrade the database handler to ETL mode with optimized settings for heavy ETL
+        workloads.
+
+        Returns:
+            DatabaseHandler: The upgraded database handler.
+        """
+        pass
+
     @property
     def database_name(self) -> str:
         """
@@ -754,3 +782,27 @@ class DatabaseHandler(ABC):
             self.disconnect()
         except Exception as error:
             self.log.error(f"Unable to disconnect from the database: {error}")
+
+    @staticmethod
+    def is_pool_timeout_error(error: Exception) -> bool:
+        """
+        🔍 Check if the error is related to connection pool timeout.
+
+        Args:
+            error: The exception to check
+
+        Returns:
+            bool: True if it's a pool timeout error
+        """
+        return any(
+            keyword in str(error).lower()
+            for keyword in [
+                "queuepool limit",
+                "connection timed out",
+                "timeout",
+                "pool",
+                "connection pool exhausted",
+                "max connections",
+                "too many connections",
+            ]
+        )

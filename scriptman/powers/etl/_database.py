@@ -5,7 +5,7 @@ try:
     from pandas import DataFrame
 
     from scriptman.powers.database._database import DatabaseHandler
-
+    from scriptman.powers.retry import retry
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -13,21 +13,44 @@ except ImportError as e:
     )
 
 
+_retry_on_pool_timeout = retry(
+    max_retries=5,
+    base_delay=10.0,
+    max_delay=60.0,
+    retry_condition=DatabaseHandler.is_pool_timeout_error,
+)
+
+
 class ETLDatabase:
     """📦 ETL database operations using composition instead of inheritance"""
 
-    def __init__(self, database_handler: DatabaseHandler):
+    def __init__(
+        self,
+        database_handler: DatabaseHandler,
+        auto_upgrade_to_etl: bool = True,
+    ):
         """
-        🚀 Initialize ETL database with a database handler.
+        🚀 Initialize ETL database with a database handler and auto-upgrade to heavy ETL
+        mode if the database handler supports it.
 
         Args:
             database_handler: DatabaseHandler object
+            auto_upgrade_to_etl: Whether to automatically upgrade to heavy ETL pool
+                settings.
         """
         self.db = database_handler
         self.log = logger.bind(
             database=self.db.database_name,
             handler=self.__class__.__name__,
         )
+
+        if auto_upgrade_to_etl:
+            try:
+                self.log.info("Auto-upgrading to heavy ETL mode...")
+                self.db.upgrade_to_etl()
+            except Exception as e:
+                self.log.warning(f"Failed to auto-upgrade to heavy ETL mode: {e}")
+                self.log.info("Continuing with current connection pool settings")
 
     @property
     def database_name(self) -> str:
@@ -365,51 +388,60 @@ class ETLDatabase:
         """
         return query, self.prepare_values(df, force_nvarchar)
 
+    @_retry_on_pool_timeout
     def execute_read_query(
         self, query: str, params: dict[str, Any] = {}
     ) -> list[dict[str, Any]]:
-        """Delegate to the database handler"""
+        """Execute read query with automatic retry on pool timeout errors"""
         return self.db.execute_read_query(query, params)
 
+    @_retry_on_pool_timeout
     def execute_write_query(
         self, query: str, params: dict[str, Any] = {}, check_affected_rows: bool = False
     ) -> bool:
-        """Delegate to the database handler"""
+        """Execute write query with automatic retry on pool timeout errors"""
         return self.db.execute_write_query(query, params, check_affected_rows)
 
+    @_retry_on_pool_timeout
     def execute_write_bulk_query(
         self, query: str, rows: list[dict[str, Any]] = []
     ) -> bool:
-        """Delegate to the database handler"""
+        """Execute bulk write query with automatic retry on pool timeout errors"""
         return self.db.execute_write_bulk_query(query, rows)
 
+    @_retry_on_pool_timeout
     def execute_write_batch_query(
         self,
         query: str,
         rows: Iterator[dict[str, Any]] | list[dict[str, Any]] = [],
         batch_size: int = 1000,
     ) -> bool:
-        """Delegate to the database handler"""
+        """Execute batch write query with automatic retry on pool timeout errors"""
         return self.db.execute_write_batch_query(query, rows, batch_size)
 
+    @_retry_on_pool_timeout
     def table_exists(self, table_name: str) -> bool:
-        """Delegate to the database handler"""
+        """Check if table exists with automatic retry on pool timeout errors"""
         return self.db.table_exists(table_name)
 
+    @_retry_on_pool_timeout
     def create_table(
         self, table_name: str, columns: dict[str, str], keys: Optional[list[str]] = None
     ) -> bool:
         """Delegate to the database handler"""
         return self.db.create_table(table_name, columns, keys)
 
+    @_retry_on_pool_timeout
     def truncate_table(self, table_name: str) -> bool:
         """Delegate to the database handler"""
         return self.db.truncate_table(table_name)
 
+    @_retry_on_pool_timeout
     def drop_table(self, table_name: str) -> bool:
         """Delegate to the database handler"""
         return self.db.drop_table(table_name)
 
+    @_retry_on_pool_timeout
     def split_query_statements(self, query: str) -> list[str]:
         """Delegate to the database handler"""
         return self.db.split_query_statements(query)

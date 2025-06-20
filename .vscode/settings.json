@@ -6,6 +6,7 @@
     "mariadb",
     "mysql",
     "postgresql",
+    "queuepool",
     "scriptman",
     "tarteaucitron"
   ]

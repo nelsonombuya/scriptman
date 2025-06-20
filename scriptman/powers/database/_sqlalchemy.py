@@ -26,11 +26,17 @@ class SQLAlchemyHandler(DatabaseHandler):
         username: Optional[str] = None,
         password: Optional[str] = None,
         windows_auth: bool = False,
+        pool_size: int = 50,
+        max_overflow: int = 100,
+        pool_timeout: int = 120,
+        pool_recycle: int = 3600,
+        pool_pre_ping: bool = True,
     ) -> None:
         """
         🚀 Initializes the SQLAlchemyHandler class.
 
         Args:
+            protocol (str): The database protocol (e.g., 'mssql+pyodbc').
             driver (str): The driver for the database.
             server (str): The server for the database.
             database (str): The database for the database.
@@ -41,6 +47,15 @@ class SQLAlchemyHandler(DatabaseHandler):
                 to None.
             windows_auth (bool, optional): Whether to use Windows authentication. Defaults
                 to False.
+            pool_size (int, optional): The size of the connection pool. Defaults to 50.
+            max_overflow (int, optional): The maximum overflow size of the connection
+                pool. Defaults to 100.
+            pool_timeout (int, optional): The timeout in seconds for getting connection
+                from pool. Defaults to 120.
+            pool_recycle (int, optional): The time in seconds to recycle connections.
+                Defaults to 3600 (1 hour).
+            pool_pre_ping (bool, optional): Whether to validate connections before use.
+                Defaults to True.
         """
         super().__init__(
             port=port,
@@ -50,10 +65,101 @@ class SQLAlchemyHandler(DatabaseHandler):
             username=username,
             password=password,
         )
-        self._windows_auth = windows_auth
-        self._protocol = protocol
         self._engine: Engine
+        self._protocol = protocol
+        self._pool_size = pool_size
+        self._windows_auth = windows_auth
+        self._max_overflow = max_overflow
+        self._pool_timeout = pool_timeout
+        self._pool_recycle = pool_recycle
+        self._pool_pre_ping = pool_pre_ping
         self.connect()
+
+    @classmethod
+    def for_etl(
+        cls,
+        protocol: str,
+        driver: str,
+        server: str,
+        database: str,
+        port: Optional[int] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        windows_auth: bool = False,
+    ) -> "SQLAlchemyHandler":
+        """
+        🚀 Create SQLAlchemyHandler optimized for heavy ETL workloads with maximum
+        supported connection pool settings.
+
+        This configuration provides:
+        - pool_size=100: Large persistent connection pool
+        - max_overflow=200: High overflow capacity
+        - pool_timeout=300: Extended timeout (5 minutes)
+        - pool_recycle=1800: Faster connection recycling (30 minutes)
+        - pool_pre_ping=True: Connection validation
+
+        Total available connections: 300
+
+        Args:
+            protocol (str): The database protocol (e.g., 'mssql+pyodbc').
+            driver (str): The driver for the database.
+            server (str): The server for the database.
+            database (str): The database for the database.
+            port (Optional[int], optional): The port for the database.
+            username (Optional[str], optional): The username for the database.
+            password (Optional[str], optional): The password for the database.
+            windows_auth (bool, optional): Whether to use Windows authentication.
+
+        Returns:
+            SQLAlchemyHandler: Configured handler for heavy ETL workloads
+        """
+        return cls(
+            protocol=protocol,
+            driver=driver,
+            server=server,
+            database=database,
+            port=port,
+            username=username,
+            password=password,
+            windows_auth=windows_auth,
+            pool_size=100,
+            max_overflow=200,
+            pool_timeout=300,  # 5 minutes
+            pool_recycle=1800,  # 30 minutes
+            pool_pre_ping=True,
+        )
+
+    def upgrade_to_etl(self) -> "SQLAlchemyHandler":
+        """
+        🚀 Upgrade this existing handler to heavy ETL connection pool settings.
+
+        This method reinitializes the engine with maximum ETL settings
+        while preserving all existing connection parameters.
+
+        Configuration applied:
+        - pool_size=100: Large persistent connection pool
+        - max_overflow=200: High overflow capacity
+        - pool_timeout=300: Extended timeout (5 minutes)
+        - pool_recycle=1800: Connection recycling (30 minutes)
+        - pool_pre_ping=True: Connection validation
+
+        Total available connections: 300
+
+        Returns:
+            SQLAlchemyHandler: The same instance with upgraded pool settings
+        """
+        self.log.info("Upgrading connection pool to heavy ETL settings...")
+        self.disconnect()
+
+        self._pool_size = 100
+        self._max_overflow = 200
+        self._pool_timeout = 300
+        self._pool_recycle = 1800
+        self._pool_pre_ping = True
+
+        self.connect()
+        self.log.success("Successfully upgraded to heavy ETL mode")
+        return self
 
     @property
     def windows_auth(self) -> bool:
@@ -115,15 +221,21 @@ class SQLAlchemyHandler(DatabaseHandler):
             # Configure connection pool for ETL workloads with concurrent operations
             self._engine = create_engine(
                 self.connection_string,
-                pool_size=20,  # Increase base pool size
-                max_overflow=30,  # Allow more overflow connections
-                pool_timeout=60,  # Increase timeout to 60 seconds
-                pool_recycle=3600,  # Recycle connections every hour
-                pool_pre_ping=True,  # Validate connections before use
+                pool_size=self._pool_size,
+                max_overflow=self._max_overflow,
+                pool_timeout=self._pool_timeout,
+                pool_recycle=self._pool_recycle,
+                pool_pre_ping=self._pool_pre_ping,
             )
             with self._engine.connect() as session:  # Test the connection
                 session.execute(text("SELECT 1"))
-            self.log.success(f"Successfully connected to {self.database}")
+
+            total_connections = self._pool_size + self._max_overflow
+            self.log.success(
+                f"Successfully connected to {self.database} with pool configuration: "
+                f"pool_size={self._pool_size}, max_overflow={self._max_overflow}, "
+                f"total_available={total_connections}, timeout={self._pool_timeout}s"
+            )
             return True
         except SQLAlchemyError as error:
             self.log.error(f"Unable to connect to {self.database}: {error}")

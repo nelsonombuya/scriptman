@@ -43,8 +43,8 @@ class DatabaseHandler(ABC):
         self.password = password
         self.log = logger.bind(database=self.database, handler=self.__class__.__name__)
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def for_etl(cls, *args: Any, **kwargs: Any) -> "DatabaseHandler":
         """
         🚀 Create a database handler for ETL mode with optimized settings for heavy ETL

@@ -112,7 +112,15 @@ class SQLAlchemyHandler(DatabaseHandler):
             DatabaseError: If a connection to the database cannot be established.
         """
         try:
-            self._engine = create_engine(self.connection_string)
+            # Configure connection pool for ETL workloads with concurrent operations
+            self._engine = create_engine(
+                self.connection_string,
+                pool_size=20,  # Increase base pool size
+                max_overflow=30,  # Allow more overflow connections
+                pool_timeout=60,  # Increase timeout to 60 seconds
+                pool_recycle=3600,  # Recycle connections every hour
+                pool_pre_ping=True,  # Validate connections before use
+            )
             with self._engine.connect() as session:  # Test the connection
                 session.execute(text("SELECT 1"))
             self.log.success(f"Successfully connected to {self.database}")

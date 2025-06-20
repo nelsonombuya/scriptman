@@ -954,10 +954,6 @@ class ETL:
         from uuid import uuid4
 
         temp_table = f"temp_{table_name}_{str(uuid4())[:8]}".replace("-", "_")
-        while database_handler.table_exists(temp_table):
-            self.log.warning(f"Temporary table {temp_table} already exists. Retrying...")
-            temp_table = f"temp_{table_name}_{str(uuid4())[:8]}".replace("-", "_")
-
         self._temp_tables.add((database_handler, temp_table))
         merge_query = query.format(source_table=temp_table)
 
@@ -973,10 +969,22 @@ class ETL:
             temp_query, temp_values = database_handler.generate_prepared_insert_query(
                 temp_table, self._data, force_nvarchar
             )
-            database_handler.execute_write_batch_query(
-                temp_query, temp_values, batch_size
-            )
-
+            try:
+                database_handler.execute_write_batch_query(
+                    temp_query, temp_values, batch_size
+                )
+            except DatabaseError as error:
+                if "duplicate key" in str(error).lower():
+                    self.log.warning(f"Duplicate key error: {error}. Retrying...")
+                    return self._merge(
+                        query=query,
+                        table_name=table_name,
+                        batch_size=batch_size,
+                        force_nvarchar=force_nvarchar,
+                        allow_fallback=allow_fallback,
+                        database_handler=database_handler,
+                    )
+                raise error
             """
             ✍🏾 Merge the data into the target table
 

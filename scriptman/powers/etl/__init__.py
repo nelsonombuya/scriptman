@@ -3,7 +3,6 @@ try:
     from contextlib import contextmanager
     from pathlib import Path
     from typing import Any, Callable, Generator, Literal, Optional, cast
-    from weakref import WeakSet
 
     from loguru import logger
     from pandas import DataFrame, MultiIndex, concat
@@ -29,7 +28,7 @@ class ETL:
 
     log = logger
     _data: DataFrame = DataFrame()
-    _temp_tables: WeakSet[tuple[ETLDatabase, str]] = WeakSet()
+    _temp_tables: set[tuple[ETLDatabase, str]] = set()
 
     @classmethod
     def _cleanup_temp_tables(cls) -> None:

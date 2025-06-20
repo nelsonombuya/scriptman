@@ -340,11 +340,7 @@ class DatabaseHandler(ABC):
     def table_exists(self, table_name: str) -> bool:
         """❓ Checks if the given table exists in the database."""
         query = "SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = :table_name"
-        try:
-            return bool(self.execute_read_query(query, {"table_name": table_name}))
-        except Exception as e:
-            self.log.error(f'Table "{table_name}" not found: {e}')
-            return False
+        return bool(self.execute_read_query(query, {"table_name": table_name}))
 
     def table_has_records(self, table_name: str) -> bool:
         """❓ Checks if the given table has records in the database."""
@@ -365,69 +361,39 @@ class DatabaseHandler(ABC):
         Returns:
             bool: True if the table was created, False otherwise.
         """
-        try:
-            if self.table_exists(table_name):
-                self.log.warning(f'Table "{table_name}" already exists')
-                return True
+        if self.table_exists(table_name):
+            self.log.warning(f'Table "{table_name}" already exists')
+            return True
 
-            if keys:
-                for key in keys:
-                    if key in columns and columns[key].upper() == "NVARCHAR(MAX)":
-                        columns[key] = "NVARCHAR(255)"
-                        self.log.debug(
-                            f'Converting primary key "{key}" '
-                            "from NVARCHAR(MAX) to NVARCHAR(255)"
-                        )
+        if keys:
+            for key in keys:
+                if key in columns and columns[key].upper() == "NVARCHAR(MAX)":
+                    columns[key] = "NVARCHAR(255)"
+                    self.log.debug(
+                        f'Converting primary key "{key}" '
+                        "from NVARCHAR(MAX) to NVARCHAR(255)"
+                    )
 
-            column_definitions = ", ".join(
-                [
-                    f'"{column_name}" {column_type}'
-                    for column_name, column_type in columns.items()
-                ]
-            )
+        column_definitions = ", ".join(
+            [
+                f'"{column_name}" {column_type}'
+                for column_name, column_type in columns.items()
+            ]
+        )
 
-            if keys:
-                column_definitions += f", PRIMARY KEY ({', '.join(keys)})"
+        if keys:
+            column_definitions += f", PRIMARY KEY ({', '.join(keys)})"
 
-            query = f'CREATE TABLE "{table_name}" ({column_definitions})'
-            result = self.execute_write_query(query)
-            if result:
-                self.log.info(f'Table "{table_name}" created')
-                return result
-            else:
-                self.log.error(f'Table "{table_name}" not created')
-                return result
-        except Exception as e:
-            self.log.error(f'Table "{table_name}" not created: {e}')
-            return False
+        query = f'CREATE TABLE "{table_name}" ({column_definitions})'
+        return self.execute_write_query(query)
 
     def truncate_table(self, table_name: str) -> bool:
         """🧹 Truncates the given table if it exists."""
-        try:
-            result = self.execute_write_query(f'TRUNCATE TABLE "{table_name}"')
-            if result:
-                self.log.info(f'Table "{table_name}" truncated')
-                return result
-            else:
-                self.log.error(f'Table "{table_name}" not truncated')
-                return result
-        except Exception as e:
-            self.log.error(f'Table "{table_name}" not truncated: {e}')
-            return False
+        return self.execute_write_query(f'TRUNCATE TABLE "{table_name}"')
 
     def drop_table(self, table_name: str) -> bool:
         """🧹 Drops the given table if it exists."""
-        try:
-            result = self.execute_write_query(f'DROP TABLE IF EXISTS "{table_name}"')
-            if result:
-                self.log.info(f'Table "{table_name}" dropped')
-                return result
-            else:
-                self.log.error(f'Table "{table_name}" not dropped')
-                return result
-        except Exception as e:
-            self.log.error(f'Table "{table_name}" not dropped: {e}')
-            return False
+        return self.execute_write_query(f'DROP TABLE IF EXISTS "{table_name}"')
 
     def convert_query_to_named_placeholders(
         self, query: str, values: list[tuple[Any, ...]]

@@ -1,8 +1,9 @@
 try:
+    from atexit import register
     from contextlib import contextmanager
-    from functools import partial
     from pathlib import Path
-    from typing import Any, Callable, Generator, Iterator, Literal, Optional, cast
+    from typing import Any, Callable, Generator, Literal, Optional, cast
+    from weakref import WeakSet
 
     from loguru import logger
     from pandas import DataFrame, MultiIndex, concat
@@ -28,6 +29,19 @@ class ETL:
 
     log = logger
     _data: DataFrame = DataFrame()
+    _temp_tables: WeakSet[tuple[ETLDatabase, str]] = WeakSet()
+
+    @classmethod
+    def _cleanup_temp_tables(cls) -> None:
+        """🧹 Clean up any remaining temporary tables."""
+        for db_handler, table_name in list(cls._temp_tables):
+            try:
+                if db_handler.table_exists(table_name):
+                    db_handler.drop_table(table_name)
+                    cls.log.info(f"Cleaned up temporary table: {table_name}")
+            except Exception as e:
+                cls.log.warning(f"Failed to cleanup temporary table {table_name}: {e}")
+        cls._temp_tables.clear()
 
     def __init__(self, data: Optional[ETL_TYPES] = None) -> None:
         """
@@ -784,6 +798,7 @@ class ETL:
         batch_size: int = 1000,
         batch_execute: bool = True,
         force_nvarchar: bool = False,
+        allow_fallback: bool = False,
         synchronize_schema: bool = True,
         method: Literal["truncate", "replace", "insert", "update", "upsert"] = "upsert",
     ) -> bool:
@@ -804,10 +819,12 @@ class ETL:
                 types. Defaults to False.
             batch_size (Optional[int], optional): The number of rows to include in each
                 batch. Defaults to 1000.
-            method (Literal["truncate", "replace", "insert", "update", "upsert"]):
-                The loading method to use. Defaults to "upsert".
+            allow_fallback (bool, optional): Whether to allow fallback to insert/update
+                operations when the primary operation fails. Defaults to False.
             synchronize_schema (bool, optional): Whether to synchronize the schema of
                 the table before loading the data. Defaults to True.
+            method (Literal["truncate", "replace", "insert", "update", "upsert"]):
+                The loading method to use. Defaults to "upsert".
 
         Raises:
             ValueError: If the dataset is empty or if bulk execute is disabled.
@@ -877,11 +894,11 @@ class ETL:
             if f"merge [{table_name}] as target" in query.lower():
                 return self._merge(
                     query=query,
-                    values=values,
                     database_handler=db,
                     batch_size=batch_size,
                     table_name=table_name,
                     force_nvarchar=force_nvarchar,
+                    allow_fallback=allow_fallback,
                 )
 
             if not batch_execute:
@@ -903,22 +920,25 @@ class ETL:
             return tasks.are_successful
 
         except DatabaseError as error:
+            if not allow_fallback:
+                self.log.error(f"Database Error: {error}")
+                raise error
+
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
-            partial_func = partial(self._insert_or_update, db, table_name)
-            tasks = executor.multithread(
-                [(lambda row: partial_func(row), (row,), {}) for row in values]
+            return self.insert_or_update(
+                database_handler=db,
+                table_name=table_name,
+                force_nvarchar=force_nvarchar,
             )
-            tasks.await_results()  # Will raise an exception if any query fails
-            return tasks.are_successful
 
     def _merge(
         self,
         database_handler: ETLDatabase,
         table_name: str,
         query: str,
-        values: Iterator[dict[str, Any]] | list[dict[str, Any]],
         force_nvarchar: bool = False,
         batch_size: int = 1000,
+        allow_fallback: bool = False,
     ) -> bool:
         """
         ✍🏾 Private method to merge data into the mssql database using a temporary table.
@@ -927,7 +947,7 @@ class ETL:
             database_handler (ETLDatabase): The database handler to use for executing
                 queries.
             query (str): The query to execute.
-            values (Iterator[dict[str, Any]] | list[dict[str, Any]]): The values to merge.
+            allow_fallback (bool): Whether to allow fallback to insert/update on error.
 
         Returns:
             bool: True if the data was merged successfully.
@@ -935,6 +955,7 @@ class ETL:
         from uuid import uuid4
 
         temp_table = f"temp_{table_name}_{str(uuid4())[:8]}".replace("-", "_")
+        self._temp_tables.add((database_handler, temp_table))
         merge_query = query.format(source_table=temp_table)
 
         try:
@@ -966,45 +987,68 @@ class ETL:
             )
 
         except DatabaseError as error:
+            if not allow_fallback:
+                raise error
+
             # If the merge fails, retry using insert/update
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
-            for value in values:
-                self._insert_or_update(database_handler, table_name, value)
-            return True
+            return self.insert_or_update(
+                table_name=table_name,
+                force_nvarchar=force_nvarchar,
+                database_handler=database_handler,
+            )
 
         finally:
-            # Drop the temporary table
-            database_handler.drop_table(temp_table)
+            try:
+                database_handler.drop_table(temp_table)
+                self._temp_tables.discard((database_handler, temp_table))
+            except Exception as e:
+                self.log.warning(f"Failed to cleanup temporary table {temp_table}: {e}")
 
-    def _insert_or_update(
-        self, database_handler: ETLDatabase, table_name: str, record: dict[str, Any]
+    def insert_or_update(
+        self,
+        database_handler: ETLDatabase,
+        table_name: str,
+        force_nvarchar: bool = False,
     ) -> bool:
         """
-        ✍🏾 Private method to insert/update a single record into the database.
+        ✍🏾 Method to insert/update the entire dataframe into the database.
 
-        This method tries to insert the record into the database first, and if
+        This method tries to insert the dataframe into the database first, and if
         that fails, it retries using an update query.
 
         Args:
-            database_handler (DatabaseHandler): The handler for the database.
+            database_handler (ETLDatabase): The handler for the database.
             table_name (str): The name of the table.
-            record (dict[str, Any]): The record to insert or update.
+            force_nvarchar (bool): Whether to force NVARCHAR data types.
         """
-        insert_query, values = database_handler.generate_prepared_insert_query(
-            table_name, DataFrame([record])
+        insert_query, _ = database_handler.generate_prepared_insert_query(
+            table_name, self._data, force_nvarchar
         )
         update_query, _ = database_handler.generate_prepared_update_query(
-            table_name, DataFrame([record])
+            table_name, self._data, force_nvarchar
         )
 
-        results: list[bool] = []
-        for value in values:
+        def _insert_or_update_single_record(record: dict[str, Any]) -> bool:
             try:
-                results.append(database_handler.execute_write_query(insert_query, value))
-            except DatabaseError as error:
-                self.log.error(f"Database Error: {error}. Retrying using update...")
-                results.append(database_handler.execute_write_query(update_query, value))
-        return all(results)
+                self.log.debug(f"Attempting insert for record: {record}")
+                return database_handler.execute_write_query(insert_query, record)
+            except DatabaseError as insert_error:
+                self.log.warning(f"Insert failed: {insert_error}")
+                self.log.debug(f"Attempting update for record: {record}")
+                return database_handler.execute_write_query(update_query, record)
+
+        return (
+            TaskExecutor()
+            .multithread(
+                [
+                    (_insert_or_update_single_record, (record,), {})
+                    for record in self._data.reset_index().to_dict(orient="records")
+                ]
+            )
+            .are_successful
+        )
 
 
+register(ETL._cleanup_temp_tables)
 __all__: list[str] = ["ETL"]

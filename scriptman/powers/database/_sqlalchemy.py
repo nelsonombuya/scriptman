@@ -75,65 +75,11 @@ class SQLAlchemyHandler(DatabaseHandler):
         self._pool_pre_ping = pool_pre_ping
         self.connect()
 
-    @classmethod
-    def for_etl(
-        cls,
-        protocol: str,
-        driver: str,
-        server: str,
-        database: str,
-        port: Optional[int] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        windows_auth: bool = False,
-    ) -> "SQLAlchemyHandler":
-        """
-        🚀 Create SQLAlchemyHandler optimized for heavy ETL workloads with maximum
-        supported connection pool settings.
-
-        This configuration provides:
-        - pool_size=100: Large persistent connection pool
-        - max_overflow=200: High overflow capacity
-        - pool_timeout=300: Extended timeout (5 minutes)
-        - pool_recycle=1800: Faster connection recycling (30 minutes)
-        - pool_pre_ping=True: Connection validation
-
-        Total available connections: 300
-
-        Args:
-            protocol (str): The database protocol (e.g., 'mssql+pyodbc').
-            driver (str): The driver for the database.
-            server (str): The server for the database.
-            database (str): The database for the database.
-            port (Optional[int], optional): The port for the database.
-            username (Optional[str], optional): The username for the database.
-            password (Optional[str], optional): The password for the database.
-            windows_auth (bool, optional): Whether to use Windows authentication.
-
-        Returns:
-            SQLAlchemyHandler: Configured handler for heavy ETL workloads
-        """
-        return cls(
-            protocol=protocol,
-            driver=driver,
-            server=server,
-            database=database,
-            port=port,
-            username=username,
-            password=password,
-            windows_auth=windows_auth,
-            pool_size=100,
-            max_overflow=200,
-            pool_timeout=300,  # 5 minutes
-            pool_recycle=1800,  # 30 minutes
-            pool_pre_ping=True,
-        )
-
     def upgrade_to_etl(self) -> "SQLAlchemyHandler":
         """
-        🚀 Upgrade this existing handler to heavy ETL connection pool settings.
+        🚀 Upgrade this existing handler to ETL-optimized connection pool settings.
 
-        This method reinitializes the engine with maximum ETL settings
+        This method reinitializes the engine with ETL-optimized settings
         while preserving all existing connection parameters.
 
         Configuration applied:
@@ -148,7 +94,11 @@ class SQLAlchemyHandler(DatabaseHandler):
         Returns:
             SQLAlchemyHandler: The same instance with upgraded pool settings
         """
-        self.log.info("Upgrading connection pool to heavy ETL settings...")
+        if self._is_etl_mode:
+            self.log.info("Already in ETL mode, skipping upgrade")
+            return self
+
+        self.log.info("Upgrading connection pool to ETL-optimized settings...")
         self.disconnect()
 
         self._pool_size = 100
@@ -158,7 +108,8 @@ class SQLAlchemyHandler(DatabaseHandler):
         self._pool_pre_ping = True
 
         self.connect()
-        self.log.success("Successfully upgraded to heavy ETL mode")
+        self._is_etl_mode = True
+        self.log.success("Successfully upgraded to ETL mode")
         return self
 
     @property

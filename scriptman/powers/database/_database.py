@@ -41,24 +41,8 @@ class DatabaseHandler(ABC):
         self.database = database
         self.username = username
         self.password = password
+        self._is_etl_mode = False
         self.log = logger.bind(database=self.database, handler=self.__class__.__name__)
-
-    @classmethod
-    @abstractmethod
-    def for_etl(cls, *args: Any, **kwargs: Any) -> "DatabaseHandler":
-        """
-        🚀 Create a database handler for ETL mode with optimized settings for heavy ETL
-        workloads. You can add arbitrary arguments to the method to pass to the database
-        handler constructor.
-
-        Args:
-            *args: Variable length argument list for the database handler.
-            **kwargs: Arbitrary keyword arguments for the database handler.
-
-        Returns:
-            DatabaseHandler: The database handler for ETL mode.
-        """
-        pass
 
     @abstractmethod
     def upgrade_to_etl(self) -> "DatabaseHandler":

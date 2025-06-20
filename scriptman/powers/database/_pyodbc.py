@@ -67,54 +67,6 @@ class PyODBCHandler(DatabaseHandler):
         self._pool_validate_connections = pool_validate_connections
         self._initialize_pool()
 
-    @classmethod
-    def for_etl(
-        cls,
-        driver: str,
-        server: str,
-        database: str,
-        username: str,
-        password: str,
-        port: Optional[int] = None,
-    ) -> "PyODBCHandler":
-        """
-        🚀 Create PyODBCHandler optimized for heavy ETL workloads with maximum
-        supported connection pool settings.
-
-        This configuration provides:
-        - pool_size=100: Very large connection pool for maximum concurrency
-        - pool_timeout=300: Extended timeout (5 minutes)
-        - pool_recycle_time=900: Faster connection recycling (15 minutes)
-        - pool_validate_connections=True: Connection validation enabled
-
-        Note: PyODBC can handle high connection counts but may be less efficient
-        than SQLAlchemy for very large pools. Monitor performance and adjust
-        if needed.
-
-        Args:
-            driver (str): The driver for the database.
-            server (str): The server for the database.
-            database (str): The database for the database.
-            username (str): The username for the database.
-            password (str): The password for the database.
-            port (Optional[int], optional): The port for the database.
-
-        Returns:
-            PyODBCHandler: Configured handler for heavy ETL workloads
-        """
-        return cls(
-            driver=driver,
-            server=server,
-            database=database,
-            username=username,
-            password=password,
-            port=port,
-            pool_size=100,
-            pool_timeout=300,  # 5 minutes
-            pool_recycle_time=900,  # 15 minutes
-            pool_validate_connections=True,
-        )
-
     def upgrade_to_etl(self) -> "PyODBCHandler":
         """
         🚀 Upgrade this existing handler to heavy ETL connection pool settings.
@@ -131,6 +83,10 @@ class PyODBCHandler(DatabaseHandler):
         Returns:
             PyODBCHandler: The same instance with upgraded pool settings
         """
+        if self._is_etl_mode:
+            self.log.info("Already in ETL mode, skipping upgrade")
+            return self
+
         self.log.info("Upgrading connection pool to heavy ETL settings...")
         self.disconnect()
 
@@ -141,6 +97,7 @@ class PyODBCHandler(DatabaseHandler):
         self._connection_created_times.clear()
 
         self._initialize_pool()
+        self._is_etl_mode = True
         self.log.success("Successfully upgraded to heavy ETL mode")
         return self
 

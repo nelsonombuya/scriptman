@@ -958,9 +958,11 @@ class ETL:
         merge_query = query.format(source_table=temp_table)
 
         try:
+            # NOTE: We don't need to create the table with the same keys as the target
+            # table because the merge query will use the temporary table as the source
+            # table.
             database_handler.create_table(
                 table_name=temp_table,
-                keys=[str(_) for _ in self._data.index.names],
                 columns=database_handler.get_table_data_types(
                     self._data.reset_index(), force_nvarchar
                 ),

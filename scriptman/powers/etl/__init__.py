@@ -951,18 +951,22 @@ class ETL:
         Returns:
             bool: True if the data was merged successfully.
         """
-        from uuid import uuid4
+        from random import randint
+        from time import sleep
 
-        temp_table = f"temp_{table_name}_{str(uuid4())[:8]}".replace("-", "_")
+        temp_table = self._generate_temp_table_name(table_name)
         self._temp_tables.add((database_handler, temp_table))
         merge_query = query.format(source_table=temp_table)
 
+        while database_handler.table_exists(temp_table):
+            self.log.warning(f"Temp table {temp_table} already exists, retrying...")
+            sleep(randint(1, 100) / 1000)  # Random backoff
+            temp_table = self._generate_temp_table_name(table_name)
+
         try:
-            # NOTE: We don't need to create the table with the same keys as the target
-            # table because the merge query will use the temporary table as the source
-            # table.
             database_handler.create_table(
                 table_name=temp_table,
+                keys=[str(_) for _ in self._data.index.names],
                 columns=database_handler.get_table_data_types(
                     self._data.reset_index(), force_nvarchar
                 ),
@@ -971,14 +975,24 @@ class ETL:
             temp_query, temp_values = database_handler.generate_prepared_insert_query(
                 temp_table, self._data, force_nvarchar
             )
+
             try:
                 database_handler.execute_write_batch_query(
                     temp_query, temp_values, batch_size
                 )
             except DatabaseError as error:
-                if "duplicate key" in str(error).lower():
+                if any(
+                    keyword in str(error).lower()
+                    for keyword in [
+                        "duplicate key",
+                        "already exists",
+                        "constraint",
+                        "violation",
+                    ]
+                ):
                     self.log.warning(f"Duplicate key error: {error}. Retrying...")
-                    return self._merge(
+                    sleep(randint(1, 100) / 1000)  # Random backoff
+                    self._merge(
                         query=query,
                         table_name=table_name,
                         batch_size=batch_size,
@@ -987,6 +1001,7 @@ class ETL:
                         database_handler=database_handler,
                     )
                 raise error
+
             """
             ✍🏾 Merge the data into the target table
 
@@ -999,6 +1014,7 @@ class ETL:
 
         except DatabaseError as error:
             if not allow_fallback:
+                self.log.error(f"Database Error: {error}. Aborting...")
                 raise error
 
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
@@ -1010,7 +1026,9 @@ class ETL:
 
         finally:
             try:
-                database_handler.drop_table(temp_table)
+                if database_handler.table_exists(temp_table):
+                    database_handler.drop_table(temp_table)
+                    self.log.debug(f"Cleaned up temporary table: {temp_table}")
                 self._temp_tables.discard((database_handler, temp_table))
             except Exception as e:
                 self.log.warning(f"Failed to cleanup temporary table {temp_table}: {e}")
@@ -1058,6 +1076,33 @@ class ETL:
             )
             .are_successful
         )
+
+    def _generate_temp_table_name(self, table_name: str) -> str:
+        """
+        ✍🏾 Method to generate a highly unique temp table name to avoid race conditions.
+        """
+        from os import getpid
+        from random import randint
+        from threading import current_thread
+        from time import time
+        from uuid import uuid4
+
+        process_id = getpid()
+        timestamp = int(time() * 1000)
+        random_suffix = randint(1000, 9999)
+        thread_id = current_thread().ident or 0
+        full_uuid = str(uuid4()).replace("-", "")
+
+        temp_table = (
+            f"temp_{table_name}_{process_id}_{thread_id}_"
+            f"{timestamp}_{random_suffix}_{full_uuid[:8]}"
+        )
+
+        # Ensure table name doesn't exceed database limits (usually 128 chars)
+        if len(temp_table) > 120:
+            temp_table = f"temp_{process_id}_{thread_id}_{timestamp}_{random_suffix}"
+
+        return temp_table
 
 
 register(ETL._cleanup_temp_tables)

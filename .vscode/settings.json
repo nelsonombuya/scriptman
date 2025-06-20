@@ -3,6 +3,7 @@
     "crdownload",
     "DUMPFILE",
     "executemany",
+    "getpid",
     "mariadb",
     "mysql",
     "postgresql",

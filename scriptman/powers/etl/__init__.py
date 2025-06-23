@@ -147,25 +147,39 @@ class ETL:
     """
 
     @classmethod
-    def from_dataframe(cls, data: DataFrame) -> "ETL":
+    def search_files(cls, file_path: str | Path, pattern: str = "*") -> list[Path]:
+        """
+        🔍 Search for files in the given path that match the pattern.
+        """
+        return list(Path(file_path).glob(pattern))
+
+    @classmethod
+    def search_downloads(cls, pattern: str = "*") -> list[Path]:
+        """
+        🔍 Search for files in the configured scriptman downloads directory that match the
+        pattern.
+        """
+        from scriptman.core.config import config
+
+        return cls.search_files(config.settings.downloads_dir, pattern)
+
+    @classmethod
+    def from_dataframe(cls, data: DataFrame | list[DataFrame]) -> "ETL":
         """
         🔍 Create an ETL object from a DataFrame.
         """
-        return cls(data)
+        return cls(data) if isinstance(data, DataFrame) else cls(concat(data))
 
     @classmethod
-    def from_dataframe_list(cls, data: list[DataFrame], **kwargs: Any) -> "ETL":
-        """
-        🔍 Create an ETL object from a list of DataFrames.
-        """
-        return cls(concat(data, **kwargs))
-
-    @classmethod
-    def from_etl_list(cls, data: list["ETL"], **kwargs: Any) -> "ETL":
+    def from_etl(cls, data: "ETL | list[ETL]") -> "ETL":
         """
         🔍 Create an ETL object from a list of ETL objects.
         """
-        return cls(concat([_.data for _ in data], **kwargs))
+        return (
+            cls(concat([_.data for _ in data]))
+            if isinstance(data, list)
+            else cls(data.data)
+        )
 
     @classmethod
     def from_list(cls, data: list[dict[str, Any]]) -> "ETL":
@@ -175,7 +189,7 @@ class ETL:
         return cls(data)
 
     @classmethod
-    def from_csv_file(cls, file_path: str | Path) -> "ETL":
+    def from_csv(cls, file_path: str | Path) -> "ETL":
         """
         📃 Extract data from a CSV file.
 
@@ -203,7 +217,7 @@ class ETL:
             raise FileNotFoundError(f"No file found at: {file_path}")
 
     @classmethod
-    def from_json_file(cls, file_path: str | Path) -> "ETL":
+    def from_json(cls, file_path: str | Path) -> "ETL":
         """
         📃 Extract data from a JSON file.
 
@@ -738,7 +752,7 @@ class ETL:
             self._data.reset_index().to_dict(orient="records"),
         )
 
-    def to_csv_file(self, file_path: str | Path) -> Path:
+    def to_csv(self, file_path: str | Path) -> Path:
         """
         📃 Saves the data to a CSV file using the given file path.
 
@@ -763,7 +777,7 @@ class ETL:
             self.log.success(f"Data saved to {file_path}")
             return file_path
 
-    def to_json_file(self, file_path: str | Path, indent: int = 2) -> Path:
+    def to_json(self, file_path: str | Path, indent: int = 2) -> Path:
         """
         📃 Saves the data to a JSON file using the given file path.
 

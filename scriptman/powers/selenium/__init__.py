@@ -33,6 +33,7 @@ class SeleniumInstance(ABC):
         self,
         browser: Browsers = Browsers.CHROME,
         browser_queue: Optional[list[Browsers]] = None,
+        remove_downloaded_files: bool = True,
     ) -> None:
         """
         🚀 Initialize SeleniumInstance with the given browser and optional browser queue.
@@ -42,9 +43,13 @@ class SeleniumInstance(ABC):
             browser_queue (Optional[list[Browsers]], optional): The browser queue to use
                 for the instance, such that if one fails, it will try the next one.
                 Defaults to None.
+            remove_downloaded_files (bool, optional): Whether to remove the downloaded
+                files after the instance is closed. Defaults to True.
         """
         self._log: Logger = logger
+        self._downloaded_files: set[Path] = set()
         self._queue: Optional[list[Browsers]] = browser_queue
+        self._remove_downloaded_files: bool = remove_downloaded_files
         self._browser: SeleniumBrowser[Driver] = BrowserMap.get(browser, Chrome)()
 
     @property
@@ -64,13 +69,13 @@ class SeleniumInstance(ABC):
         keys: Optional[str] = None,
         rest: float = uniform(0.25, 0.50),
         mode: Literal[
-            "wait",
             "click",
             "js_click",
             "send_keys",
             "send_return",
             "deny_cookies",
             "accept_cookies",
+            "wait_till_invisible",
         ] = "click",
     ) -> bool:
         """
@@ -105,19 +110,19 @@ class SeleniumInstance(ABC):
             mode = "js_click"
 
         wait = WebDriverWait(self.driver, timeout)
-        if mode == "wait":  # Wait for the element to become invisible
+        if mode == "wait_till_invisible":  # Wait for the element to become invisible
             wait.until(EC.invisibility_of_element_located((By.XPATH, xpath)))
             return True
 
         element = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
-        ActionChains(self.driver).move_to_element(element).perform()  # type:ignore
+        ActionChains(self.driver).move_to_element(element).perform()  # type: ignore
 
         if mode == "click":  # Click on the web element
             element.click()
             return True
 
         if mode == "js_click":  # Perform a JavaScript click on the web element
-            self.driver.execute_script("arguments[0].click();", element)  # type:ignore
+            self.driver.execute_script("arguments[0].click();", element)  # type: ignore
             return True
 
         if mode == "send_keys":  # Send keys (text input) to the web element
@@ -132,13 +137,16 @@ class SeleniumInstance(ABC):
 
         raise ValueError(f"Invalid mode: {mode}")
 
-    def wait_for_downloads_to_finish(self, file_name: Optional[str] = None) -> None:
+    def wait_for_downloads_to_finish(self, file_name: Optional[str] = None) -> Path:
         """
         ⌚ Wait for all downloads to finish before continuing.
 
         Args:
             file_name (Optional[str]): The name of the file you want to wait for its
                 download to complete. Defaults to None.
+
+        Returns:
+            Path: The path of the recently downloaded file.
         """
         download_extensions = (".tmp", ".crdownload")
         directory = Path(config.settings.downloads_dir)
@@ -156,13 +164,29 @@ class SeleniumInstance(ABC):
                 return len(new_files) > 0
 
             WebDriverWait(self.driver, 300, 1).until(is_new_file_added)
-            return
+
+            # Return the most recently downloaded file
+            current_files = list(directory.iterdir())
+            new_files = [
+                file
+                for file in current_files
+                if file not in files and file.suffix not in download_extensions
+            ]
+            downloaded_file = max(new_files, key=lambda x: x.stat().st_mtime)
+            self._downloaded_files.add(downloaded_file)
+            return downloaded_file
         else:
 
             def does_file_exist(driver: Driver) -> bool:
                 return bool(list(Path(directory).glob(f"{file_name}*")))
 
             WebDriverWait(self.driver, 300, 1).until(does_file_exist)
+
+            # Return the specific file that was waited for
+            matching_files = list(Path(directory).glob(f"{file_name}*"))
+            downloaded_file = max(matching_files, key=lambda x: x.stat().st_mtime)
+            self._downloaded_files.add(downloaded_file)
+            return downloaded_file
 
     def __del__(self) -> None:
         """
@@ -174,6 +198,10 @@ class SeleniumInstance(ABC):
             self.driver.quit()
         except Exception as e:
             self._log.error(f"Failed to close SeleniumInstance {name} : {e}")
+
+        if self._remove_downloaded_files:
+            for file in self._downloaded_files:
+                file.unlink()
 
 
 __all__: list[str] = [

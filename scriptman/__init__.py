@@ -47,43 +47,54 @@ try:
     )
     from scriptman.powers.api import _exceptions as api_exceptions
     from scriptman.powers.api import api
-except ImportError:
-    logger.debug("API Powers Not Available. Install with `pip install scriptman[api]`")
+except ImportError as e:
+    logger.warning(
+        "Scriptman API Powers are unavailable. "
+        "You may install them with `pip install scriptman[api]`"
+    )
+    logger.debug(f"API Powers Import Error: {e}")
 
 """
 Cache powers
 """
 try:
     from scriptman.powers.cache import CacheManager, cache
-except ImportError:
-    logger.debug(
-        "Cache Powers Not Available. Install with `pip install scriptman[cache]`"
+except ImportError as e:
+    logger.warning(
+        "Scriptman Cache Powers are unavailable. "
+        "You may install them with `pip install scriptman[cache]`"
     )
+    logger.debug(f"Cache Powers Import Error: {e}")
 
 """
 Database powers
 """
 try:
     from scriptman.powers.database import DatabaseHandler
-
-    try:
-        from scriptman.powers.database._sqlalchemy import SQLAlchemyHandler
-    except ImportError:
-        logger.debug(
-            "SQLAlchemy Powers Not Available. "
-            "Install with `pip install scriptman[sqlalchemy]`"
-        )
-
-    try:
-        from scriptman.powers.database._pyodbc import PyODBCHandler
-    except ImportError:
-        logger.debug(
-            "PyODBC Powers Not Available. Install with `pip install scriptman[pyodbc]`"
-        )
-except ImportError:
-    logger.debug(
-        "Database Powers Not Available. Install with `pip install scriptman[database]`"
+except ImportError as e:
+    logger.warning(
+        "Scriptman Database Powers are unavailable. "
+        "You may install them with `pip install scriptman[database]`"
     )
+    logger.debug(f"Database Powers Import Error: {e}")
+
+try:
+    from scriptman.powers.database._sqlalchemy import SQLAlchemyHandler
+except ImportError as e:
+    logger.warning(
+        "Scriptman SQLAlchemy Powers are unavailable. "
+        "You may install them with `pip install scriptman[sqlalchemy]`"
+    )
+    logger.debug(f"SQLAlchemy Powers Import Error: {e}")
+
+try:
+    from scriptman.powers.database._pyodbc import PyODBCHandler
+except ImportError as e:
+    logger.warning(
+        "Scriptman PyODBC Powers are unavailable. "
+        "You may install them with `pip install scriptman[pyodbc]`"
+    )
+    logger.debug(f"PyODBC Powers Import Error: {e}")
 
 
 """
@@ -91,8 +102,12 @@ ETL powers
 """
 try:
     from scriptman.powers.etl import ETL
-except ImportError:
-    logger.debug("ETL Powers Not Available. Install with `pip install scriptman[etl]`")
+except ImportError as e:
+    logger.warning(
+        "Scriptman ETL Powers are unavailable. "
+        "You may install them with `pip install scriptman[etl]`"
+    )
+    logger.debug(f"ETL Powers Import Error: {e}")
 
 
 """
@@ -100,10 +115,12 @@ Scheduler powers
 """
 try:
     from scriptman.powers.scheduler import Scheduler, scheduler
-except ImportError:
-    logger.debug(
-        "Scheduler Powers Not Available. Install with `pip install scriptman[scheduler]`"
+except ImportError as e:
+    logger.warning(
+        "Scriptman Scheduler Powers are unavailable. "
+        "You may install them with `pip install scriptman[scheduler]`"
     )
+    logger.debug(f"Scheduler Powers Import Error: {e}")
 
 
 """
@@ -111,10 +128,12 @@ Selenium powers
 """
 try:
     from scriptman.powers.selenium import SeleniumInstance
-except ImportError:
-    logger.debug(
-        "Selenium Powers Not Available. Install with `pip install scriptman[selenium]`"
+except ImportError as e:
+    logger.warning(
+        "Scriptman Selenium Powers are unavailable. "
+        "You may install them with `pip install scriptman[selenium]`"
     )
+    logger.debug(f"Selenium Powers Import Error: {e}")
 
 
 __all__: list[str] = [

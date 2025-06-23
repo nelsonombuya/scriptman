@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.9.526"
+version = "2.9.527"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -82,6 +82,7 @@ pytest = "^8.3.4"
 icecream = "^2.1.4"
 pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
+pytest-asyncio = "^0.25.0"
 
 # Formatting & Linting Configuration
 [tool.black]

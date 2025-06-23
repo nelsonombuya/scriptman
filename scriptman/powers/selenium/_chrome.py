@@ -6,7 +6,7 @@ try:
     from typing import Any, Literal, Optional
     from zipfile import ZipFile
 
-    from loguru import Logger, logger
+    from loguru import logger
     from requests import get
     from selenium.webdriver import Chrome as ChromeDriver
     from selenium.webdriver.chrome.options import Options as ChromeOptions
@@ -100,7 +100,7 @@ class ChromeDownloader:
     and Driver.
     """
 
-    log: Logger = logger.bind(handler="Chrome Downloader")
+    log = logger.bind(name="Chrome Downloader")
     chrome_download_dir: Path = Path(config.settings.downloads_dir, ".selenium", "chrome")
 
     def download(self, version: int, app: Literal["driver", "browser"]) -> Path:

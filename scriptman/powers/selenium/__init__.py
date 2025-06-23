@@ -5,7 +5,7 @@ try:
     from time import sleep
     from typing import Literal, Optional
 
-    from loguru import Logger, logger
+    from loguru import logger
     from selenium.webdriver.common.action_chains import ActionChains
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
@@ -14,18 +14,18 @@ try:
 
     from scriptman.core.config import config
     from scriptman.powers.selenium._chrome import Chrome
-    from scriptman.powers.selenium._enums import (
-        BrowserMap,
-        Browsers,
-        Driver,
-        SeleniumBrowser,
-    )
+    from scriptman.powers.selenium._enums import Browsers, Driver, SeleniumBrowser
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
         "Kindly install the dependencies on your package manager using "
         "scriptman[selenium]."
     )
+
+# Define BrowserMap after all imports to avoid circular imports
+BrowserMap: dict[Browsers, type[SeleniumBrowser[Driver]]] = {
+    Browsers.CHROME: Chrome,
+}
 
 
 class SeleniumInstance(ABC):
@@ -46,8 +46,8 @@ class SeleniumInstance(ABC):
             remove_downloaded_files (bool, optional): Whether to remove the downloaded
                 files after the instance is closed. Defaults to True.
         """
-        self._log: Logger = logger
         self._downloaded_files: set[Path] = set()
+        self._log = logger.bind(name=self.__class__.__name__)
         self._queue: Optional[list[Browsers]] = browser_queue
         self._remove_downloaded_files: bool = remove_downloaded_files
         self._browser: SeleniumBrowser[Driver] = BrowserMap.get(browser, Chrome)()
@@ -208,6 +208,7 @@ __all__: list[str] = [
     "Chrome",
     "Driver",
     "Browsers",
+    "BrowserMap",
     "SeleniumBrowser",
     "SeleniumInstance",
 ]

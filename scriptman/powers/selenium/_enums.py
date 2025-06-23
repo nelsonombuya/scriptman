@@ -8,7 +8,6 @@ try:
 
     from scriptman.core.config import config
     from scriptman.powers.generics import T
-    from scriptman.powers.selenium._chrome import Chrome
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -34,9 +33,6 @@ class Browsers(Enum):
 
 
 Driver = ChromeDriver
-BrowserMap: dict[Browsers, type["SeleniumBrowser[Driver]"]] = {
-    Browsers.CHROME: Chrome,
-}
 
 
 class SeleniumBrowser(ABC, Generic[T]):

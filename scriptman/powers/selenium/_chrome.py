@@ -32,20 +32,33 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
         Returns:
             Driver: The Chrome WebDriver instance.
         """
-        try:
-            if self._local_mode:
-                raise ValueError("Setting up Chrome in Local mode...")
-            options = self._get_chrome_options()
-            service = Service(ChromeDriverManager().install())
-        except ValueError:
-            self.log.debug("Setting up Chrome in Local mode...")
-            cd = ChromeDownloader()
-            chrome_version = config.settings.get("selenium_chrome_version", 139)
-            chrome_driver = cd.download(chrome_version, "chromedriver")
-            chrome_browser = cd.download(chrome_version, "chrome")
-            options = self._get_chrome_options(chrome_browser)
-            service = Service(executable_path=chrome_driver)
-        return ChromeDriver(options=options, service_args=service)
+        if config.settings.get("selenium_local_mode", True):
+            options, service = self._get_local_mode_options()
+        else:
+            options, service = self._get_non_local_mode_options()
+        return ChromeDriver(options=options, service=service)  # type: ignore
+
+    def _get_non_local_mode_options(self) -> tuple[ChromeOptions, Service]:
+        """
+        ⚙ Get Chrome WebDriver options with specified configurations.
+        """
+        self.log.debug("Setting up Chrome in Non-Local mode...")
+        options = self._get_chrome_options()
+        service = Service(ChromeDriverManager().install())
+        return options, service
+
+    def _get_local_mode_options(self) -> tuple[ChromeOptions, Service]:
+        """
+        ⚙ Get Chrome WebDriver options with specified configurations.
+        """
+        self.log.debug("Setting up Chrome in Local mode...")
+        cd = ChromeDownloader()
+        chrome_version = config.settings.get("selenium_chrome_version", 138)
+        chrome_driver = cd.download(chrome_version, "chromedriver")
+        chrome_browser = cd.download(chrome_version, "chrome")
+        options = self._get_chrome_options(chrome_browser)
+        service = Service(executable_path=chrome_driver)
+        return options, service
 
     def _get_chrome_options(
         self, chrome_executable_path: Optional[Path] = None
@@ -75,8 +88,13 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
                 "--disable-dev-shm-usage",
                 "--disable-notifications",
                 "--disable-setuid-sandbox",
-                "--remote-debugging-port=9222",
+                "--disable-software-rasterizer",
+                "--disable-features=TranslateUI",
+                "--disable-renderer-backgrounding",
+                "--disable-ipc-flooding-protection",
                 "--disable-browser-side-navigation",
+                "--disable-background-timer-throttling",
+                "--disable-backgrounding-occluded-windows",
                 "--disable-blink-features=AutomationControlled",
             ]:
                 options.add_argument(arg)
@@ -87,7 +105,7 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
                 "download.directory_upgrade": True,
                 "download.safebrowsing.enabled": True,
                 "download.prompt_for_download": False,
-                "download.default_directory": config.settings.downloads_dir,
+                "download.default_directory": str(config.settings.downloads_dir),
             },
         )
 
@@ -161,6 +179,48 @@ class ChromeDownloader:
         else:
             raise KeyError(f"No {str(app).title()} URL for Chrome version {version}. ")
 
+    def _find_executable_in_directory(
+        self, target_dir: Path, app: Literal["chromedriver", "chrome"]
+    ) -> Optional[Path]:
+        """
+        🔍 Find the executable file in the given directory or its subdirectories.
+
+        Args:
+            target_dir (Path): The directory to search in.
+            app (str): The application name (chromedriver or chrome).
+
+        Returns:
+            Optional[Path]: The path to the executable if found, None otherwise.
+        """
+        executable_name = app + ".exe" if name == "nt" else app
+
+        # First, check if the executable is directly in the target directory
+        direct_path = target_dir / executable_name
+        if direct_path.exists():
+            self.log.debug(f"Found {app} executable at {direct_path}")
+            return direct_path
+
+        # If not found directly, look for it in subdirectories
+        for item in target_dir.iterdir():
+            if item.is_dir():
+                # Check if this subdirectory contains the executable
+                subdir_executable = item / executable_name
+                if subdir_executable.exists():
+                    self.log.debug(f"Found {app} executable at {subdir_executable}")
+                    return subdir_executable
+
+                # Also check for any executable with the app name in this subdirectory
+                for subitem in item.iterdir():
+                    if subitem.is_file() and subitem.name.startswith(app):
+                        if name == "nt" and subitem.suffix == ".exe":
+                            self.log.debug(f"Found {app} executable at {subitem}")
+                            return subitem
+                        elif name != "nt" and subitem.suffix == "":
+                            self.log.debug(f"Found {app} executable at {subitem}")
+                            return subitem
+
+        return None
+
     def _app_already_downloaded(
         self, version: int, app: Literal["chromedriver", "chrome"]
     ) -> Optional[Path]:
@@ -174,16 +234,20 @@ class ChromeDownloader:
         Returns:
             Optional[Path]: The path to the downloaded file if it exists, None otherwise.
         """
-        path: Path = Path(
+        target_dir = Path(
             self.chrome_download_dir,
             f"{app}-{self._get_system_platform()}-{version}",
-            app + ".exe" if name == "nt" else "",
         )
-        return (
-            path
-            if path.exists() and path.parent.stem.split("-")[2] == str(version)
-            else None
-        )
+
+        if not target_dir.exists():
+            return None
+
+        executable_path = self._find_executable_in_directory(target_dir, app)
+        if executable_path and executable_path.exists():
+            self.log.debug(f"Found existing {app} v{version} at {executable_path}")
+            return executable_path
+
+        return None
 
     def _fetch_download_urls(self) -> dict[str, Any]:
         """
@@ -246,7 +310,7 @@ class ChromeDownloader:
         Args:
             url (str): The URL to download Chrome Driver/Browser from.
             app (str): The application name (default is "chromedriver").
-            path (Path): The path to save the downloaded ChromeDriver executable.
+            version (int): The Chrome version.
 
         Returns:
             Path: The path to the downloaded ChromeDriver executable.
@@ -255,25 +319,27 @@ class ChromeDownloader:
         response = get(url)
         response.raise_for_status()
 
-        path: Path = Path(
+        target_dir = Path(
             self.chrome_download_dir,
             f"{app}-{self._get_system_platform()}-{version}",
-            app + ".exe" if name == "nt" else "",
         )
-        zip_download_path = Path(path.parent, f"{app}.zip")
-        zip_download_path.parent.mkdir(parents=True, exist_ok=True)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        zip_download_path = target_dir / f"{app}.zip"
 
         with open(zip_download_path, "wb") as file:
             self.log.debug(f"Writing {app} to {zip_download_path}")
             file.write(response.content)
 
         with ZipFile(zip_download_path, "r") as zip_ref:
-            self.log.debug(f"Extracting {app} to {zip_download_path.parent}")
-            zip_ref.extractall(zip_download_path.parent)
+            self.log.debug(f"Extracting {app} to {target_dir}")
+            zip_ref.extractall(target_dir)
 
-        zip_download_path.unlink()  # Remove the downloaded zip file
-        self.log.debug(f"Downloaded {app} to {path.parent}")
-        return path
+        zip_download_path.unlink()
+        if executable_path := self._find_executable_in_directory(target_dir, app):
+            return executable_path
+        raise FileNotFoundError(
+            f"Could not find {app} executable in extracted contents at {target_dir}"
+        )
 
     @classmethod
     def cleanup_chrome_downloads(cls) -> None:

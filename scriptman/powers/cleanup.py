@@ -115,9 +115,35 @@ class CleanUp:
     def selenium_cleanup(self) -> None:
         """🧹 Clean up Selenium downloads and cache folders."""
         try:
+            from pathlib import Path
+            from tempfile import gettempdir
+
             from scriptman.powers.selenium._chrome import ChromeDownloader
 
+            # Clean up primary Chrome downloads
             ChromeDownloader.cleanup_chrome_downloads()
+
+            # Clean up temporary Chrome directories
+            temp_base = Path(gettempdir())
+            temp_dirs = [
+                d
+                for d in temp_base.iterdir()
+                if d.is_dir() and d.name.startswith("scriptman_chrome_")
+            ]
+
+            for temp_dir in temp_dirs:
+                try:
+                    shutil.rmtree(temp_dir)
+                    logger.debug(f"Cleaned up temporary Chrome directory: {temp_dir}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to clean up temporary directory {temp_dir}: {e}"
+                    )
+
+            # Log download directory information
+            download_info = ChromeDownloader.get_download_info()
+            logger.debug(f"Chrome download directories: {download_info}")
+
         except ImportError as e:
             logger.warning(f"Skipped cleaning up Selenium files: {e}")
 

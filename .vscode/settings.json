@@ -1,13 +1,16 @@
 {
   "cSpell.words": [
+    "chromedriver",
     "crdownload",
     "DUMPFILE",
     "executemany",
     "getpid",
+    "infobars",
     "mariadb",
     "mysql",
     "postgresql",
     "queuepool",
+    "safebrowsing",
     "scriptman",
     "tarteaucitron"
   ]

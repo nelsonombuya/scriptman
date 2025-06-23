@@ -3,6 +3,7 @@ try:
     from pathlib import Path
     from platform import architecture, machine, system
     from shutil import rmtree
+    from tempfile import gettempdir, mkdtemp
     from typing import Any, Literal, Optional
     from zipfile import ZipFile
 
@@ -39,9 +40,9 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
         except ValueError:
             self.log.debug("Setting up Chrome in Local mode...")
             cd = ChromeDownloader()
-            chrome_version = config.settings.get("selenium_chrome_version", 126)
-            chrome_browser = cd.download(chrome_version, "browser")
-            chrome_driver = cd.download(chrome_version, "driver")
+            chrome_version = config.settings.get("selenium_chrome_version", 139)
+            chrome_driver = cd.download(chrome_version, "chromedriver")
+            chrome_browser = cd.download(chrome_version, "chrome")
             options = self._get_chrome_options(chrome_browser)
             service = Service(executable_path=chrome_driver)
         return ChromeDriver(options=options, service_args=service)
@@ -64,7 +65,6 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
             options.binary_location = chrome_executable_path.resolve().as_posix()
 
         if config.settings.get("selenium_optimizations", False):
-
             for arg in [
                 "--headless",
                 "--no-sandbox",
@@ -101,15 +101,44 @@ class ChromeDownloader:
     """
 
     log = logger.bind(name="Chrome Downloader")
-    chrome_download_dir: Path = Path(config.settings.downloads_dir, ".selenium", "chrome")
+    _chrome_download_dir: Optional[Path] = None
 
-    def download(self, version: int, app: Literal["driver", "browser"]) -> Path:
+    @property
+    def chrome_download_dir(self) -> Path:
+        """
+        📁 Get the Chrome download directory with fallback to temp directory.
+
+        Returns:
+            Path: The Chrome download directory path.
+        """
+        if self._chrome_download_dir is None:
+            # Try primary downloads directory first
+            primary_dir = Path(config.settings.downloads_dir, ".selenium", "chrome")
+            try:
+                primary_dir.mkdir(parents=True, exist_ok=True)
+                test_file = primary_dir / ".test_write"  # Test write permissions
+                test_file.touch()
+                test_file.unlink()
+                self._chrome_download_dir = primary_dir
+                self.log.debug(f"Using primary download directory: {primary_dir}")
+            except (PermissionError, OSError) as e:
+                # Fallback to temp directory
+                temp_dir = Path(mkdtemp(prefix="scriptman_chrome_", dir=gettempdir()))
+                self._chrome_download_dir = temp_dir
+                self.log.warning(
+                    f"Permission denied for primary directory {primary_dir}: {e}. "
+                    f"Using temporary directory: {temp_dir}"
+                )
+
+        return self._chrome_download_dir
+
+    def download(self, version: int, app: Literal["chromedriver", "chrome"]) -> Path:
         """
         ⬇ Download the Chrome Driver/Browser for the specified Chrome version.
 
         Args:
             version (int): The desired Chrome version.
-            app (str): The application name (default is "driver").
+            app (str): The application name (default is "chromedriver").
 
         Returns:
             str: The path to the downloaded ChromeDriver executable.
@@ -123,36 +152,33 @@ class ChromeDownloader:
         url: Optional[str] = None
 
         for version_info in download_urls["versions"]:
-            if version_info["version"].startswith(str(version)):
+            if str(version_info["version"]).startswith(str(version)):
                 url = self._get_app_url(version_info, app)
                 break
 
         if url:
-            return self._get_app_path(url, app, version)
+            return self._download_and_extract_app(url, app, version)
         else:
             raise KeyError(f"No {str(app).title()} URL for Chrome version {version}. ")
 
     def _app_already_downloaded(
-        self, version: int, app: Literal["driver", "browser"]
+        self, version: int, app: Literal["chromedriver", "chrome"]
     ) -> Optional[Path]:
         """
         🔍 Check if the specified Chrome application is already downloaded.
 
         Args:
             version (int): The desired Chrome version.
-            app (str): The application name (default is "driver").
+            app (str): The application name (default is "chromedriver").
 
         Returns:
             Optional[Path]: The path to the downloaded file if it exists, None otherwise.
         """
-        app_name: str = "chromedriver" if app == "driver" else "chrome"
-        suffix: str = ".exe" if name == "nt" else ""
         path: Path = Path(
             self.chrome_download_dir,
             f"{app}-{self._get_system_platform()}-{version}",
-            app_name + suffix,
+            app + ".exe" if name == "nt" else "",
         )
-
         return (
             path
             if path.exists() and path.parent.stem.split("-")[2] == str(version)
@@ -169,25 +195,24 @@ class ChromeDownloader:
         self.log.debug("Fetching Chrome download URLs...")
         response = get(config.settings.chrome_download_url)
         response.raise_for_status()
-        data: dict[str, Any] = response.json()
-        return data
+        return dict(response.json())
 
     def _get_app_url(
-        self, version_info: dict[str, Any], app: Literal["driver", "browser"]
+        self, version_info: dict[str, Any], app: Literal["chromedriver", "chrome"]
     ) -> Optional[str]:
         """
         🔗 Get the download URL for the specified Chrome version and platform.
 
         Args:
             version_info (dict): Information about Chrome versions and downloads.
-            app (str): The application name (default is "driver").
+            app (str): The application name (default is "chromedriver").
 
         Returns:
             Optional[str]: The download URL or None if not found.
         """
         current_platform = self._get_system_platform()
         if current_platform:
-            for download_info in version_info["downloads"].get(app, []):
+            for download_info in dict(version_info["downloads"]).get(app, []):
                 if download_info["platform"] == current_platform:
                     self.log.debug(f"Found {str(app).title()} URL for {current_platform}")
                     return str(download_info["url"])
@@ -211,32 +236,8 @@ class ChromeDownloader:
         self.log.debug(f"System Platform: {system_platform}")
         return system_platform
 
-    def _get_app_path(
-        self, url: str, app: Literal["driver", "browser"], version: int
-    ) -> Path:
-        """
-        🚶🏾‍♂️ Get the path to the Chrome Driver or Browser executable, downloading it if
-        necessary.
-
-        Args:
-            url (str): The URL to download Chrome Driver/Browser from.
-            app (str): The application name (default is "driver").
-            version (int): The desired Chrome version.
-
-        Returns:
-            Path: The path to the downloaded ChromeDriver executable.
-        """
-        app_name: str = "chromedriver" if app == "driver" else "chrome"
-        suffix: str = ".exe" if name == "nt" else ""
-        path: Path = Path(
-            self.chrome_download_dir,
-            f"{app}-{self._get_system_platform()}-{version}",
-            app_name + suffix,
-        )
-        return self._download_and_extract_app(url, app, path)
-
     def _download_and_extract_app(
-        self, url: str, app: Literal["driver", "browser"], path: Path
+        self, url: str, app: Literal["chromedriver", "chrome"], version: int
     ) -> Path:
         """
         🗃 Download and extract the Chrome Driver/Browser executable from the
@@ -253,10 +254,14 @@ class ChromeDownloader:
         self.log.debug(f"Downloading {app} from {url}")
         response = get(url)
         response.raise_for_status()
-        zip_download_path = Path(
-            path.parent, f"chrome{'driver' if app == 'driver' else ''}.zip"
+
+        path: Path = Path(
+            self.chrome_download_dir,
+            f"{app}-{self._get_system_platform()}-{version}",
+            app + ".exe" if name == "nt" else "",
         )
-        zip_download_path.mkdir(parents=True, exist_ok=True)
+        zip_download_path = Path(path.parent, f"{app}.zip")
+        zip_download_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(zip_download_path, "wb") as file:
             self.log.debug(f"Writing {app} to {zip_download_path}")
@@ -274,4 +279,69 @@ class ChromeDownloader:
     def cleanup_chrome_downloads(cls) -> None:
         """🧹 Clean up Chrome downloads."""
         cls.log.debug("Cleaning up Chrome downloads...")
-        rmtree(cls.chrome_download_dir)
+        try:
+            primary_dir = Path(config.settings.downloads_dir, ".selenium", "chrome")
+            if primary_dir.exists():
+                rmtree(primary_dir)
+                cls.log.debug(f"Cleaned up primary directory: {primary_dir}")
+        except Exception as e:
+            cls.log.warning(f"Failed to clean up primary directory: {e}")
+
+        # Note: We don't clean up temp directories automatically as they might be in use
+        # The OS will clean them up eventually, or they can be cleaned manually
+
+    @classmethod
+    def get_download_info(cls) -> dict[str, Any]:
+        """
+        📊 Get information about Chrome download directories.
+
+        Returns:
+            dict: Information about download directories and their status.
+        """
+        primary_dir = Path(config.settings.downloads_dir, ".selenium", "chrome")
+        temp_base = Path(gettempdir())
+
+        # Find any existing temp directories
+        temp_dirs = [
+            d
+            for d in temp_base.iterdir()
+            if d.is_dir() and d.name.startswith("scriptman_chrome_")
+        ]
+
+        return {
+            "primary_directory": {
+                "path": str(primary_dir),
+                "exists": primary_dir.exists(),
+                "writable": cls._is_directory_writable(primary_dir),
+            },
+            "temp_directories": [
+                {
+                    "path": str(temp_dir),
+                    "exists": temp_dir.exists(),
+                    "writable": cls._is_directory_writable(temp_dir),
+                }
+                for temp_dir in temp_dirs
+            ],
+            "temp_base": str(temp_base),
+        }
+
+    @staticmethod
+    def _is_directory_writable(directory: Path) -> bool:
+        """
+        🔍 Check if a directory is writable.
+
+        Args:
+            directory (Path): Directory to check.
+
+        Returns:
+            bool: True if writable, False otherwise.
+        """
+        if not directory.exists():
+            return False
+        try:
+            test_file = directory / ".test_write"
+            test_file.touch()
+            test_file.unlink()
+            return True
+        except (PermissionError, OSError):
+            return False

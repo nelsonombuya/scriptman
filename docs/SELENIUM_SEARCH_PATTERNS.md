@@ -32,6 +32,34 @@ file_path = selenium.wait_for_downloads_to_finish("*.xlsx")
 file_path = selenium.wait_for_downloads_to_finish()
 ```
 
+### File Deletion Behavior
+
+Downloaded files can be automatically deleted when the SeleniumInstance is garbage collected. You control this behavior using the `mark_for_deletion` parameter:
+
+```python
+# Mark this file for deletion (default)
+file_path = selenium.wait_for_downloads_to_finish("*statement*.csv", mark_for_deletion=True)
+
+# Keep this file (won't be deleted)
+file_path = selenium.wait_for_downloads_to_finish("*statement*.csv", mark_for_deletion=False)
+```
+
+#### Example Usage
+
+```python
+# Initialize selenium instance
+selenium = SeleniumInstance()
+
+# This file will be deleted when selenium is garbage collected
+temp_file = selenium.wait_for_downloads_to_finish("*temp*.csv", mark_for_deletion=True)
+
+# This file will be kept
+important_file = selenium.wait_for_downloads_to_finish("*important*.pdf", mark_for_deletion=False)
+
+# Default behavior (mark_for_deletion=True)
+file_path = selenium.wait_for_downloads_to_finish("*statement*.csv")
+```
+
 ### Case Sensitivity
 
 By default, pattern matching is case sensitive. You can control this behavior with the `case_sensitive` parameter:
@@ -66,6 +94,7 @@ file_path = selenium.wait_for_downloads_to_finish("*statement*.csv", case_sensit
 3. **File Filtering**: Excludes temporary download files (`.crdownload`, `.part`, `.tmp`)
 4. **Latest File**: Among matching files, selects the most recently modified file
 5. **File Movement**: Moves the file to the configured downloads directory
+6. **Deletion Tracking**: Optionally marks files for automatic deletion
 
 ### Wildcard Characters
 
@@ -79,8 +108,9 @@ file_path = selenium.wait_for_downloads_to_finish("*statement*.csv", case_sensit
 1. **Be Specific**: Use patterns that are specific enough to avoid matching unwanted files
 2. **Include Extensions**: Always include file extensions in your patterns
 3. **Consider Case**: Decide whether case sensitivity matters for your use case
-4. **Test Patterns**: Test your patterns with sample filenames before using in production
-5. **Handle Timeouts**: Set appropriate timeout values for your use case
+4. **Manage Deletion**: Use `mark_for_deletion=False` for files you want to keep
+5. **Test Patterns**: Test your patterns with sample filenames before using in production
+6. **Handle Timeouts**: Set appropriate timeout values for your use case
 
 ### Error Handling
 
@@ -102,4 +132,9 @@ file_path = selenium.wait_for_downloads_to_finish("report_*.pdf")
 
 # New way (case insensitive)
 file_path = selenium.wait_for_downloads_to_finish("report_*.pdf", case_sensitive=False)
+
+# New way (keep file)
+file_path = selenium.wait_for_downloads_to_finish("report_*.pdf", mark_for_deletion=False)
 ```
+
+**Note**: The `remove_downloaded_files` constructor parameter has been removed. File deletion is now controlled entirely through the `mark_for_deletion` parameter in the `wait_for_downloads_to_finish` method.

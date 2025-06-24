@@ -40,7 +40,6 @@ class SeleniumInstance(ABC):
         self,
         browser: Browsers = Browsers.CHROME,
         browser_queue: Optional[list[Browsers]] = None,
-        remove_downloaded_files: bool = True,
     ) -> None:
         """
         🚀 Initialize SeleniumInstance with the given browser and optional browser queue.
@@ -50,13 +49,10 @@ class SeleniumInstance(ABC):
             browser_queue (Optional[list[Browsers]], optional): The browser queue to use
                 for the instance, such that if one fails, it will try the next one.
                 Defaults to None.
-            remove_downloaded_files (bool, optional): Whether to remove the downloaded
-                files after the instance is closed. Defaults to True.
         """
         self._downloaded_files: set[Path] = set()
         self._log = logger.bind(name=self.__class__.__name__)
         self._queue: Optional[list[Browsers]] = browser_queue
-        self._remove_downloaded_files: bool = remove_downloaded_files
         self._browser: SeleniumBrowser[Driver] = BrowserMap.get(browser, Chrome)()
 
     @property
@@ -153,6 +149,7 @@ class SeleniumInstance(ABC):
         search_pattern: Optional[str] = None,
         timeout: int = 300,
         case_sensitive: bool = True,
+        mark_for_deletion: bool = True,
     ) -> Path:
         """
         ⌚ Wait for all downloads to finish before continuing.
@@ -169,6 +166,9 @@ class SeleniumInstance(ABC):
                 downloads to finish. Defaults to 300.
             case_sensitive (bool, optional): Whether pattern matching should be case
                 sensitive. If False, patterns will match files regardless of case.
+                Defaults to True.
+            mark_for_deletion (bool, optional): Whether to mark the downloaded file
+                for automatic deletion when the SeleniumInstance is garbage collected.
                 Defaults to True.
 
         Returns:
@@ -200,79 +200,137 @@ class SeleniumInstance(ABC):
         files = list(browser_download_dir.iterdir())
 
         if not search_pattern:
+            # Wait for any new file
+            self._wait_for_new_file(
+                timeout=timeout,
+                initial_files=files,
+                download_extensions=download_extensions,
+                browser_download_dir=browser_download_dir,
+            )
+            downloaded_file = self._get_latest_new_file(
+                initial_files=files,
+                download_extensions=download_extensions,
+                browser_download_dir=browser_download_dir,
+            )
+        else:
+            # Wait for file matching pattern
+            self._wait_for_matching_file(
+                browser_download_dir=browser_download_dir,
+                download_extensions=download_extensions,
+                search_pattern=search_pattern,
+                case_sensitive=case_sensitive,
+                timeout=timeout,
+            )
+            downloaded_file = self._get_latest_matching_file(
+                browser_download_dir=browser_download_dir,
+                download_extensions=download_extensions,
+                search_pattern=search_pattern,
+                case_sensitive=case_sensitive,
+            )
 
-            def is_new_file_added(driver: Driver) -> bool:
-                current_files = list(browser_download_dir.iterdir())
-                new_files = [
-                    file
-                    for file in current_files
-                    if file not in files and file.suffix not in download_extensions
-                ]
-                return len(new_files) > 0
+        # Move file to configured directory and handle deletion tracking
+        final_path = self._move_file_to_configured_dir(
+            source_file=downloaded_file,
+            target_dir=configured_download_dir,
+        )
+        if mark_for_deletion:
+            self._downloaded_files.add(final_path)
 
-            WebDriverWait(self.driver, timeout, 1).until(is_new_file_added)
+        return final_path
 
-            # Return the most recently downloaded file
+    def _wait_for_new_file(
+        self,
+        browser_download_dir: Path,
+        initial_files: list[Path],
+        download_extensions: tuple[str, ...],
+        timeout: int,
+    ) -> None:
+        """Wait for any new file to be added to the download directory."""
+
+        def is_new_file_added(driver: Driver) -> bool:
             current_files = list(browser_download_dir.iterdir())
             new_files = [
                 file
                 for file in current_files
-                if file not in files and file.suffix not in download_extensions
+                if file not in initial_files and file.suffix not in download_extensions
             ]
-            downloaded_file = max(new_files, key=lambda x: x.stat().st_mtime)
+            return len(new_files) > 0
 
-            # Move file to configured directory
-            final_path = self._move_file_to_configured_dir(
-                downloaded_file, configured_download_dir
-            )
-            self._downloaded_files.add(final_path)
-            return final_path
-        else:
+        WebDriverWait(self.driver, timeout, 1).until(is_new_file_added)
 
-            def does_file_exist(driver: Driver) -> bool:
-                current_files = list(browser_download_dir.iterdir())
-                if case_sensitive:
-                    matching_files = [
-                        file
-                        for file in current_files
-                        if file.suffix not in download_extensions
-                        and fnmatch(file.name, search_pattern)
-                    ]
-                else:
-                    matching_files = [
-                        file
-                        for file in current_files
-                        if file.suffix not in download_extensions
-                        and fnmatch(file.name.lower(), search_pattern.lower())
-                    ]
-                return len(matching_files) > 0
+    def _wait_for_matching_file(
+        self,
+        browser_download_dir: Path,
+        search_pattern: str,
+        case_sensitive: bool,
+        download_extensions: tuple[str, ...],
+        timeout: int,
+    ) -> None:
+        """Wait for a file matching the pattern to be added to the download directory."""
 
-            WebDriverWait(self.driver, timeout, 1).until(does_file_exist)
-
-            # Return the most recently downloaded file matching the pattern
+        def does_file_exist(driver: Driver) -> bool:
             current_files = list(browser_download_dir.iterdir())
-            if case_sensitive:
-                matching_files = [
-                    file
-                    for file in current_files
-                    if file.suffix not in download_extensions
-                    and fnmatch(file.name, search_pattern)
-                ]
-            else:
-                matching_files = [
-                    file
-                    for file in current_files
-                    if file.suffix not in download_extensions
-                    and fnmatch(file.name.lower(), search_pattern.lower())
-                ]
-            downloaded_file = max(matching_files, key=lambda x: x.stat().st_mtime)
-
-            # Move file to configured directory
-            final_path = self._move_file_to_configured_dir(
-                downloaded_file, configured_download_dir
+            matching_files = self._get_matching_files(
+                files=current_files,
+                search_pattern=search_pattern,
+                case_sensitive=case_sensitive,
+                download_extensions=download_extensions,
             )
-            self._downloaded_files.add(final_path)
-            return final_path
+            return len(matching_files) > 0
+
+        WebDriverWait(self.driver, timeout, 1).until(does_file_exist)
+
+    def _get_latest_new_file(
+        self,
+        browser_download_dir: Path,
+        initial_files: list[Path],
+        download_extensions: tuple[str, ...],
+    ) -> Path:
+        """Get the most recently downloaded new file."""
+        current_files = list(browser_download_dir.iterdir())
+        new_files = [
+            file
+            for file in current_files
+            if file not in initial_files and file.suffix not in download_extensions
+        ]
+        return max(new_files, key=lambda x: x.stat().st_mtime)
+
+    def _get_latest_matching_file(
+        self,
+        browser_download_dir: Path,
+        search_pattern: str,
+        case_sensitive: bool,
+        download_extensions: tuple[str, ...],
+    ) -> Path:
+        """Get the most recently downloaded file matching the pattern."""
+        current_files = list(browser_download_dir.iterdir())
+        matching_files = self._get_matching_files(
+            current_files, search_pattern, case_sensitive, download_extensions
+        )
+        return max(matching_files, key=lambda x: x.stat().st_mtime)
+
+    def _get_matching_files(
+        self,
+        files: list[Path],
+        search_pattern: str,
+        case_sensitive: bool,
+        download_extensions: tuple[str, ...],
+    ) -> list[Path]:
+        """Get files matching the pattern, excluding download extensions."""
+        if case_sensitive:
+            return [
+                file
+                for file in files
+                if file.suffix not in download_extensions
+                and fnmatch(file.name, search_pattern)
+            ]
+        else:
+            return [
+                file
+                for file in files
+                if file.suffix not in download_extensions
+                and fnmatch(file.name.lower(), search_pattern.lower())
+            ]
 
     def _move_file_to_configured_dir(self, source_file: Path, target_dir: Path) -> Path:
         """
@@ -352,7 +410,7 @@ class SeleniumInstance(ABC):
         except Exception as e:
             self._log.error(f"Failed to close SeleniumInstance {name} : {e}")
 
-        if self._remove_downloaded_files:
+        if self._downloaded_files:
             for file in self._downloaded_files:
                 try:
                     file.unlink()

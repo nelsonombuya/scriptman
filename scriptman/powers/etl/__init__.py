@@ -2,6 +2,7 @@ try:
     from atexit import register
     from contextlib import contextmanager
     from pathlib import Path
+    from re import sub
     from typing import Any, Callable, Generator, Literal, Optional, cast
 
     from loguru import logger
@@ -750,23 +751,67 @@ class ETL:
         )
         return ETL(new_data)
 
+    def sanitize_names(self) -> "ETL":
+        """
+        🛡️ Sanitizes all column names and index names in the DataFrame to be SQL-safe.
+
+        This method removes or replaces characters that could cause SQL injection,
+        syntax errors, or other issues in database operations.
+
+        Returns:
+            ETL: A new ETL instance with SQL-safe column and index names.
+
+        Example:
+            # Sanitize columns like "User's Name" to "user_s_name"
+            # Also sanitizes index names like "OBU Number!" to "obu_number"
+            etl_safe = etl.sanitize_names()
+        """
+        # Create a copy of the DataFrame with sanitized columns
+        sanitized_columns = {
+            col: self.__sanitize_for_sql(col) for col in self._data.columns
+        }
+        new_data = self._data.rename(columns=sanitized_columns)
+
+        # Handle index names if they exist
+        sanitized_indices = None
+        if self._data.index.name is not None:
+            index_name = str(self._data.index.name)
+            sanitized_indices = {index_name: self.__sanitize_for_sql(index_name)}
+            new_data = new_data.rename_axis(sanitized_indices[index_name])
+        elif isinstance(self._data.index, MultiIndex) and self._data.index.names:
+            sanitized_indices = {
+                str(name): self.__sanitize_for_sql(str(name))
+                for name in self._data.index.names
+                if name is not None
+            }
+            if sanitized_indices:
+                new_data = new_data.rename_axis(list(sanitized_indices.values()), axis=0)
+
+        total_sanitized = len(sanitized_columns) + (
+            len(sanitized_indices) if sanitized_indices else 0
+        )
+        index_count = len(sanitized_indices) if sanitized_indices else 0
+        self.log.info(
+            f"Sanitized {total_sanitized} names for SQL safety "
+            f"({len(sanitized_columns)} columns, {index_count} indices)"
+        )
+        return ETL(new_data)
+
     def __convert_to_snake_case(self, name: str) -> str:
-        """🐍 Convert a string to snake_case."""
-        from re import sub
+        """🐍 Convert a string to snake_case with SQL-safe characters."""
 
         # Replace spaces, hyphens, and other separators with underscores
-        s1 = sub(r"[\s\-\.]", "_", name)
+        s1 = sub(r"[\s\-\.]", "_", self.__sanitize_for_sql(name))
         # Insert underscore between camelCase transitions
         s2 = sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
         # Convert to lowercase
         return s2.lower()
 
     def __convert_to_camel_case(self, name: str) -> str:
-        """🐐 Convert a string to camelCase."""
-        from re import sub
+        """🐐 Convert a string to camelCase with SQL-safe characters."""
 
         # Replace underscores with spaces
-        s1 = sub(r"_", " ", name)
+        s1 = sub(r"_", " ", self.__sanitize_for_sql(name))
 
         # Handle capitalization - first word should be lowercase, others uppercase
         words = s1.split()
@@ -780,6 +825,44 @@ class ETL:
             result = first_word + "".join(rest_words)
 
         return result
+
+    def __sanitize_for_sql(self, name: str) -> str:
+        """
+        🛡️ Sanitize a string to be SQL-safe by removing or replacing problematic
+        characters.
+
+        Removes or replaces characters that could cause SQL injection, syntax errors,
+        or other issues in database operations.
+
+        Args:
+            name (str): The string to sanitize
+
+        Returns:
+            str: A SQL-safe version of the input string
+        """
+        if not name:
+            return "unnamed"
+
+        # Remove or replace SQL-unsafe characters
+        # Remove: quotes, semicolons, backslashes, null bytes, control characters
+        # Replace: other special characters with underscores
+        sanitized = sub(r'[\'"`;\\\x00-\x1f\x7f]', "", name)
+
+        # Replace other problematic characters with underscores
+        sanitized = sub(r"[^\w\s\-\.]", "_", sanitized)
+
+        # Remove leading/trailing underscores and spaces
+        sanitized = sanitized.strip("_ ")
+
+        # Ensure the result is not empty and doesn't start with a number
+        if not sanitized or sanitized[0].isdigit():
+            sanitized = f"col_{sanitized}" if sanitized else "unnamed_column"
+
+        # Limit length to avoid database constraints (most DBs limit to 128 chars)
+        if len(sanitized) > 120:
+            sanitized = sanitized[:120]
+
+        return sanitized
 
     """
     🔍 Loading methods
@@ -862,6 +945,7 @@ class ETL:
         allow_fallback: bool = False,
         use_logical_keys: bool = False,
         synchronize_schema: bool = True,
+        sanitize_column_names: bool = True,
         method: Literal["truncate", "replace", "insert", "update", "upsert"] = "upsert",
     ) -> bool:
         """
@@ -889,6 +973,9 @@ class ETL:
                 Defaults to False.
             synchronize_schema (bool, optional): Whether to synchronize the schema of
                 the table before loading the data. Defaults to True.
+            sanitize_column_names (bool, optional): Whether to automatically sanitize
+                column and index names to be SQL-safe using the sanitize_names() method.
+                Defaults to True.
             method (Literal["truncate", "replace", "insert", "update", "upsert"]):
                 The loading method to use. Defaults to "upsert".
 
@@ -899,6 +986,14 @@ class ETL:
         Returns:
             bool: True if the data was loaded successfully.
         """
+        # Sanitize column and index names if requested
+        if sanitize_column_names:
+            self.log.info("Sanitizing column and index names for SQL safety...")
+            working_data = self.sanitize_names()._data
+            self.log.info("Column and index names sanitized for SQL safety")
+        else:
+            working_data = self._data.copy()
+
         # Wrap the handler with ETLDatabase for extended functionality
         executor = TaskExecutor()
         db = ETLDatabase(db_handler)
@@ -915,7 +1010,7 @@ class ETL:
             db.drop_table(table_name)
             table_exists = False
 
-        if (method in {"upsert", "update"}) and self._data.index.empty:
+        if (method in {"upsert", "update"}) and working_data.index.empty:
             message = (
                 "Dataset has no index! "
                 "Please set the index using the `set_index` method."
@@ -927,7 +1022,7 @@ class ETL:
             db.synchronize_table_schema(
                 force_nvarchar=force_nvarchar,
                 table_name=table_name,
-                df=self._data,
+                df=working_data,
             )
 
         if not table_exists:
@@ -935,17 +1030,17 @@ class ETL:
             if use_logical_keys:
                 db.create_table_with_logical_keys(
                     table_name=table_name,
-                    logical_keys=[str(_) for _ in self._data.index.names],
+                    logical_keys=[str(_) for _ in working_data.index.names],
                     columns=db.get_table_data_types(
-                        self._data.reset_index(), force_nvarchar
+                        working_data.reset_index(), force_nvarchar
                     ),
                 )
             else:
                 db.create_table(
                     table_name=table_name,
-                    keys=[str(_) for _ in self._data.index.names],
+                    keys=[str(_) for _ in working_data.index.names],
                     columns=db.get_table_data_types(
-                        self._data.reset_index(), force_nvarchar
+                        working_data.reset_index(), force_nvarchar
                     ),
                 )
             method = "insert"
@@ -955,20 +1050,20 @@ class ETL:
             query, values = db.generate_prepared_insert_query(
                 force_nvarchar=force_nvarchar,
                 table_name=table_name,
-                df=self._data,
+                df=working_data,
             )
         elif method == "update":
             query, values = db.generate_prepared_update_query(
                 force_nvarchar=force_nvarchar,
                 table_name=table_name,
-                df=self._data,
+                df=working_data,
             )
         else:  # upsert
             query, values = db.generate_prepared_upsert_query(
                 use_logical_keys=use_logical_keys,
                 force_nvarchar=force_nvarchar,
                 table_name=table_name,
-                df=self._data,
+                df=working_data,
             )
         self.log.info(
             f"{method.capitalize()}ing data "
@@ -984,6 +1079,7 @@ class ETL:
                     database_handler=db,
                     batch_size=batch_size,
                     table_name=table_name,
+                    working_data=working_data,
                     force_nvarchar=force_nvarchar,
                     allow_fallback=allow_fallback,
                     use_logical_keys=use_logical_keys,
@@ -1028,6 +1124,7 @@ class ETL:
         batch_size: int = 1000,
         allow_fallback: bool = False,
         use_logical_keys: bool = False,
+        working_data: Optional[DataFrame] = None,
     ) -> bool:
         """
         ✍🏾 Private method to merge data into the mssql database using a temporary table.
@@ -1040,6 +1137,8 @@ class ETL:
             use_logical_keys (bool): If True, uses DataFrame indices as logical
                 keys for WHERE clauses in update/merge operations without creating actual
                 database constraints. If False, creates actual PRIMARY KEY constraints.
+            working_data (Optional[DataFrame], optional): The working DataFrame to use
+                for the merge. Defaults to None.
 
         Returns:
             bool: True if the data was merged successfully.
@@ -1047,6 +1146,7 @@ class ETL:
         from random import randint
         from time import sleep
 
+        data_to_use = working_data if working_data is not None else self._data
         temp_table = self._generate_temp_table_name(table_name)
         self._temp_tables.add((database_handler, temp_table))
         merge_query = query.format(source_table=temp_table)
@@ -1060,22 +1160,22 @@ class ETL:
             if use_logical_keys:
                 database_handler.create_table_with_logical_keys(
                     table_name=temp_table,
-                    logical_keys=[str(_) for _ in self._data.index.names],
+                    logical_keys=[str(_) for _ in data_to_use.index.names],
                     columns=database_handler.get_table_data_types(
-                        self._data.reset_index(), force_nvarchar
+                        data_to_use.reset_index(), force_nvarchar
                     ),
                 )
             else:
                 database_handler.create_table(
                     table_name=temp_table,
-                    keys=[str(_) for _ in self._data.index.names],
+                    keys=[str(_) for _ in data_to_use.index.names],
                     columns=database_handler.get_table_data_types(
-                        self._data.reset_index(), force_nvarchar
+                        data_to_use.reset_index(), force_nvarchar
                     ),
                 )
 
             temp_query, temp_values = database_handler.generate_prepared_insert_query(
-                temp_table, self._data, force_nvarchar
+                temp_table, data_to_use, force_nvarchar
             )
 
             try:
@@ -1098,6 +1198,7 @@ class ETL:
                         query=query,
                         table_name=table_name,
                         batch_size=batch_size,
+                        working_data=working_data,
                         force_nvarchar=force_nvarchar,
                         allow_fallback=allow_fallback,
                         database_handler=database_handler,

@@ -305,7 +305,10 @@ class SeleniumInstance(ABC):
         """Get the most recently downloaded file matching the pattern."""
         current_files = list(browser_download_dir.iterdir())
         matching_files = self._get_matching_files(
-            current_files, search_pattern, case_sensitive, download_extensions
+            files=current_files,
+            search_pattern=search_pattern,
+            case_sensitive=case_sensitive,
+            download_extensions=download_extensions,
         )
         return max(matching_files, key=lambda x: x.stat().st_mtime)
 

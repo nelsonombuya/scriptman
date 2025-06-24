@@ -50,12 +50,16 @@ class ConfigModel(BaseModel):
         default=True,
         description="Enable selenium optimizations",
     )
+    selenium_headless: bool = Field(
+        default=True,
+        description="Enable selenium headless mode",
+    )
     selenium_local_mode: bool = Field(
         default=True,
         description="Enable selenium local mode (Download and run a local copy of the "
         "browser)",
     )
-    chrome_download_url: str = Field(
+    selenium_chrome_download_url: str = Field(
         default=(
             "https://googlechromelabs.github.io/chrome-for-testing/"
             "known-good-versions-with-downloads.json"
@@ -66,25 +70,9 @@ class ConfigModel(BaseModel):
         default=".venv",
         description="Path to the virtual environment relative to the project root",
     )
-    thread_pool_size: int = Field(
-        default=50,
-        description="Maximum number of threads for the global thread pool",
-    )
-    process_pool_size: int = Field(
-        default=4,
-        description="Maximum number of processes for the global process pool",
-    )
-    task_queue_size: int = Field(
-        default=100,
-        description="Maximum number of tasks that can be queued",
-    )
     task_timeout: int = Field(
         default=30,
         description="Default timeout in seconds for task execution",
-    )
-    max_concurrent_requests: int = Field(
-        default=25,
-        description="Maximum number of concurrent requests",
     )
 
     @field_validator("logs_dir", "downloads_dir", mode="before")

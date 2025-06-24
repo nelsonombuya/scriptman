@@ -137,18 +137,26 @@ class SeleniumInstance(ABC):
 
         raise ValueError(f"Invalid mode: {mode}")
 
-    def wait_for_downloads_to_finish(self, file_name: Optional[str] = None) -> Path:
+    def wait_for_downloads_to_finish(
+        self, file_name: Optional[str] = None, timeout: int = 300
+    ) -> Path:
         """
         ⌚ Wait for all downloads to finish before continuing.
 
         Args:
             file_name (Optional[str]): The name of the file you want to wait for its
                 download to complete. Defaults to None.
+            timeout (int, optional): The maximum time (in seconds) to wait for the
+                downloads to finish. Defaults to 300.
 
         Returns:
             Path: The path of the recently downloaded file.
         """
-        download_extensions = (".tmp", ".crdownload")
+        download_extensions = (
+            ".crdownload",  # Chrome
+            ".part",  # Firefox
+            ".tmp",  # Chromium/Other
+        )
         directory = Path(config.settings.downloads_dir)
         files = list(directory.iterdir())
 
@@ -163,7 +171,7 @@ class SeleniumInstance(ABC):
                 ]
                 return len(new_files) > 0
 
-            WebDriverWait(self.driver, 300, 1).until(is_new_file_added)
+            WebDriverWait(self.driver, timeout, 1).until(is_new_file_added)
 
             # Return the most recently downloaded file
             current_files = list(directory.iterdir())
@@ -180,7 +188,7 @@ class SeleniumInstance(ABC):
             def does_file_exist(driver: Driver) -> bool:
                 return bool(list(Path(directory).glob(f"{file_name}*")))
 
-            WebDriverWait(self.driver, 300, 1).until(does_file_exist)
+            WebDriverWait(self.driver, timeout, 1).until(does_file_exist)
 
             # Return the specific file that was waited for
             matching_files = list(Path(directory).glob(f"{file_name}*"))

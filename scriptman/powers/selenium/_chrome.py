@@ -73,13 +73,14 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
             ChromeOptions: Chrome WebDriver options.
         """
         options = ChromeOptions()
+        download_dir = Path(config.settings.downloads_dir).resolve().as_posix()
 
         if chrome_executable_path:
             options.binary_location = chrome_executable_path.resolve().as_posix()
 
         if config.settings.get("selenium_optimizations", False):
             for arg in [
-                "--headless",
+                "--headless" if config.settings.get("selenium_headless", True) else None,
                 "--no-sandbox",
                 "--mute-audio",
                 "--disable-gpu",
@@ -97,7 +98,8 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
                 "--disable-backgrounding-occluded-windows",
                 "--disable-blink-features=AutomationControlled",
             ]:
-                options.add_argument(arg)
+                if arg is not None:
+                    options.add_argument(arg)
 
         options.add_experimental_option(
             "prefs",
@@ -105,7 +107,7 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
                 "download.directory_upgrade": True,
                 "download.safebrowsing.enabled": True,
                 "download.prompt_for_download": False,
-                "download.default_directory": str(config.settings.downloads_dir),
+                "download.default_directory": download_dir,
             },
         )
 
@@ -257,7 +259,7 @@ class ChromeDownloader:
             dict: JSON data containing download URLs.
         """
         self.log.debug("Fetching Chrome download URLs...")
-        response = get(config.settings.chrome_download_url)
+        response = get(config.settings.selenium_chrome_download_url)
         response.raise_for_status()
         return dict(response.json())
 

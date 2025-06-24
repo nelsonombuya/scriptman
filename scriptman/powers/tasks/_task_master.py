@@ -70,7 +70,11 @@ class TaskMaster:
         self._task_lock: RLock = RLock()
 
         # Worker threads
-        self._dispatcher_thread: Thread = Thread(target=self._dispatch_loop, daemon=True)
+        self._dispatcher_thread: Thread = Thread(
+            daemon=True,
+            target=self._dispatch_loop,
+            name="TaskMaster - Task Dispatcher",
+        )
         self._dispatcher_thread.start()
 
         # Start monitoring

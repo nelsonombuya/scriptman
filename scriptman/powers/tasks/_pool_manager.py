@@ -28,7 +28,11 @@ class DynamicPoolManager:
         self.executors.append(HybridExecutor(base_threads, base_processes))
 
         # Start cleanup thread
-        self._cleanup_thread = Thread(target=self._cleanup_loop, daemon=True)
+        self._cleanup_thread = Thread(
+            daemon=True,
+            target=self._cleanup_loop,
+            name="TaskMaster - Dynamic Pool Manager - Idle Cleaner",
+        )
         self._cleanup_thread.start()
 
     def get_available_executor(self) -> HybridExecutor:

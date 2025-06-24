@@ -664,42 +664,90 @@ class ETL:
 
     def to_snake_case(self) -> "ETL":
         """
-        🐍 Converts all column names in the DataFrame to snake_case.
+        🐍 Converts all column names and index names in the DataFrame to snake_case.
 
-        This method transforms column names like 'FirstName', 'first-name', 'First Name'
-        to 'first_name'.
+        This method transforms column names and index names like 'FirstName',
+        'first-name', 'First Name' to 'first_name'.
 
         Returns:
-            ETL: A new ETL instance with snake_case column names.
+            ETL: A new ETL instance with snake_case column and index names.
 
         Example:
             # Convert columns like 'FirstName', 'LastName' to 'first_name', 'last_name'
+            # Also converts index names like 'OBU Number' to 'obu_number'
             etl_snake = etl.to_snake_case()
         """
         # Create a copy of the DataFrame with renamed columns
         renamed_columns = {_: self.__convert_to_snake_case(_) for _ in self._data.columns}
         new_data = self._data.rename(columns=renamed_columns)
-        self.log.info(f"Converted {len(renamed_columns)} column names to snake_case")
+
+        # Handle index names if they exist
+        renamed_indices = None
+        if self._data.index.name is not None:
+            index_name = str(self._data.index.name)
+            renamed_indices = {index_name: self.__convert_to_snake_case(index_name)}
+            new_data = new_data.rename_axis(renamed_indices[index_name])
+        elif isinstance(self._data.index, MultiIndex) and self._data.index.names:
+            renamed_indices = {
+                str(name): self.__convert_to_snake_case(str(name))
+                for name in self._data.index.names
+                if name is not None
+            }
+            if renamed_indices:
+                new_data = new_data.rename_axis(list(renamed_indices.values()), axis=0)
+
+        total_renamed = len(renamed_columns) + (
+            len(renamed_indices) if renamed_indices else 0
+        )
+        index_count = len(renamed_indices) if renamed_indices else 0
+        self.log.info(
+            f"Converted {total_renamed} names to snake_case "
+            f"({len(renamed_columns)} columns, {index_count} indices)"
+        )
         return ETL(new_data)
 
     def to_camel_case(self) -> "ETL":
         """
-        🐐 Converts all column names in the DataFrame to camelCase.
+        🐐 Converts all column names and index names in the DataFrame to camelCase.
 
-        This method transforms column names like 'first_name', 'last_name' to
-        'FirstName', 'LastName'.
+        This method transforms column names and index names like 'first_name',
+        'last_name' to 'FirstName', 'LastName'.
 
         Returns:
-            ETL: A new ETL instance with camelCase column names.
+            ETL: A new ETL instance with camelCase column and index names.
 
         Example:
             # Convert columns like 'first_name', 'last_name' to 'FirstName', 'LastName'
+            # Also converts index names like 'obu_number' to 'obuNumber'
             etl_camel = etl.to_camel_case()
         """
         # Create a copy of the DataFrame with renamed columns
         renamed_columns = {_: self.__convert_to_camel_case(_) for _ in self._data.columns}
         new_data = self._data.rename(columns=renamed_columns)
-        self.log.info(f"Converted {len(renamed_columns)} column names to camelCase")
+
+        # Handle index names if they exist
+        renamed_indices = None
+        if self._data.index.name is not None:
+            index_name = str(self._data.index.name)
+            renamed_indices = {index_name: self.__convert_to_camel_case(index_name)}
+            new_data = new_data.rename_axis(renamed_indices[index_name])
+        elif isinstance(self._data.index, MultiIndex) and self._data.index.names:
+            renamed_indices = {
+                str(name): self.__convert_to_camel_case(str(name))
+                for name in self._data.index.names
+                if name is not None
+            }
+            if renamed_indices:
+                new_data = new_data.rename_axis(list(renamed_indices.values()), axis=0)
+
+        total_renamed = len(renamed_columns) + (
+            len(renamed_indices) if renamed_indices else 0
+        )
+        index_count = len(renamed_indices) if renamed_indices else 0
+        self.log.info(
+            f"Converted {total_renamed} names to camelCase "
+            f"({len(renamed_columns)} columns, {index_count} indices)"
+        )
         return ETL(new_data)
 
     def __convert_to_snake_case(self, name: str) -> str:

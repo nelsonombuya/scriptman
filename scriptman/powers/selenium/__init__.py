@@ -5,7 +5,7 @@ try:
     from random import uniform
     from shutil import move
     from time import sleep
-    from typing import Literal, Optional
+    from typing import Any, Literal, Optional
 
     from loguru import logger
     from selenium.webdriver import ActionChains
@@ -16,6 +16,7 @@ try:
 
     from scriptman.core.config import config
     from scriptman.powers.selenium._chrome import Chrome
+    from scriptman.powers.selenium._firefox import Firefox
     from scriptman.powers.selenium._utils import (
         Browsers,
         Driver,
@@ -30,29 +31,22 @@ except ImportError as e:
     )
 
 # Define BrowserMap after all imports to avoid circular imports
-BrowserMap: dict[Browsers, type[SeleniumBrowser[Driver]]] = {
+BrowserMap: dict[Browsers, type[SeleniumBrowser[Any]]] = {
     Browsers.CHROME: Chrome,
+    Browsers.FIREFOX: Firefox,
 }
 
 
 class SeleniumInstance(ABC):
-    def __init__(
-        self,
-        browser: Browsers = Browsers.CHROME,
-        browser_queue: Optional[list[Browsers]] = None,
-    ) -> None:
+    def __init__(self, browser: Browsers = Browsers.CHROME) -> None:
         """
-        🚀 Initialize SeleniumInstance with the given browser and optional browser queue.
+        🚀 Initialize SeleniumInstance with the given browser.
 
         Args:
             browser (Browsers, optional): The browser to use. Defaults to Browsers.CHROME.
-            browser_queue (Optional[list[Browsers]], optional): The browser queue to use
-                for the instance, such that if one fails, it will try the next one.
-                Defaults to None.
         """
         self._downloaded_files: set[Path] = set()
         self._log = logger.bind(name=self.__class__.__name__)
-        self._queue: Optional[list[Browsers]] = browser_queue
         self._browser: SeleniumBrowser[Driver] = BrowserMap.get(browser, Chrome)()
 
     @property
@@ -229,10 +223,18 @@ class SeleniumInstance(ABC):
             )
 
         # Move file to configured directory and handle deletion tracking
-        final_path = self._move_file_to_configured_dir(
-            source_file=downloaded_file,
-            target_dir=configured_download_dir,
-        )
+        if config.settings.get("selenium_auto_move_downloads", False):
+            final_path = self._move_file_to_configured_dir(
+                source_file=downloaded_file,
+                target_dir=configured_download_dir,
+            )
+        else:
+            final_path = downloaded_file
+            self._log.debug(
+                f"Auto-move is currently disabled, keeping file in browser directory: "
+                f"{final_path}"
+            )
+
         if mark_for_deletion:
             self._downloaded_files.add(final_path)
 
@@ -423,6 +425,7 @@ class SeleniumInstance(ABC):
 
 __all__: list[str] = [
     "Chrome",
+    "Firefox",
     "Driver",
     "Browsers",
     "BrowserMap",

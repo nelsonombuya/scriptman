@@ -4,6 +4,7 @@
     "crdownload",
     "DUMPFILE",
     "executemany",
+    "geckodriver",
     "getpid",
     "infobars",
     "mariadb",

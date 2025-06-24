@@ -2,10 +2,11 @@ try:
     from abc import ABC, abstractmethod
     from enum import Enum
     from pathlib import Path
-    from typing import Generic
+    from typing import Generic, Union
 
     from loguru import logger
     from selenium.webdriver import Chrome as ChromeDriver
+    from selenium.webdriver import Firefox as FirefoxDriver
 
     from scriptman.core.config import config
     from scriptman.powers.generics import T
@@ -25,20 +26,22 @@ class Browsers(Enum):
 
     Attributes:
         CHROME (str): Google Chrome
+        FIREFOX (str): Mozilla Firefox
     """
 
     CHROME = "Google Chrome"
+    FIREFOX = "Mozilla Firefox"
 
     def __str__(self) -> str:
         return self.value
 
 
-Driver = ChromeDriver
+Driver = Union[ChromeDriver, FirefoxDriver]
 
 
 class SeleniumBrowser(ABC, Generic[T]):
     _driver: T
-    _local_mode: bool = config.settings.get("selenium_local_mode", True)
+    _managed_mode: bool = config.settings.get("selenium_managed_mode", True)
 
     def __init__(self) -> None:
         """

@@ -32,26 +32,26 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
         Returns:
             Driver: The Chrome WebDriver instance.
         """
-        if config.settings.get("selenium_local_mode", True):
-            options, service = self._get_local_mode_options()
+        if config.settings.get("selenium_managed_mode", True):
+            options, service = self._get_managed_mode_options()
         else:
-            options, service = self._get_non_local_mode_options()
+            options, service = self._get_non_managed_mode_options()
         return ChromeDriver(options=options, service=service)  # type: ignore
 
-    def _get_non_local_mode_options(self) -> tuple[ChromeOptions, Service]:
+    def _get_non_managed_mode_options(self) -> tuple[ChromeOptions, Service]:
         """
         ⚙ Get Chrome WebDriver options with specified configurations.
         """
-        self.log.debug("Setting up Chrome in Non-Local mode...")
+        self.log.debug("Setting up Chrome in Non-Managed mode...")
         options = self._get_chrome_options()
         service = Service(ChromeDriverManager().install())
         return options, service
 
-    def _get_local_mode_options(self) -> tuple[ChromeOptions, Service]:
+    def _get_managed_mode_options(self) -> tuple[ChromeOptions, Service]:
         """
         ⚙ Get Chrome WebDriver options with specified configurations.
         """
-        self.log.debug("Setting up Chrome in Local mode...")
+        self.log.debug("Setting up Chrome in Managed mode...")
         cd = ChromeDownloader()
         chrome_version = config.settings.get("selenium_chrome_version", 138)
         chrome_driver = cd.download(chrome_version, "chromedriver")
@@ -113,6 +113,17 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
 
         return options
 
+    def __del__(self) -> None:
+        """
+        🧹 Clean up Chrome downloads on garbage collection if enabled.
+        """
+        if config.settings.get("selenium_cleanup_downloads_on_exit", False):
+            try:
+                self.log.debug("Cleaning up Chrome downloads on exit...")
+                ChromeDownloader.cleanup_chrome_downloads()
+            except Exception as e:
+                self.log.warning(f"Failed to clean up Chrome downloads: {e}")
+
 
 class ChromeDownloader:
     """
@@ -121,7 +132,11 @@ class ChromeDownloader:
     """
 
     log = logger.bind(name="Chrome Downloader")
-    _chrome_download_dir: Optional[Path] = None
+    __chrome_download_dir: Optional[Path] = None
+    __chrome_download_url: str = (
+        "https://googlechromelabs.github.io/chrome-for-testing/"
+        "known-good-versions-with-downloads.json"
+    )
 
     @property
     def chrome_download_dir(self) -> Path:
@@ -131,7 +146,7 @@ class ChromeDownloader:
         Returns:
             Path: The Chrome download directory path.
         """
-        if self._chrome_download_dir is None:
+        if self.__chrome_download_dir is None:
             # Try primary downloads directory first
             primary_dir = Path(config.settings.downloads_dir, ".selenium", "chrome")
             try:
@@ -139,18 +154,18 @@ class ChromeDownloader:
                 test_file = primary_dir / ".test_write"  # Test write permissions
                 test_file.touch()
                 test_file.unlink()
-                self._chrome_download_dir = primary_dir
+                self.__chrome_download_dir = primary_dir
                 self.log.debug(f"Using primary download directory: {primary_dir}")
             except (PermissionError, OSError) as e:
                 # Fallback to temp directory
                 temp_dir = Path(mkdtemp(prefix="scriptman_chrome_", dir=gettempdir()))
-                self._chrome_download_dir = temp_dir
+                self.__chrome_download_dir = temp_dir
                 self.log.warning(
                     f"Permission denied for primary directory {primary_dir}: {e}. "
                     f"Using temporary directory: {temp_dir}"
                 )
 
-        return self._chrome_download_dir
+        return self.__chrome_download_dir
 
     def download(self, version: int, app: Literal["chromedriver", "chrome"]) -> Path:
         """
@@ -259,7 +274,7 @@ class ChromeDownloader:
             dict: JSON data containing download URLs.
         """
         self.log.debug("Fetching Chrome download URLs...")
-        response = get(config.settings.selenium_chrome_download_url)
+        response = get(self.__chrome_download_url)
         response.raise_for_status()
         return dict(response.json())
 

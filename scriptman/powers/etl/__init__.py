@@ -844,12 +844,12 @@ class ETL:
             return "unnamed"
 
         # Remove or replace SQL-unsafe characters
-        # Remove: quotes, semicolons, backslashes, null bytes, control characters
+        # Remove: quotes, semicolons, backslashes, null bytes, control characters, dots
         # Replace: other special characters with underscores
-        sanitized = sub(r'[\'"`;\\\x00-\x1f\x7f]', "", name)
+        sanitized = sub(r'[\'"`;\\\x00-\x1f\x7f\.]', "", name)
 
         # Replace other problematic characters with underscores
-        sanitized = sub(r"[^\w\s\-\.]", "_", sanitized)
+        sanitized = sub(r"[^\w\s\-]", "_", sanitized)
 
         # Remove leading/trailing underscores and spaces
         sanitized = sanitized.strip("_ ")

@@ -227,7 +227,10 @@ class TaskExecutor:
         else:
             # Use direct thread/process pools for direct execution
             self._task_master = None
-            self._thread_pool = ThreadPoolExecutor(thread_pool_size, "task_executor")
+            self._thread_pool = ThreadPoolExecutor(
+                thread_pool_size,
+                "TaskExecutor - Direct Mode - ",
+            )
             self._process_pool = ProcessPoolExecutor(process_pool_size)
             self._log.info("🔧 TaskExecutor initialized in Direct mode")
 
@@ -525,7 +528,10 @@ class TaskExecutor:
         # Always use direct thread pool execution for race operations
         # This avoids resource contention and provides consistent, fast execution
         if not self._thread_pool:
-            self._thread_pool = ThreadPoolExecutor(None, "task_executor")
+            self._thread_pool = ThreadPoolExecutor(
+                None,
+                "TaskExecutor - Race Mode - ",
+            )
 
         self._log.debug(f"🏃‍♂️ Racing {len(tasks)} tasks using Direct mode")
         for idx, (func, args, kwargs) in enumerate(tasks):

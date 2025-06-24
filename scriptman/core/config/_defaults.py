@@ -27,8 +27,8 @@ class ConfigModel(BaseModel):
         description="Path to the logs directory",
     )
     downloads_dir: DirectoryPath = Field(
-        default=Path(__file__).parent.parent / ".downloads",
-        description="Path to the downloads directory",
+        default=Path.home() / "Downloads",
+        description="Path to the downloads directory (defaults to system Downloads dir)",
     )
     concurrent: bool = Field(
         default=True,

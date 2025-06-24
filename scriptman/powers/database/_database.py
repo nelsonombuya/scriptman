@@ -394,7 +394,9 @@ class DatabaseHandler(ABC):
         )
 
         if keys:
-            column_definitions += f", PRIMARY KEY ({', '.join(keys)})"
+            column_definitions += (
+                f", PRIMARY KEY ({', '.join([f'"{key}"' for key in keys])})"
+            )
 
         query = f'CREATE TABLE "{table_name}" ({column_definitions})'
         return self.execute_write_query(query)

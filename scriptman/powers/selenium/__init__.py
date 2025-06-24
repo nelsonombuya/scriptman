@@ -1,5 +1,6 @@
 try:
     from abc import ABC
+    from fnmatch import fnmatch
     from pathlib import Path
     from random import uniform
     from shutil import move
@@ -148,7 +149,7 @@ class SeleniumInstance(ABC):
         raise ValueError(f"Invalid mode: {mode}")
 
     def wait_for_downloads_to_finish(
-        self, file_name: Optional[str] = None, timeout: int = 300
+        self, search_pattern: Optional[str] = None, timeout: int = 300
     ) -> Path:
         """
         ⌚ Wait for all downloads to finish before continuing.
@@ -157,8 +158,10 @@ class SeleniumInstance(ABC):
         configured downloads directory after detection.
 
         Args:
-            file_name (Optional[str]): The name of the file you want to wait for its
-                download to complete. Defaults to None.
+            search_pattern (Optional[str]): A wildcard pattern to search for specific
+                files. Supports patterns like "*statement*.csv", "report_*.pdf", etc.
+                If None, waits for any new file to be downloaded.
+                Defaults to None.
             timeout (int, optional): The maximum time (in seconds) to wait for the
                 downloads to finish. Defaults to 300.
 
@@ -190,7 +193,7 @@ class SeleniumInstance(ABC):
 
         files = list(browser_download_dir.iterdir())
 
-        if not file_name:
+        if not search_pattern:
 
             def is_new_file_added(driver: Driver) -> bool:
                 current_files = list(browser_download_dir.iterdir())
@@ -221,12 +224,25 @@ class SeleniumInstance(ABC):
         else:
 
             def does_file_exist(driver: Driver) -> bool:
-                return bool(list(browser_download_dir.glob(f"{file_name}*")))
+                current_files = list(browser_download_dir.iterdir())
+                matching_files = [
+                    file
+                    for file in current_files
+                    if file.suffix not in download_extensions
+                    and fnmatch(file.name, search_pattern)
+                ]
+                return len(matching_files) > 0
 
             WebDriverWait(self.driver, timeout, 1).until(does_file_exist)
 
-            # Return the specific file that was waited for
-            matching_files = list(browser_download_dir.glob(f"{file_name}*"))
+            # Return the most recently downloaded file matching the pattern
+            current_files = list(browser_download_dir.iterdir())
+            matching_files = [
+                file
+                for file in current_files
+                if file.suffix not in download_extensions
+                and fnmatch(file.name, search_pattern)
+            ]
             downloaded_file = max(matching_files, key=lambda x: x.stat().st_mtime)
 
             # Move file to configured directory

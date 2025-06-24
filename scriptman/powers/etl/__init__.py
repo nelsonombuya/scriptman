@@ -860,6 +860,7 @@ class ETL:
         batch_execute: bool = True,
         force_nvarchar: bool = False,
         allow_fallback: bool = False,
+        use_logical_keys: bool = False,
         synchronize_schema: bool = True,
         method: Literal["truncate", "replace", "insert", "update", "upsert"] = "upsert",
     ) -> bool:
@@ -882,6 +883,10 @@ class ETL:
                 batch. Defaults to 1000.
             allow_fallback (bool, optional): Whether to allow fallback to insert/update
                 operations when the primary operation fails. Defaults to False.
+            use_logical_keys (bool, optional): If True, uses DataFrame indices as logical
+                keys for WHERE clauses in update/merge operations without creating actual
+                database constraints. If False, creates actual PRIMARY KEY constraints.
+                Defaults to False.
             synchronize_schema (bool, optional): Whether to synchronize the schema of
                 the table before loading the data. Defaults to True.
             method (Literal["truncate", "replace", "insert", "update", "upsert"]):
@@ -927,23 +932,44 @@ class ETL:
 
         if not table_exists:
             self.log.warning(f'Table "{table_name}" does not exist. Creating table...')
-            db.create_table(
-                table_name=table_name,
-                keys=[str(_) for _ in self._data.index.names],
-                columns=db.get_table_data_types(self._data.reset_index(), force_nvarchar),
-            )
+            if use_logical_keys:
+                db.create_table_with_logical_keys(
+                    table_name=table_name,
+                    logical_keys=[str(_) for _ in self._data.index.names],
+                    columns=db.get_table_data_types(
+                        self._data.reset_index(), force_nvarchar
+                    ),
+                )
+            else:
+                db.create_table(
+                    table_name=table_name,
+                    keys=[str(_) for _ in self._data.index.names],
+                    columns=db.get_table_data_types(
+                        self._data.reset_index(), force_nvarchar
+                    ),
+                )
             method = "insert"
             self.log.info(f"Since table was created, method set to: {method}")
 
-        query, values = {
-            "insert": db.generate_prepared_insert_query,
-            "update": db.generate_prepared_update_query,
-            "upsert": db.generate_prepared_upsert_query,
-        }.get(method, db.generate_prepared_upsert_query)(
-            force_nvarchar=force_nvarchar,
-            table_name=table_name,
-            df=self._data,
-        )
+        if method == "insert":
+            query, values = db.generate_prepared_insert_query(
+                force_nvarchar=force_nvarchar,
+                table_name=table_name,
+                df=self._data,
+            )
+        elif method == "update":
+            query, values = db.generate_prepared_update_query(
+                force_nvarchar=force_nvarchar,
+                table_name=table_name,
+                df=self._data,
+            )
+        else:  # upsert
+            query, values = db.generate_prepared_upsert_query(
+                use_logical_keys=use_logical_keys,
+                force_nvarchar=force_nvarchar,
+                table_name=table_name,
+                df=self._data,
+            )
         self.log.info(
             f"{method.capitalize()}ing data "
             f'into "{db.database_name}"."{table_name}" '
@@ -960,6 +986,7 @@ class ETL:
                     table_name=table_name,
                     force_nvarchar=force_nvarchar,
                     allow_fallback=allow_fallback,
+                    use_logical_keys=use_logical_keys,
                 )
 
             if not batch_execute:
@@ -1000,6 +1027,7 @@ class ETL:
         force_nvarchar: bool = False,
         batch_size: int = 1000,
         allow_fallback: bool = False,
+        use_logical_keys: bool = False,
     ) -> bool:
         """
         ✍🏾 Private method to merge data into the mssql database using a temporary table.
@@ -1009,6 +1037,9 @@ class ETL:
                 queries.
             query (str): The query to execute.
             allow_fallback (bool): Whether to allow fallback to insert/update on error.
+            use_logical_keys (bool): If True, uses DataFrame indices as logical
+                keys for WHERE clauses in update/merge operations without creating actual
+                database constraints. If False, creates actual PRIMARY KEY constraints.
 
         Returns:
             bool: True if the data was merged successfully.
@@ -1026,13 +1057,22 @@ class ETL:
             temp_table = self._generate_temp_table_name(table_name)
 
         try:
-            database_handler.create_table(
-                table_name=temp_table,
-                keys=[str(_) for _ in self._data.index.names],
-                columns=database_handler.get_table_data_types(
-                    self._data.reset_index(), force_nvarchar
-                ),
-            )
+            if use_logical_keys:
+                database_handler.create_table_with_logical_keys(
+                    table_name=temp_table,
+                    logical_keys=[str(_) for _ in self._data.index.names],
+                    columns=database_handler.get_table_data_types(
+                        self._data.reset_index(), force_nvarchar
+                    ),
+                )
+            else:
+                database_handler.create_table(
+                    table_name=temp_table,
+                    keys=[str(_) for _ in self._data.index.names],
+                    columns=database_handler.get_table_data_types(
+                        self._data.reset_index(), force_nvarchar
+                    ),
+                )
 
             temp_query, temp_values = database_handler.generate_prepared_insert_query(
                 temp_table, self._data, force_nvarchar
@@ -1061,6 +1101,7 @@ class ETL:
                         force_nvarchar=force_nvarchar,
                         allow_fallback=allow_fallback,
                         database_handler=database_handler,
+                        use_logical_keys=use_logical_keys,
                     )
                 raise error
 

@@ -197,7 +197,11 @@ class ETLDatabase:
         return query, self.prepare_values(df, force_nvarchar)
 
     def generate_prepared_upsert_query(
-        self, table_name: str, df: DataFrame, force_nvarchar: bool = False
+        self,
+        table_name: str,
+        df: DataFrame,
+        force_nvarchar: bool = False,
+        use_logical_keys: bool = False,
     ) -> tuple[str, Iterator[dict[str, Any]]]:
         """
         ✍🏾 Generates a prepared SQL upsert query for the given table and DataFrame.
@@ -206,6 +210,8 @@ class ETLDatabase:
             table_name (str): The name of the table to upsert into.
             df (DataFrame): The DataFrame containing the data to upsert.
             force_nvarchar (bool): Whether to force all columns to be NVARCHAR(MAX).
+            use_logical_keys (bool): If True, uses logical keys for WHERE clauses
+                without database constraints.
 
         Returns:
             tuple(str, Iterator[dict[str, Any]]): The prepared SQL query and the
@@ -236,7 +242,9 @@ class ETLDatabase:
 
         elif self.database_type in ["mssql", "oracle"]:
             # Use MERGE for MSSQL Server and Oracle
-            query, values = self.generate_merge_query(table_name, df, var)
+            query, values = self.generate_merge_query(
+                table_name, df, var, use_logical_keys
+            )
 
         assert query is not None, "Unsupported database type"
         assert values is not None, "No values to upsert"
@@ -326,7 +334,11 @@ class ETLDatabase:
         return True
 
     def generate_merge_query(
-        self, table_name: str, df: DataFrame, force_nvarchar: bool = False
+        self,
+        table_name: str,
+        df: DataFrame,
+        force_nvarchar: bool = False,
+        use_logical_keys: bool = False,
     ) -> tuple[str, Iterator[dict[str, Any]]]:
         """
         ✍🏾 Generates a SQL MERGE INTO query using a temporary table approach.
@@ -338,6 +350,8 @@ class ETLDatabase:
             table_name (str): The name of the table to merge into.
             df (DataFrame): The DataFrame containing the data to merge.
             force_nvarchar (bool): Whether to force all columns to be NVARCHAR(MAX).
+            use_logical_keys (bool): If True, uses logical keys for WHERE clauses
+                without database constraints.
 
         Returns:
             tuple(str, Iterator[dict[str, Any]]): The prepared SQL query and the
@@ -355,7 +369,10 @@ class ETLDatabase:
 
         # Build the query parts
         temp_schema = ", ".join([f"[{c}] {data_types[c]}" for c in columns_to_insert])
-        temp_schema += f", PRIMARY KEY ({', '.join([f'[{k}]' for k in indices])})"
+
+        # Only add PRIMARY KEY constraint if not using logical keys
+        if not use_logical_keys:
+            temp_schema += f", PRIMARY KEY ({', '.join([f'[{k}]' for k in indices])})"
         update = ", ".join([f"target.[{c}] = source.[{c}]" for c in columns_to_update])
 
         # Add COLLATE clause for string comparisons to handle collation conflicts
@@ -426,6 +443,46 @@ class ETLDatabase:
     ) -> bool:
         """Delegate to the database handler"""
         return self.db.create_table(table_name, columns, keys)
+
+    @_retry_conditions
+    def create_table_with_logical_keys(
+        self, table_name: str, columns: dict[str, str], logical_keys: list[str]
+    ) -> bool:
+        """
+        🔨 Creates a table with logical keys (no database constraints) but stores the
+        logical key information for use in WHERE clauses.
+
+        Args:
+            table_name (str): The name of the table.
+            columns (dict[str, str]): A dictionary of column names and their data types.
+            logical_keys (list[str]): A list of column names to use as logical keys
+                for WHERE clauses in update/merge operations.
+
+        Returns:
+            bool: True if the table was created, False otherwise.
+        """
+        # Store logical keys information for later use in queries
+        if not hasattr(self, "_logical_keys"):
+            self._logical_keys = {}
+        self._logical_keys[table_name] = logical_keys
+
+        # Create table without actual database constraints
+        return self.db.create_table(table_name, columns, keys=None)
+
+    def get_logical_keys(self, table_name: str) -> Optional[list[str]]:
+        """
+        🔍 Get the logical keys for a table if they were set using
+        create_table_with_logical_keys.
+
+        Args:
+            table_name (str): The name of the table.
+
+        Returns:
+            Optional[list[str]]: The logical keys for the table, or None if not set.
+        """
+        if hasattr(self, "_logical_keys"):
+            return self._logical_keys.get(table_name)
+        return None
 
     @_retry_conditions
     def truncate_table(self, table_name: str) -> bool:

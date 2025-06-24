@@ -47,6 +47,17 @@ Scriptman automatically uses your system's default Downloads directory:
 - **macOS**: `/Users/<username>/Downloads`
 - **Linux**: `/home/<username>/Downloads`
 
+### Smart Download Handling
+
+Scriptman uses an intelligent download mechanism that:
+
+1. **Lets Chrome use its default download directory** (usually your Downloads folder)
+2. **Monitors for completed downloads** in Chrome's default location
+3. **Automatically moves files** to your configured downloads directory
+4. **Handles filename conflicts** by adding counters to duplicate names
+
+This approach prevents download issues that can occur when forcing Chrome to use a specific download directory.
+
 ### Configuration
 
 You can customize the downloads directory in your configuration:
@@ -59,7 +70,7 @@ downloads_dir = "/path/to/custom/downloads"
 
 ### File Organization
 
-- **Selenium Downloads**: Files downloaded through Selenium are saved directly to the Downloads directory
+- **Selenium Downloads**: Files downloaded through Selenium are saved to the configured directory
 - **Chrome/Selenium Files**: Browser executables are stored in `.selenium/chrome/` subdirectory
 - **Temporary Files**: Fallback to system temp directory if Downloads is not writable
 
@@ -72,7 +83,7 @@ Scriptman's Selenium implementation includes:
 - **Automatic Browser Management**: Downloads and manages Chrome/ChromeDriver
 - **Fallback Mechanisms**: Graceful handling of permission issues
 - **Headless Mode**: Optimized for server environments
-- **Download Monitoring**: Automatic detection of completed downloads
+- **Download Monitoring**: Automatic detection and relocation of completed downloads
 
 ### Example: Web Scraping
 
@@ -89,6 +100,15 @@ selenium.interact_with_element("//button[@id='download']", mode="click")
 file_path = selenium.wait_for_downloads_to_finish("report.pdf")
 print(f"Downloaded: {file_path}")
 ```
+
+### Download Process Flow
+
+1. **Chrome downloads** to its default directory (usually Downloads)
+2. **Scriptman monitors** the default directory for new files
+3. **File detection** occurs when download completes
+4. **Automatic move** to configured directory
+5. **Filename conflict resolution** if needed
+6. **Return final path** in configured directory
 
 ## ETL Operations
 

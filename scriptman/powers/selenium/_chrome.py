@@ -15,7 +15,7 @@ try:
     from webdriver_manager.chrome import ChromeDriverManager
 
     from scriptman.core.config import config
-    from scriptman.powers.selenium._enums import SeleniumBrowser
+    from scriptman.powers.selenium._utils import SeleniumBrowser
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -73,7 +73,6 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
             ChromeOptions: Chrome WebDriver options.
         """
         options = ChromeOptions()
-        download_dir = Path(config.settings.downloads_dir).resolve().as_posix()
 
         if chrome_executable_path:
             options.binary_location = chrome_executable_path.resolve().as_posix()
@@ -101,13 +100,14 @@ class Chrome(SeleniumBrowser[ChromeDriver]):
                 if arg is not None:
                     options.add_argument(arg)
 
+        # Note: We don't set download.default_directory to let Chrome use its default
+        # This prevents download issues in certain environments
         options.add_experimental_option(
             "prefs",
             {
                 "download.directory_upgrade": True,
                 "download.safebrowsing.enabled": True,
                 "download.prompt_for_download": False,
-                "download.default_directory": download_dir,
             },
         )
 

@@ -1,6 +1,7 @@
 try:
     from abc import ABC, abstractmethod
     from enum import Enum
+    from pathlib import Path
     from typing import Generic
 
     from loguru import logger
@@ -68,3 +69,36 @@ class SeleniumBrowser(ABC, Generic[T]):
             T: The WebDriver instance (Chrome, Edge, or Firefox) used by the browser.
         """
         return self._driver
+
+
+def get_browser_default_download_dir() -> Path:
+    """
+    📁 Get the browser's default download directory for the current operating system.
+
+    Returns:
+        Path: The browser's default download directory path.
+    """
+    system = str(__import__("platform").system()).capitalize()
+
+    if system == "Windows":
+        # Windows: The browser typically uses the Downloads folder
+        downloads = Path.home() / "Downloads"
+        if downloads.exists():
+            return downloads
+        # Fallback to OneDrive Downloads if it exists
+        onedrive_downloads = Path.home() / "OneDrive" / "Downloads"
+        if onedrive_downloads.exists():
+            return onedrive_downloads
+        return downloads
+
+    elif system == "Darwin":  # macOS
+        # macOS: The browser uses the Downloads folder
+        return Path.home() / "Downloads"
+
+    elif system == "Linux":
+        # Linux: The browser uses the Downloads folder
+        return Path.home() / "Downloads"
+
+    else:
+        # Fallback for unknown systems (Windows, macOS, Linux)
+        return Path.home() / "Downloads"

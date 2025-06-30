@@ -496,6 +496,34 @@ class TaskExecutor:
         """
         🏃‍♂️ Race multiple tasks and return the first successful result.
 
+        Args:
+            tasks: List of (func, args, kwargs) tuples to race
+            preferred_task_idx: If all tasks fail, use this task's result. If None,
+                use the result of the task that finishes last.
+            timeout: Maximum time to wait for a result
+
+        Returns:
+            Task: The winning task's result, or an empty task if shutting down.
+        """
+        if self._mode == "smart" and self._task_master:
+            return self._task_master.submit(
+                func=self._race,
+                tasks=tasks,
+                timeout=timeout,
+                preferred_task_idx=preferred_task_idx,
+            ).await_result(timeout=timeout)
+        return self._race(tasks, preferred_task_idx=preferred_task_idx, timeout=timeout)
+
+    def _race(
+        self,
+        tasks: list[tuple[Callable[P, R], tuple[Any, ...], dict[str, Any]]],
+        *,
+        preferred_task_idx: Optional[int] = None,
+        timeout: Optional[float] = None,
+    ) -> Task[R]:
+        """
+        🏃‍♂️ Race multiple tasks and return the first successful result.
+
         Note: Race method always uses direct thread pool execution for optimal
         performance and to avoid resource contention, regardless of executor mode.
 

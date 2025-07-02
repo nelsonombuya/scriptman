@@ -393,8 +393,8 @@ class BaseEntityModel(BaseModel):
         Raises:
             ValueError: If dp is negative or value cannot be converted to Decimal
 
-        Note:
-            Uses ROUND_HALF_EVEN (Banker's rounding) for consistent financial calculations
+        NOTE: Uses ROUND_HALF_EVEN (Banker's rounding) for consistent financial
+        calculations.
         """
         if value is None:
             return None

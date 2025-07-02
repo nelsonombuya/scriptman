@@ -524,7 +524,7 @@ class TaskExecutor:
         """
         🏃‍♂️ Race multiple tasks and return the first successful result.
 
-        Note: Race method always uses direct thread pool execution for optimal
+        NOTE: Race method always uses direct thread pool execution for optimal
         performance and to avoid resource contention, regardless of executor mode.
 
         Args:

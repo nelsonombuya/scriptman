@@ -13,6 +13,7 @@ try:
     from scriptman.powers.api._models import APIRequest, APIResponse
     from scriptman.powers.generics import Func, P
     from scriptman.powers.serializer import SERIALIZE_FOR_JSON, serialize
+    from scriptman.powers.tasks._models import TaskException
     from scriptman.powers.tasks._task_master import TaskMaster
 except ImportError as e:
     raise ImportError(
@@ -77,7 +78,12 @@ def create_error_response(request: APIRequest, e: Exception) -> dict[str, Any]:
         dict[str, Any]: Formatted error API response data.
     """
     if not isinstance(e, APIException):
-        e = APIException(f"{e.__class__.__name__}: {str(e)}", exception=e)
+        if isinstance(e, TaskException):
+            full_stacktrace = e.get_full_stacktrace()
+            e = APIException(f"{e.__class__.__name__}: {str(e)}", exception=e)
+            e.stacktrace = full_stacktrace
+        else:
+            e = APIException(f"{e.__class__.__name__}: {str(e)}", exception=e)
 
     logger.error(f"❌ Request {request.request_id} failed with error: {e}")
     logger.debug(f"📤 Request details: \n{dumps(request.model_dump(), indent=4)}")

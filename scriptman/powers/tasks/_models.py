@@ -1,6 +1,7 @@
 from concurrent.futures import ALL_COMPLETED, FIRST_EXCEPTION, Future, wait
 from dataclasses import dataclass, field
 from time import perf_counter, time
+from traceback import format_exception
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -30,9 +31,53 @@ class TaskException(Exception):
         super().__init__(self.message)
         self.exception_type = exception.__class__.__name__
         self.stacktrace = getattr(exception, "__traceback__", None)
+        self.full_traceback = "".join(
+            format_exception(
+                type(exception),
+                exception,
+                exception.__traceback__,
+            )
+        )
 
     def __str__(self) -> str:
         return self.message
+
+    def get_full_stacktrace(self) -> list[dict[str, str | int | None]]:
+        """Parse the full traceback into structured format"""
+        lines = self.full_traceback.split("\n")
+        frames: list[dict[str, str | int | None]] = []
+        current_frame: dict[str, str | int | None] = {}
+
+        for line in lines:
+            line = line.strip()
+            if line.startswith('File "'):
+                parts = line.split('", line ')
+                if len(parts) == 2:
+                    file_path = parts[0].replace('File "', "")
+                    line_num = int(parts[1].replace(", in ", "").split(",")[0])
+                    current_frame = {
+                        "file": file_path,
+                        "line": line_num,
+                        "function": "unknown",
+                    }
+            elif line.startswith("in "):
+                function_name = line.replace("in ", "")
+                if current_frame:
+                    current_frame["function"] = function_name
+            elif (
+                line
+                and not line.startswith("Traceback")
+                and not line.startswith("Exception")
+            ):
+                if current_frame:
+                    current_frame["code"] = line
+                    frames.append(current_frame.copy())
+                    current_frame = {}
+
+        for i, frame in enumerate(frames, 1):
+            frame["frame"] = i
+
+        return frames
 
     def __reduce__(
         self,

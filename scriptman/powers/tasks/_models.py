@@ -19,7 +19,6 @@ from loguru import logger
 from scriptman.powers.generics import Func, T
 
 if TYPE_CHECKING:  # pragma: no cover # NOTE: Avoids circular imports
-    from scriptman.powers.api._exceptions import APIException
     from scriptman.powers.cache import CacheManager
     from scriptman.powers.tasks._task_master import TaskMaster
 
@@ -43,6 +42,8 @@ class TaskException(Exception):
         self.message: str = message
         self.stacktrace: list[dict[str, str | int | None]] = []
         self.exception: Exception = exception or Exception(message)
+
+        from scriptman.powers.api._exceptions import APIException
 
         if (
             exception is not None

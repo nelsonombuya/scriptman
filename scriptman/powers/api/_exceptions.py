@@ -1,12 +1,9 @@
 try:
     from sys import exc_info
     from traceback import extract_tb
-    from typing import TYPE_CHECKING, Any, Optional
+    from typing import Any, Optional
 
     from fastapi import status
-
-    if TYPE_CHECKING:  # pragma: no cover # NOTE: Avoids circular imports
-        from scriptman.powers.tasks._models import TaskException
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -45,6 +42,8 @@ class APIException(Exception):
         self.status_code: int = status_code
         self.exception: Optional[Exception] = exception
         self.response: Optional[dict[str, Any]] = response
+
+        from scriptman.powers.tasks._models import TaskException
 
         if (
             exception is not None

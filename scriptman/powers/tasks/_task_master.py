@@ -219,7 +219,8 @@ class TaskMaster:
                     if isinstance(exception := src_future.exception(), Exception) and (
                         task := self.active_tasks.get(task_id)
                     ):
-                        task._cache_result(TaskException(exception))
+                        message = f"Task {task_id} failed with exception: {exception}"
+                        task._cache_result(TaskException(message, exception))
 
                     # Check again before setting exception (race condition protection)
                     if not target.cancelled() and not target.done():

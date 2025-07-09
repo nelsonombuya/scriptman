@@ -79,9 +79,7 @@ def create_error_response(request: APIRequest, e: Exception) -> dict[str, Any]:
     """
     if not isinstance(e, APIException):
         if isinstance(e, TaskException):
-            full_stacktrace = e.get_full_stacktrace()
-            e = APIException(f"{e.__class__.__name__}: {str(e)}", exception=e)
-            e.stacktrace = full_stacktrace
+            e = APIException(e.message, exception=e)
         else:
             e = APIException(f"{e.__class__.__name__}: {str(e)}", exception=e)
 

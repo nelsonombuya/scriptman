@@ -26,11 +26,17 @@ class SQLAlchemyHandler(DatabaseHandler):
         username: Optional[str] = None,
         password: Optional[str] = None,
         windows_auth: bool = False,
+        pool_size: int = 50,
+        max_overflow: int = 100,
+        pool_timeout: int = 120,
+        pool_recycle: int = 3600,
+        pool_pre_ping: bool = True,
     ) -> None:
         """
         🚀 Initializes the SQLAlchemyHandler class.
 
         Args:
+            protocol (str): The database protocol (e.g., 'mssql+pyodbc').
             driver (str): The driver for the database.
             server (str): The server for the database.
             database (str): The database for the database.
@@ -41,6 +47,15 @@ class SQLAlchemyHandler(DatabaseHandler):
                 to None.
             windows_auth (bool, optional): Whether to use Windows authentication. Defaults
                 to False.
+            pool_size (int, optional): The size of the connection pool. Defaults to 50.
+            max_overflow (int, optional): The maximum overflow size of the connection
+                pool. Defaults to 100.
+            pool_timeout (int, optional): The timeout in seconds for getting connection
+                from pool. Defaults to 120.
+            pool_recycle (int, optional): The time in seconds to recycle connections.
+                Defaults to 3600 (1 hour).
+            pool_pre_ping (bool, optional): Whether to validate connections before use.
+                Defaults to True.
         """
         super().__init__(
             port=port,
@@ -50,10 +65,52 @@ class SQLAlchemyHandler(DatabaseHandler):
             username=username,
             password=password,
         )
-        self._windows_auth = windows_auth
-        self._protocol = protocol
         self._engine: Engine
+        self._protocol = protocol
+        self._pool_size = pool_size
+        self._windows_auth = windows_auth
+        self._max_overflow = max_overflow
+        self._pool_timeout = pool_timeout
+        self._pool_recycle = pool_recycle
+        self._pool_pre_ping = pool_pre_ping
         self.connect()
+
+    def upgrade_to_etl(self) -> "SQLAlchemyHandler":
+        """
+        🚀 Upgrade this existing handler to ETL-optimized connection pool settings.
+
+        This method reinitializes the engine with ETL-optimized settings
+        while preserving all existing connection parameters.
+
+        Configuration applied:
+        - pool_size=100: Large persistent connection pool
+        - max_overflow=200: High overflow capacity
+        - pool_timeout=300: Extended timeout (5 minutes)
+        - pool_recycle=1800: Connection recycling (30 minutes)
+        - pool_pre_ping=True: Connection validation
+
+        Total available connections: 300
+
+        Returns:
+            SQLAlchemyHandler: The same instance with upgraded pool settings
+        """
+        if self._is_etl_mode:
+            self.log.info("Already in ETL mode, skipping upgrade")
+            return self
+
+        self.log.info("Upgrading connection pool to ETL-optimized settings...")
+        self.disconnect()
+
+        self._pool_size = 100
+        self._max_overflow = 200
+        self._pool_timeout = 300
+        self._pool_recycle = 1800
+        self._pool_pre_ping = True
+
+        self.connect()
+        self._is_etl_mode = True
+        self.log.success("Successfully upgraded to ETL mode")
+        return self
 
     @property
     def windows_auth(self) -> bool:
@@ -112,10 +169,24 @@ class SQLAlchemyHandler(DatabaseHandler):
             DatabaseError: If a connection to the database cannot be established.
         """
         try:
-            self._engine = create_engine(self.connection_string)
+            # Configure connection pool for ETL workloads with concurrent operations
+            self._engine = create_engine(
+                self.connection_string,
+                pool_size=self._pool_size,
+                max_overflow=self._max_overflow,
+                pool_timeout=self._pool_timeout,
+                pool_recycle=self._pool_recycle,
+                pool_pre_ping=self._pool_pre_ping,
+            )
             with self._engine.connect() as session:  # Test the connection
                 session.execute(text("SELECT 1"))
-            self.log.success(f"Successfully connected to {self.database}")
+
+            total_connections = self._pool_size + self._max_overflow
+            self.log.success(
+                f"Successfully connected to {self.database} with pool configuration: "
+                f"pool_size={self._pool_size}, max_overflow={self._max_overflow}, "
+                f"total_available={total_connections}, timeout={self._pool_timeout}s"
+            )
             return True
         except SQLAlchemyError as error:
             self.log.error(f"Unable to connect to {self.database}: {error}")
@@ -164,9 +235,6 @@ class SQLAlchemyHandler(DatabaseHandler):
             with self._engine.connect() as session:
                 return [dict(_._mapping) for _ in session.execute(text(query), params)]
         except SQLAlchemyError as error:
-            if "deadlock" in str(error).lower():
-                self.log.warning("Deadlock detected, retrying query...")
-                return self.execute_read_query(query, params)
             self.log.error(
                 f"Unable to execute read query: \n"
                 f"Error: {error} \n"
@@ -208,9 +276,6 @@ class SQLAlchemyHandler(DatabaseHandler):
                     raise ValueError("No rows were affected by the query.")
                 return True
         except (SQLAlchemyError, ValueError) as error:
-            if "deadlock" in str(error).lower():
-                self.log.warning("Deadlock detected, retrying query...")
-                return self.execute_write_query(query, params, check_affected_rows)
             self.log.error(
                 "Unable to execute write query: \n"
                 f"Error: {error} \n"
@@ -250,9 +315,6 @@ class SQLAlchemyHandler(DatabaseHandler):
             self.log.success("Bulk operation completed successfully")
             return True
         except SQLAlchemyError as error:
-            if "deadlock" in str(error).lower():
-                self.log.warning("Deadlock detected, retrying query...")
-                return self.execute_write_bulk_query(query, rows)
             sample_rows = "\n\t".join(str(row) for row in rows[:5])
             if len(rows) > 5:
                 sample_rows += "\n\t... and more rows"
@@ -263,13 +325,3 @@ class SQLAlchemyHandler(DatabaseHandler):
                 f"Rows: {sample_rows} \n"
             )
             raise DatabaseError("Unable to bulk execute query", error)
-
-    def __del__(self) -> None:
-        """
-        Destructor to disconnect from the database when the instance is
-        destroyed.
-        """
-        try:
-            self.disconnect()
-        except Exception as error:
-            self.log.error(f"Unable to disconnect from the database: {error}")

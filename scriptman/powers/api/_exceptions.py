@@ -1,5 +1,5 @@
 try:
-    import sys
+    from sys import exc_info
     from traceback import extract_tb
     from typing import Any, Optional
 
@@ -42,7 +42,17 @@ class APIException(Exception):
         self.status_code: int = status_code
         self.exception: Optional[Exception] = exception
         self.response: Optional[dict[str, Any]] = response
-        self.stacktrace: list[dict[str, Any]] = self._generate_stacktrace()
+
+        from scriptman.powers.tasks._models import TaskException
+
+        if (
+            exception is not None
+            and isinstance(exception, TaskException)
+            and exception.stacktrace
+        ):
+            self.stacktrace = exception.stacktrace
+        else:
+            self.stacktrace = self._generate_stacktrace()
 
     def _generate_stacktrace(self) -> list[dict[str, str | int | None]]:
         """
@@ -59,7 +69,7 @@ class APIException(Exception):
                 "function": frame.name,
                 "code": frame.line,
             }
-            for index, frame in enumerate(extract_tb(sys.exc_info()[2]), 1)
+            for index, frame in enumerate(extract_tb(exc_info()[2]), 1)
         ]
 
     @property
@@ -80,6 +90,23 @@ class APIException(Exception):
             "status_code": self.status_code,
             "stacktrace": self.stacktrace,
         }
+
+    def __str__(self) -> str:
+        """🔍 Get a string representation of the exception"""
+        return f"{self.exception.__class__.__name__}: {self.message}"
+
+    def __reduce__(
+        self,
+    ) -> tuple[type["APIException"], tuple[Exception], dict[str, Any]]:
+        """Enable pickling for this exception class"""
+        return (
+            self.__class__,
+            (Exception(self.message),),
+            {
+                "exception_type": self.exception.__class__.__name__,
+                "stacktrace": self.stacktrace,
+            },
+        )
 
 
 class NotFoundError(APIException):

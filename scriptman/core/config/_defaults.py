@@ -27,8 +27,8 @@ class ConfigModel(BaseModel):
         description="Path to the logs directory",
     )
     downloads_dir: DirectoryPath = Field(
-        default=Path(__file__).parent.parent / ".downloads",
-        description="Path to the downloads directory",
+        default=Path.home() / "Downloads",
+        description="Path to the downloads directory (defaults to system Downloads dir)",
     )
     concurrent: bool = Field(
         default=True,
@@ -50,41 +50,38 @@ class ConfigModel(BaseModel):
         default=True,
         description="Enable selenium optimizations",
     )
-    selenium_local_mode: bool = Field(
+    selenium_headless: bool = Field(
         default=True,
-        description="Enable selenium local mode (Download and run a local copy of the "
+        description="Enable selenium headless mode",
+    )
+    selenium_managed_mode: bool = Field(
+        default=True,
+        description="Enable selenium managed mode (Download and run a local copy of the "
         "browser)",
     )
-    chrome_download_url: str = Field(
-        default=(
-            "https://googlechromelabs.github.io/chrome-for-testing/"
-            "known-good-versions-with-downloads.json"
-        ),
-        description="URL to fetch Chrome download URLs",
+    selenium_chrome_version: int = Field(
+        default=138,
+        description="Chrome version to download in managed mode",
+    )
+    selenium_firefox_version: str = Field(
+        default="latest",
+        description="Firefox version to download in managed mode",
+    )
+    selenium_cleanup_downloads_on_exit: bool = Field(
+        default=False,
+        description="Automatically delete downloaded browser files on exit",
+    )
+    selenium_auto_move_downloads: bool = Field(
+        default=False,
+        description="Automatically move downloaded files to configured directory",
     )
     relative_venv_path: str = Field(
         default=".venv",
         description="Path to the virtual environment relative to the project root",
     )
-    thread_pool_size: int = Field(
-        default=50,
-        description="Maximum number of threads for the global thread pool",
-    )
-    process_pool_size: int = Field(
-        default=4,
-        description="Maximum number of processes for the global process pool",
-    )
-    task_queue_size: int = Field(
-        default=100,
-        description="Maximum number of tasks that can be queued",
-    )
     task_timeout: int = Field(
         default=30,
         description="Default timeout in seconds for task execution",
-    )
-    max_concurrent_requests: int = Field(
-        default=25,
-        description="Maximum number of concurrent requests",
     )
 
     @field_validator("logs_dir", "downloads_dir", mode="before")

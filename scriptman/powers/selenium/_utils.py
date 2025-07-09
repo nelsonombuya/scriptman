@@ -1,14 +1,15 @@
 try:
     from abc import ABC, abstractmethod
     from enum import Enum
-    from typing import Generic
+    from pathlib import Path
+    from typing import Generic, Union
 
     from loguru import logger
     from selenium.webdriver import Chrome as ChromeDriver
+    from selenium.webdriver import Firefox as FirefoxDriver
 
     from scriptman.core.config import config
     from scriptman.powers.generics import T
-    from scriptman.powers.selenium._chrome import Chrome
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -25,23 +26,22 @@ class Browsers(Enum):
 
     Attributes:
         CHROME (str): Google Chrome
+        FIREFOX (str): Mozilla Firefox
     """
 
     CHROME = "Google Chrome"
+    FIREFOX = "Mozilla Firefox"
 
     def __str__(self) -> str:
         return self.value
 
 
-Driver = ChromeDriver
-BrowserMap: dict[Browsers, type["SeleniumBrowser[Driver]"]] = {
-    Browsers.CHROME: Chrome,
-}
+Driver = Union[ChromeDriver, FirefoxDriver]
 
 
 class SeleniumBrowser(ABC, Generic[T]):
     _driver: T
-    _local_mode: bool = config.settings.get("selenium_local_mode", True)
+    _managed_mode: bool = config.settings.get("selenium_managed_mode", True)
 
     def __init__(self) -> None:
         """
@@ -72,3 +72,36 @@ class SeleniumBrowser(ABC, Generic[T]):
             T: The WebDriver instance (Chrome, Edge, or Firefox) used by the browser.
         """
         return self._driver
+
+
+def get_browser_default_download_dir() -> Path:
+    """
+    📁 Get the browser's default download directory for the current operating system.
+
+    Returns:
+        Path: The browser's default download directory path.
+    """
+    system = str(__import__("platform").system()).capitalize()
+
+    if system == "Windows":
+        # Windows: The browser typically uses the Downloads folder
+        downloads = Path.home() / "Downloads"
+        if downloads.exists():
+            return downloads
+        # Fallback to OneDrive Downloads if it exists
+        onedrive_downloads = Path.home() / "OneDrive" / "Downloads"
+        if onedrive_downloads.exists():
+            return onedrive_downloads
+        return downloads
+
+    elif system == "Darwin":  # macOS
+        # macOS: The browser uses the Downloads folder
+        return Path.home() / "Downloads"
+
+    elif system == "Linux":
+        # Linux: The browser uses the Downloads folder
+        return Path.home() / "Downloads"
+
+    else:
+        # Fallback for unknown systems (Windows, macOS, Linux)
+        return Path.home() / "Downloads"

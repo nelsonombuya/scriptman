@@ -115,9 +115,57 @@ class CleanUp:
     def selenium_cleanup(self) -> None:
         """🧹 Clean up Selenium downloads and cache folders."""
         try:
-            from scriptman.powers.selenium._chrome import ChromeDownloader
+            from pathlib import Path
+            from tempfile import gettempdir
 
+            from scriptman.powers.selenium._chrome import ChromeDownloader
+            from scriptman.powers.selenium._firefox import FirefoxDownloader
+
+            # Clean up primary Chrome downloads
             ChromeDownloader.cleanup_chrome_downloads()
+
+            # Clean up primary Firefox downloads
+            FirefoxDownloader.cleanup_firefox_downloads()
+
+            # Clean up temporary Chrome directories
+            temp_base = Path(gettempdir())
+            chrome_temp_dirs = [
+                d
+                for d in temp_base.iterdir()
+                if d.is_dir() and d.name.startswith("scriptman_chrome_")
+            ]
+
+            for temp_dir in chrome_temp_dirs:
+                try:
+                    shutil.rmtree(temp_dir)
+                    logger.debug(f"Cleaned up temporary Chrome directory: {temp_dir}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to clean up temporary Chrome directory {temp_dir}: {e}"
+                    )
+
+            # Clean up temporary Firefox directories
+            firefox_temp_dirs = [
+                d
+                for d in temp_base.iterdir()
+                if d.is_dir() and d.name.startswith("scriptman_firefox_")
+            ]
+
+            for temp_dir in firefox_temp_dirs:
+                try:
+                    shutil.rmtree(temp_dir)
+                    logger.debug(f"Cleaned up temporary Firefox directory: {temp_dir}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to clean up temporary Firefox directory {temp_dir}: {e}"
+                    )
+
+            # Log download directory information
+            chrome_info = ChromeDownloader.get_download_info()
+            firefox_info = FirefoxDownloader.get_download_info()
+            logger.debug(f"Chrome download directories: {chrome_info}")
+            logger.debug(f"Firefox download directories: {firefox_info}")
+
         except ImportError as e:
             logger.warning(f"Skipped cleaning up Selenium files: {e}")
 

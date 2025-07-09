@@ -1,8 +1,9 @@
 try:
+    from atexit import register
     from contextlib import contextmanager
-    from functools import partial
     from pathlib import Path
-    from typing import Any, Callable, Generator, Iterator, Literal, Optional, cast
+    from re import sub
+    from typing import Any, Callable, Generator, Literal, Optional, cast
 
     from loguru import logger
     from pandas import DataFrame, MultiIndex, concat
@@ -28,6 +29,19 @@ class ETL:
 
     log = logger
     _data: DataFrame = DataFrame()
+    _temp_tables: set[tuple[ETLDatabase, str]] = set()
+
+    @classmethod
+    def _cleanup_temp_tables(cls) -> None:
+        """🧹 Clean up any remaining temporary tables."""
+        for db_handler, table_name in list(cls._temp_tables):
+            try:
+                if db_handler.table_exists(table_name):
+                    db_handler.drop_table(table_name)
+                    cls.log.info(f"Cleaned up temporary table: {table_name}")
+            except Exception as e:
+                cls.log.warning(f"Failed to cleanup temporary table {table_name}: {e}")
+        cls._temp_tables.clear()
 
     def __init__(self, data: Optional[ETL_TYPES] = None) -> None:
         """
@@ -134,25 +148,39 @@ class ETL:
     """
 
     @classmethod
-    def from_dataframe(cls, data: DataFrame) -> "ETL":
+    def search_files(cls, file_path: str | Path, pattern: str = "*") -> list[Path]:
+        """
+        🔍 Search for files in the given path that match the pattern.
+        """
+        return list(Path(file_path).glob(pattern))
+
+    @classmethod
+    def search_downloads(cls, pattern: str = "*") -> list[Path]:
+        """
+        🔍 Search for files in the configured scriptman downloads directory that match the
+        pattern.
+        """
+        from scriptman.core.config import config
+
+        return cls.search_files(config.settings.downloads_dir, pattern)
+
+    @classmethod
+    def from_dataframe(cls, data: DataFrame | list[DataFrame]) -> "ETL":
         """
         🔍 Create an ETL object from a DataFrame.
         """
-        return cls(data)
+        return cls(data) if isinstance(data, DataFrame) else cls(concat(data))
 
     @classmethod
-    def from_dataframe_list(cls, data: list[DataFrame], **kwargs: Any) -> "ETL":
-        """
-        🔍 Create an ETL object from a list of DataFrames.
-        """
-        return cls(concat(data, **kwargs))
-
-    @classmethod
-    def from_etl_list(cls, data: list["ETL"], **kwargs: Any) -> "ETL":
+    def from_etl(cls, data: "ETL | list[ETL]") -> "ETL":
         """
         🔍 Create an ETL object from a list of ETL objects.
         """
-        return cls(concat([_.data for _ in data], **kwargs))
+        return (
+            cls(concat([_.data for _ in data]))
+            if isinstance(data, list)
+            else cls(data.data)
+        )
 
     @classmethod
     def from_list(cls, data: list[dict[str, Any]]) -> "ETL":
@@ -162,7 +190,7 @@ class ETL:
         return cls(data)
 
     @classmethod
-    def from_csv_file(cls, file_path: str | Path) -> "ETL":
+    def from_csv(cls, file_path: str | Path) -> "ETL":
         """
         📃 Extract data from a CSV file.
 
@@ -190,7 +218,7 @@ class ETL:
             raise FileNotFoundError(f"No file found at: {file_path}")
 
     @classmethod
-    def from_json_file(cls, file_path: str | Path) -> "ETL":
+    def from_json(cls, file_path: str | Path) -> "ETL":
         """
         📃 Extract data from a JSON file.
 
@@ -637,61 +665,153 @@ class ETL:
 
     def to_snake_case(self) -> "ETL":
         """
-        🐍 Converts all column names in the DataFrame to snake_case.
+        🐍 Converts all column names and index names in the DataFrame to snake_case.
 
-        This method transforms column names like 'FirstName', 'first-name', 'First Name'
-        to 'first_name'.
+        This method transforms column names and index names like 'FirstName',
+        'first-name', 'First Name' to 'first_name'.
 
         Returns:
-            ETL: A new ETL instance with snake_case column names.
+            ETL: A new ETL instance with snake_case column and index names.
 
         Example:
             # Convert columns like 'FirstName', 'LastName' to 'first_name', 'last_name'
+            # Also converts index names like 'OBU Number' to 'obu_number'
             etl_snake = etl.to_snake_case()
         """
         # Create a copy of the DataFrame with renamed columns
         renamed_columns = {_: self.__convert_to_snake_case(_) for _ in self._data.columns}
         new_data = self._data.rename(columns=renamed_columns)
-        self.log.info(f"Converted {len(renamed_columns)} column names to snake_case")
+
+        # Handle index names if they exist
+        renamed_indices = None
+        if self._data.index.name is not None:
+            index_name = str(self._data.index.name)
+            renamed_indices = {index_name: self.__convert_to_snake_case(index_name)}
+            new_data = new_data.rename_axis(renamed_indices[index_name])
+        elif isinstance(self._data.index, MultiIndex) and self._data.index.names:
+            renamed_indices = {
+                str(name): self.__convert_to_snake_case(str(name))
+                for name in self._data.index.names
+                if name is not None
+            }
+            if renamed_indices:
+                new_data = new_data.rename_axis(list(renamed_indices.values()), axis=0)
+
+        total_renamed = len(renamed_columns) + (
+            len(renamed_indices) if renamed_indices else 0
+        )
+        index_count = len(renamed_indices) if renamed_indices else 0
+        self.log.info(
+            f"Converted {total_renamed} names to snake_case "
+            f"({len(renamed_columns)} columns, {index_count} indices)"
+        )
         return ETL(new_data)
 
     def to_camel_case(self) -> "ETL":
         """
-        🐐 Converts all column names in the DataFrame to camelCase.
+        🐐 Converts all column names and index names in the DataFrame to camelCase.
 
-        This method transforms column names like 'first_name', 'last_name' to
-        'FirstName', 'LastName'.
+        This method transforms column names and index names like 'first_name',
+        'last_name' to 'FirstName', 'LastName'.
 
         Returns:
-            ETL: A new ETL instance with camelCase column names.
+            ETL: A new ETL instance with camelCase column and index names.
 
         Example:
             # Convert columns like 'first_name', 'last_name' to 'FirstName', 'LastName'
+            # Also converts index names like 'obu_number' to 'obuNumber'
             etl_camel = etl.to_camel_case()
         """
         # Create a copy of the DataFrame with renamed columns
         renamed_columns = {_: self.__convert_to_camel_case(_) for _ in self._data.columns}
         new_data = self._data.rename(columns=renamed_columns)
-        self.log.info(f"Converted {len(renamed_columns)} column names to camelCase")
+
+        # Handle index names if they exist
+        renamed_indices = None
+        if self._data.index.name is not None:
+            index_name = str(self._data.index.name)
+            renamed_indices = {index_name: self.__convert_to_camel_case(index_name)}
+            new_data = new_data.rename_axis(renamed_indices[index_name])
+        elif isinstance(self._data.index, MultiIndex) and self._data.index.names:
+            renamed_indices = {
+                str(name): self.__convert_to_camel_case(str(name))
+                for name in self._data.index.names
+                if name is not None
+            }
+            if renamed_indices:
+                new_data = new_data.rename_axis(list(renamed_indices.values()), axis=0)
+
+        total_renamed = len(renamed_columns) + (
+            len(renamed_indices) if renamed_indices else 0
+        )
+        index_count = len(renamed_indices) if renamed_indices else 0
+        self.log.info(
+            f"Converted {total_renamed} names to camelCase "
+            f"({len(renamed_columns)} columns, {index_count} indices)"
+        )
+        return ETL(new_data)
+
+    def sanitize_names(self) -> "ETL":
+        """
+        🛡️ Sanitizes all column names and index names in the DataFrame to be SQL-safe.
+
+        This method removes or replaces characters that could cause SQL injection,
+        syntax errors, or other issues in database operations.
+
+        Returns:
+            ETL: A new ETL instance with SQL-safe column and index names.
+
+        Example:
+            # Sanitize columns like "User's Name" to "user_s_name"
+            # Also sanitizes index names like "OBU Number!" to "obu_number"
+            etl_safe = etl.sanitize_names()
+        """
+        # Create a copy of the DataFrame with sanitized columns
+        sanitized_columns = {
+            col: self.__sanitize_for_sql(col) for col in self._data.columns
+        }
+        new_data = self._data.rename(columns=sanitized_columns)
+
+        # Handle index names if they exist
+        sanitized_indices = None
+        if self._data.index.name is not None:
+            index_name = str(self._data.index.name)
+            sanitized_indices = {index_name: self.__sanitize_for_sql(index_name)}
+            new_data = new_data.rename_axis(sanitized_indices[index_name])
+        elif isinstance(self._data.index, MultiIndex) and self._data.index.names:
+            sanitized_indices = {
+                str(name): self.__sanitize_for_sql(str(name))
+                for name in self._data.index.names
+                if name is not None
+            }
+            if sanitized_indices:
+                new_data = new_data.rename_axis(list(sanitized_indices.values()), axis=0)
+
+        total_sanitized = len(sanitized_columns) + (
+            len(sanitized_indices) if sanitized_indices else 0
+        )
+        index_count = len(sanitized_indices) if sanitized_indices else 0
+        self.log.info(
+            f"Sanitized {total_sanitized} names for SQL safety "
+            f"({len(sanitized_columns)} columns, {index_count} indices)"
+        )
         return ETL(new_data)
 
     def __convert_to_snake_case(self, name: str) -> str:
-        """🐍 Convert a string to snake_case."""
-        from re import sub
+        """🐍 Convert a string to snake_case with SQL-safe characters."""
 
         # Replace spaces, hyphens, and other separators with underscores
-        s1 = sub(r"[\s\-\.]", "_", name)
+        s1 = sub(r"[\s\-\.]", "_", self.__sanitize_for_sql(name))
         # Insert underscore between camelCase transitions
         s2 = sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
         # Convert to lowercase
         return s2.lower()
 
     def __convert_to_camel_case(self, name: str) -> str:
-        """🐐 Convert a string to camelCase."""
-        from re import sub
+        """🐐 Convert a string to camelCase with SQL-safe characters."""
 
         # Replace underscores with spaces
-        s1 = sub(r"_", " ", name)
+        s1 = sub(r"_", " ", self.__sanitize_for_sql(name))
 
         # Handle capitalization - first word should be lowercase, others uppercase
         words = s1.split()
@@ -705,6 +825,44 @@ class ETL:
             result = first_word + "".join(rest_words)
 
         return result
+
+    def __sanitize_for_sql(self, name: str) -> str:
+        """
+        🛡️ Sanitize a string to be SQL-safe by removing or replacing problematic
+        characters.
+
+        Removes or replaces characters that could cause SQL injection, syntax errors,
+        or other issues in database operations.
+
+        Args:
+            name (str): The string to sanitize
+
+        Returns:
+            str: A SQL-safe version of the input string
+        """
+        if not name:
+            return "unnamed"
+
+        # Remove or replace SQL-unsafe characters
+        # Remove: quotes, semicolons, backslashes, null bytes, control characters, dots
+        # Replace: other special characters with underscores
+        sanitized = sub(r'[\'"`;\\\x00-\x1f\x7f\.]', "", name)
+
+        # Replace other problematic characters with underscores
+        sanitized = sub(r"[^\w\s\-]", "_", sanitized)
+
+        # Remove leading/trailing underscores and spaces
+        sanitized = sanitized.strip("_ ")
+
+        # Ensure the result is not empty and doesn't start with a number
+        if not sanitized or sanitized[0].isdigit():
+            sanitized = f"col_{sanitized}" if sanitized else "unnamed_column"
+
+        # Limit length to avoid database constraints (most DBs limit to 128 chars)
+        if len(sanitized) > 120:
+            sanitized = sanitized[:120]
+
+        return sanitized
 
     """
     🔍 Loading methods
@@ -725,7 +883,7 @@ class ETL:
             self._data.reset_index().to_dict(orient="records"),
         )
 
-    def to_csv_file(self, file_path: str | Path) -> Path:
+    def to_csv(self, file_path: str | Path) -> Path:
         """
         📃 Saves the data to a CSV file using the given file path.
 
@@ -750,7 +908,7 @@ class ETL:
             self.log.success(f"Data saved to {file_path}")
             return file_path
 
-    def to_json_file(self, file_path: str | Path, indent: int = 2) -> Path:
+    def to_json(self, file_path: str | Path, indent: int = 2) -> Path:
         """
         📃 Saves the data to a JSON file using the given file path.
 
@@ -784,7 +942,10 @@ class ETL:
         batch_size: int = 1000,
         batch_execute: bool = True,
         force_nvarchar: bool = False,
+        allow_fallback: bool = False,
+        use_logical_keys: bool = False,
         synchronize_schema: bool = True,
+        sanitize_column_names: bool = True,
         method: Literal["truncate", "replace", "insert", "update", "upsert"] = "upsert",
     ) -> bool:
         """
@@ -804,10 +965,19 @@ class ETL:
                 types. Defaults to False.
             batch_size (Optional[int], optional): The number of rows to include in each
                 batch. Defaults to 1000.
-            method (Literal["truncate", "replace", "insert", "update", "upsert"]):
-                The loading method to use. Defaults to "upsert".
+            allow_fallback (bool, optional): Whether to allow fallback to insert/update
+                operations when the primary operation fails. Defaults to False.
+            use_logical_keys (bool, optional): If True, uses DataFrame indices as logical
+                keys for WHERE clauses in update/merge operations without creating actual
+                database constraints. If False, creates actual PRIMARY KEY constraints.
+                Defaults to False.
             synchronize_schema (bool, optional): Whether to synchronize the schema of
                 the table before loading the data. Defaults to True.
+            sanitize_column_names (bool, optional): Whether to automatically sanitize
+                column and index names to be SQL-safe using the sanitize_names() method.
+                Defaults to True.
+            method (Literal["truncate", "replace", "insert", "update", "upsert"]):
+                The loading method to use. Defaults to "upsert".
 
         Raises:
             ValueError: If the dataset is empty or if bulk execute is disabled.
@@ -816,6 +986,14 @@ class ETL:
         Returns:
             bool: True if the data was loaded successfully.
         """
+        # Sanitize column and index names if requested
+        if sanitize_column_names:
+            self.log.info("Sanitizing column and index names for SQL safety...")
+            working_data = self.sanitize_names()._data
+            self.log.info("Column and index names sanitized for SQL safety")
+        else:
+            working_data = self._data.copy()
+
         # Wrap the handler with ETLDatabase for extended functionality
         executor = TaskExecutor()
         db = ETLDatabase(db_handler)
@@ -832,7 +1010,7 @@ class ETL:
             db.drop_table(table_name)
             table_exists = False
 
-        if (method in {"upsert", "update"}) and self._data.index.empty:
+        if (method in {"upsert", "update"}) and working_data.index.empty:
             message = (
                 "Dataset has no index! "
                 "Please set the index using the `set_index` method."
@@ -844,28 +1022,49 @@ class ETL:
             db.synchronize_table_schema(
                 force_nvarchar=force_nvarchar,
                 table_name=table_name,
-                df=self._data,
+                df=working_data,
             )
 
         if not table_exists:
             self.log.warning(f'Table "{table_name}" does not exist. Creating table...')
-            db.create_table(
-                table_name=table_name,
-                keys=[str(_) for _ in self._data.index.names],
-                columns=db.get_table_data_types(self._data.reset_index(), force_nvarchar),
-            )
+            if use_logical_keys:
+                db.create_table_with_logical_keys(
+                    table_name=table_name,
+                    logical_keys=[str(_) for _ in working_data.index.names],
+                    columns=db.get_table_data_types(
+                        working_data.reset_index(), force_nvarchar
+                    ),
+                )
+            else:
+                db.create_table(
+                    table_name=table_name,
+                    keys=[str(_) for _ in working_data.index.names],
+                    columns=db.get_table_data_types(
+                        working_data.reset_index(), force_nvarchar
+                    ),
+                )
             method = "insert"
             self.log.info(f"Since table was created, method set to: {method}")
 
-        query, values = {
-            "insert": db.generate_prepared_insert_query,
-            "update": db.generate_prepared_update_query,
-            "upsert": db.generate_prepared_upsert_query,
-        }.get(method, db.generate_prepared_upsert_query)(
-            force_nvarchar=force_nvarchar,
-            table_name=table_name,
-            df=self._data,
-        )
+        if method == "insert":
+            query, values = db.generate_prepared_insert_query(
+                force_nvarchar=force_nvarchar,
+                table_name=table_name,
+                df=working_data,
+            )
+        elif method == "update":
+            query, values = db.generate_prepared_update_query(
+                force_nvarchar=force_nvarchar,
+                table_name=table_name,
+                df=working_data,
+            )
+        else:  # upsert
+            query, values = db.generate_prepared_upsert_query(
+                use_logical_keys=use_logical_keys,
+                force_nvarchar=force_nvarchar,
+                table_name=table_name,
+                df=working_data,
+            )
         self.log.info(
             f"{method.capitalize()}ing data "
             f'into "{db.database_name}"."{table_name}" '
@@ -877,11 +1076,13 @@ class ETL:
             if f"merge [{table_name}] as target" in query.lower():
                 return self._merge(
                     query=query,
-                    values=values,
                     database_handler=db,
                     batch_size=batch_size,
                     table_name=table_name,
+                    working_data=working_data,
                     force_nvarchar=force_nvarchar,
+                    allow_fallback=allow_fallback,
+                    use_logical_keys=use_logical_keys,
                 )
 
             if not batch_execute:
@@ -903,22 +1104,27 @@ class ETL:
             return tasks.are_successful
 
         except DatabaseError as error:
+            if not allow_fallback:
+                self.log.error(f"Database Error: {error}")
+                raise error
+
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
-            partial_func = partial(self._insert_or_update, db, table_name)
-            tasks = executor.multithread(
-                [(lambda row: partial_func(row), (row,), {}) for row in values]
+            return self.insert_or_update(
+                database_handler=db,
+                table_name=table_name,
+                force_nvarchar=force_nvarchar,
             )
-            tasks.await_results()  # Will raise an exception if any query fails
-            return tasks.are_successful
 
     def _merge(
         self,
         database_handler: ETLDatabase,
         table_name: str,
         query: str,
-        values: Iterator[dict[str, Any]] | list[dict[str, Any]],
         force_nvarchar: bool = False,
         batch_size: int = 1000,
+        allow_fallback: bool = False,
+        use_logical_keys: bool = False,
+        working_data: Optional[DataFrame] = None,
     ) -> bool:
         """
         ✍🏾 Private method to merge data into the mssql database using a temporary table.
@@ -927,33 +1133,78 @@ class ETL:
             database_handler (ETLDatabase): The database handler to use for executing
                 queries.
             query (str): The query to execute.
-            values (Iterator[dict[str, Any]] | list[dict[str, Any]]): The values to merge.
+            allow_fallback (bool): Whether to allow fallback to insert/update on error.
+            use_logical_keys (bool): If True, uses DataFrame indices as logical
+                keys for WHERE clauses in update/merge operations without creating actual
+                database constraints. If False, creates actual PRIMARY KEY constraints.
+            working_data (Optional[DataFrame], optional): The working DataFrame to use
+                for the merge. Defaults to None.
 
         Returns:
             bool: True if the data was merged successfully.
         """
-        from uuid import uuid4
+        from random import randint
+        from time import sleep
 
-        temp_table = f"temp_{table_name}_{str(uuid4())[:8]}".replace("-", "_")
+        data_to_use = working_data if working_data is not None else self._data
+        temp_table = self._generate_temp_table_name(table_name)
+        self._temp_tables.add((database_handler, temp_table))
         merge_query = query.format(source_table=temp_table)
 
+        while database_handler.table_exists(temp_table):
+            self.log.warning(f"Temp table {temp_table} already exists, retrying...")
+            sleep(randint(1, 100) / 1000)  # Random backoff
+            temp_table = self._generate_temp_table_name(table_name)
+
         try:
-            # Create the temporary table
-            database_handler.create_table(
-                table_name=temp_table,
-                keys=[str(_) for _ in self._data.index.names],
-                columns=database_handler.get_table_data_types(
-                    self._data.reset_index(), force_nvarchar
-                ),
+            if use_logical_keys:
+                database_handler.create_table_with_logical_keys(
+                    table_name=temp_table,
+                    logical_keys=[str(_) for _ in data_to_use.index.names],
+                    columns=database_handler.get_table_data_types(
+                        data_to_use.reset_index(), force_nvarchar
+                    ),
+                )
+            else:
+                database_handler.create_table(
+                    table_name=temp_table,
+                    keys=[str(_) for _ in data_to_use.index.names],
+                    columns=database_handler.get_table_data_types(
+                        data_to_use.reset_index(), force_nvarchar
+                    ),
+                )
+
+            temp_query, temp_values = database_handler.generate_prepared_insert_query(
+                temp_table, data_to_use, force_nvarchar
             )
 
-            # Insert the data into the temporary table
-            temp_query, temp_values = database_handler.generate_prepared_insert_query(
-                temp_table, self._data, force_nvarchar
-            )
-            database_handler.execute_write_batch_query(
-                temp_query, temp_values, batch_size
-            )
+            try:
+                database_handler.execute_write_batch_query(
+                    temp_query, temp_values, batch_size
+                )
+            except DatabaseError as error:
+                if any(
+                    keyword in str(error).lower()
+                    for keyword in [
+                        "duplicate key",
+                        "already exists",
+                        "constraint",
+                        "violation",
+                    ]
+                ):
+                    self.log.warning(f"Duplicate key error: {error}. Retrying...")
+                    sleep(randint(1, 100) / 1000)  # Random backoff
+                    self._merge(
+                        query=query,
+                        table_name=table_name,
+                        batch_size=batch_size,
+                        working_data=working_data,
+                        force_nvarchar=force_nvarchar,
+                        allow_fallback=allow_fallback,
+                        database_handler=database_handler,
+                        use_logical_keys=use_logical_keys,
+                    )
+                raise error
 
             """
             ✍🏾 Merge the data into the target table
@@ -966,45 +1217,97 @@ class ETL:
             )
 
         except DatabaseError as error:
-            # If the merge fails, retry using insert/update
+            if not allow_fallback:
+                self.log.error(f"Database Error: {error}. Aborting...")
+                raise error
+
             self.log.error(f"Database Error: {error}. Retrying using insert/update...")
-            for value in values:
-                self._insert_or_update(database_handler, table_name, value)
-            return True
+            return self.insert_or_update(
+                table_name=table_name,
+                force_nvarchar=force_nvarchar,
+                database_handler=database_handler,
+            )
 
         finally:
-            # Drop the temporary table
-            database_handler.drop_table(temp_table)
+            try:
+                if database_handler.table_exists(temp_table):
+                    database_handler.drop_table(temp_table)
+                    self.log.debug(f"Cleaned up temporary table: {temp_table}")
+                self._temp_tables.discard((database_handler, temp_table))
+            except Exception as e:
+                self.log.warning(f"Failed to cleanup temporary table {temp_table}: {e}")
 
-    def _insert_or_update(
-        self, database_handler: ETLDatabase, table_name: str, record: dict[str, Any]
+    def insert_or_update(
+        self,
+        database_handler: ETLDatabase,
+        table_name: str,
+        force_nvarchar: bool = False,
     ) -> bool:
         """
-        ✍🏾 Private method to insert/update a single record into the database.
+        ✍🏾 Method to insert/update the entire dataframe into the database.
 
-        This method tries to insert the record into the database first, and if
+        This method tries to insert the dataframe into the database first, and if
         that fails, it retries using an update query.
 
         Args:
-            database_handler (DatabaseHandler): The handler for the database.
+            database_handler (ETLDatabase): The handler for the database.
             table_name (str): The name of the table.
-            record (dict[str, Any]): The record to insert or update.
+            force_nvarchar (bool): Whether to force NVARCHAR data types.
         """
-        insert_query, values = database_handler.generate_prepared_insert_query(
-            table_name, DataFrame([record])
+        insert_query, _ = database_handler.generate_prepared_insert_query(
+            table_name, self._data, force_nvarchar
         )
         update_query, _ = database_handler.generate_prepared_update_query(
-            table_name, DataFrame([record])
+            table_name, self._data, force_nvarchar
         )
 
-        results: list[bool] = []
-        for value in values:
+        def _insert_or_update_single_record(record: dict[str, Any]) -> bool:
             try:
-                results.append(database_handler.execute_write_query(insert_query, value))
-            except DatabaseError as error:
-                self.log.error(f"Database Error: {error}. Retrying using update...")
-                results.append(database_handler.execute_write_query(update_query, value))
-        return all(results)
+                self.log.debug(f"Attempting insert for record: {record}")
+                return database_handler.execute_write_query(insert_query, record)
+            except DatabaseError as insert_error:
+                self.log.warning(f"Insert failed: {insert_error}")
+                self.log.debug(f"Attempting update for record: {record}")
+                return database_handler.execute_write_query(update_query, record)
+
+        return (
+            TaskExecutor()
+            .multithread(
+                [
+                    (_insert_or_update_single_record, (record,), {})
+                    for record in self._data.reset_index().to_dict(orient="records")
+                ]
+            )
+            .are_successful
+        )
+
+    def _generate_temp_table_name(self, table_name: str) -> str:
+        """
+        ✍🏾 Method to generate a highly unique temp table name to avoid race conditions.
+        """
+        from os import getpid
+        from random import randint
+        from threading import current_thread
+        from time import time
+        from uuid import uuid4
+
+        process_id = getpid()
+        timestamp = int(time() * 1000)
+        random_suffix = randint(1000, 9999)
+        thread_id = current_thread().ident or 0
+        full_uuid = str(uuid4()).replace("-", "")
+
+        temp_table = (
+            f"temp_{table_name}_{process_id}_{thread_id}_"
+            f"{timestamp}_{random_suffix}_{full_uuid[:8]}"
+        )
+
+        # Ensure table name doesn't exceed database limits (usually 128 chars)
+        if len(temp_table) > 120:
+            temp_table = f"temp_{process_id}_{thread_id}_{timestamp}_{random_suffix}"
+
+        return temp_table
 
 
+register(ETL._cleanup_temp_tables)
 __all__: list[str] = ["ETL"]

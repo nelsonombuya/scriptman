@@ -24,7 +24,11 @@ class ResourceMonitor:
         with self._lock:
             if not self._monitoring:
                 self._monitoring = True
-                self._monitor_thread = Thread(target=self._monitor_loop, daemon=True)
+                self._monitor_thread = Thread(
+                    daemon=True,
+                    target=self._monitor_loop,
+                    name="TaskMaster - Resource Monitor",
+                )
                 self._monitor_thread.start()
 
     def stop_monitoring(self) -> None:

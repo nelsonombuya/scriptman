@@ -5,7 +5,7 @@ try:
     from pandas import DataFrame
 
     from scriptman.powers.database._database import DatabaseHandler
-
+    from scriptman.powers.retry import retry
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -13,21 +13,44 @@ except ImportError as e:
     )
 
 
+_retry_conditions = retry(
+    max_retries=5,
+    base_delay=10.0,
+    max_delay=60.0,
+    retry_condition=DatabaseHandler.retry_conditions,
+)
+
+
 class ETLDatabase:
     """📦 ETL database operations using composition instead of inheritance"""
 
-    def __init__(self, database_handler: DatabaseHandler):
+    def __init__(
+        self,
+        database_handler: DatabaseHandler,
+        auto_upgrade_to_etl: bool = True,
+    ):
         """
-        🚀 Initialize ETL database with a database handler.
+        🚀 Initialize ETL database with a database handler and auto-upgrade to heavy ETL
+        mode if the database handler supports it.
 
         Args:
             database_handler: DatabaseHandler object
+            auto_upgrade_to_etl: Whether to automatically upgrade to heavy ETL pool
+                settings.
         """
         self.db = database_handler
         self.log = logger.bind(
             database=self.db.database_name,
-            handler=self.__class__.__name__,
+            handler=self.db.__class__.__name__,
         )
+
+        if auto_upgrade_to_etl and not self.db._is_etl_mode:
+            try:
+                self.log.info("Auto-upgrading to heavy ETL mode...")
+                self.db.upgrade_to_etl()
+            except Exception as e:
+                self.log.warning(f"Failed to auto-upgrade to heavy ETL mode: {e}")
+                self.log.info("Continuing with current connection pool settings")
 
     @property
     def database_name(self) -> str:
@@ -174,7 +197,11 @@ class ETLDatabase:
         return query, self.prepare_values(df, force_nvarchar)
 
     def generate_prepared_upsert_query(
-        self, table_name: str, df: DataFrame, force_nvarchar: bool = False
+        self,
+        table_name: str,
+        df: DataFrame,
+        force_nvarchar: bool = False,
+        use_logical_keys: bool = False,
     ) -> tuple[str, Iterator[dict[str, Any]]]:
         """
         ✍🏾 Generates a prepared SQL upsert query for the given table and DataFrame.
@@ -183,6 +210,8 @@ class ETLDatabase:
             table_name (str): The name of the table to upsert into.
             df (DataFrame): The DataFrame containing the data to upsert.
             force_nvarchar (bool): Whether to force all columns to be NVARCHAR(MAX).
+            use_logical_keys (bool): If True, uses logical keys for WHERE clauses
+                without database constraints.
 
         Returns:
             tuple(str, Iterator[dict[str, Any]]): The prepared SQL query and the
@@ -213,12 +242,15 @@ class ETLDatabase:
 
         elif self.database_type in ["mssql", "oracle"]:
             # Use MERGE for MSSQL Server and Oracle
-            query, values = self.generate_merge_query(table_name, df, var)
+            query, values = self.generate_merge_query(
+                table_name, df, var, use_logical_keys
+            )
 
         assert query is not None, "Unsupported database type"
         assert values is not None, "No values to upsert"
         return query, values
 
+    @_retry_conditions
     def synchronize_table_schema(
         self, table_name: str, df: DataFrame, force_nvarchar: bool = False
     ) -> bool:
@@ -239,75 +271,74 @@ class ETLDatabase:
         Returns:
             bool: True if schema was synchronized successfully, False otherwise
         """
-        try:
-            # Get the target schema from the DataFrame
-            target_schema = self.get_table_data_types(df, force_nvarchar)
+        # Get the target schema from the DataFrame
+        target_schema = self.get_table_data_types(df, force_nvarchar)
 
-            if not self.db.table_exists(table_name):
-                # Create new table with the DataFrame's schema
-                return self.db.create_table(table_name, target_schema)
+        if not self.db.table_exists(table_name):
+            # Create new table with the DataFrame's schema
+            return self.db.create_table(table_name, target_schema)
 
-            # Get current table schema
-            schema_query = f"""
-                SELECT
-                    COLUMN_NAME,
-                    DATA_TYPE,
-                    CHARACTER_MAXIMUM_LENGTH,
-                    IS_NULLABLE
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_NAME = '{table_name}'
-            """
-            current_schema = self.db.execute_read_query(schema_query)
+        # Get current table schema
+        schema_query = f"""
+            SELECT
+                COLUMN_NAME,
+                DATA_TYPE,
+                CHARACTER_MAXIMUM_LENGTH,
+                IS_NULLABLE
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = '{table_name}'
+        """
+        current_schema = self.db.execute_read_query(schema_query)
 
-            # Convert current schema to a dictionary
-            current_columns = {
-                row["COLUMN_NAME"]: {
-                    "type": row["DATA_TYPE"],
-                    "max_length": row["CHARACTER_MAXIMUM_LENGTH"],
-                    "nullable": row["IS_NULLABLE"] == "YES",
-                }
-                for row in current_schema
+        # Convert current schema to a dictionary
+        current_columns = {
+            row["COLUMN_NAME"]: {
+                "type": row["DATA_TYPE"],
+                "max_length": row["CHARACTER_MAXIMUM_LENGTH"],
+                "nullable": row["IS_NULLABLE"] == "YES",
             }
+            for row in current_schema
+        }
 
-            # Find missing columns and columns that need type updates
-            missing_columns = {}
-            type_updates = {}
+        # Find missing columns and columns that need type updates
+        missing_columns = {}
+        type_updates = {}
 
-            for column, target_type in target_schema.items():
-                if column not in current_columns:
-                    missing_columns[column] = target_type
-                else:
-                    current_type = current_columns[column]["type"]
-                    # Check if type needs to be updated
-                    if current_type != target_type:
-                        type_updates[column] = target_type
+        for column, target_type in target_schema.items():
+            if column not in current_columns:
+                missing_columns[column] = target_type
+            else:
+                current_type = current_columns[column]["type"]
+                # Check if type needs to be updated
+                if current_type != target_type:
+                    type_updates[column] = target_type
 
-            # Add missing columns
-            if missing_columns:
-                alter_queries = []
-                for column, data_type in missing_columns.items():
-                    alter_queries.append(
-                        f"ALTER TABLE [{table_name}] ADD [{column}] {data_type}"
-                    )
-                self.db.execute_multiple_write_queries(";".join(alter_queries))
+        # Add missing columns
+        if missing_columns:
+            alter_queries = []
+            for column, data_type in missing_columns.items():
+                alter_queries.append(
+                    f"ALTER TABLE [{table_name}] ADD [{column}] {data_type}"
+                )
+            self.db.execute_multiple_write_queries(";".join(alter_queries))
 
-            # Update column types if needed
-            if type_updates:
-                alter_queries = []
-                for column, new_type in type_updates.items():
-                    alter_queries.append(
-                        f"ALTER TABLE [{table_name}] ALTER COLUMN [{column}] {new_type}"
-                    )
-                self.db.execute_multiple_write_queries(";".join(alter_queries))
+        # Update column types if needed
+        if type_updates:
+            alter_queries = []
+            for column, new_type in type_updates.items():
+                alter_queries.append(
+                    f"ALTER TABLE [{table_name}] ALTER COLUMN [{column}] {new_type}"
+                )
+            self.db.execute_multiple_write_queries(";".join(alter_queries))
 
-            return True
-
-        except Exception as e:
-            self.log.error(f"Error synchronizing table schema: {str(e)}")
-            return False
+        return True
 
     def generate_merge_query(
-        self, table_name: str, df: DataFrame, force_nvarchar: bool = False
+        self,
+        table_name: str,
+        df: DataFrame,
+        force_nvarchar: bool = False,
+        use_logical_keys: bool = False,
     ) -> tuple[str, Iterator[dict[str, Any]]]:
         """
         ✍🏾 Generates a SQL MERGE INTO query using a temporary table approach.
@@ -319,6 +350,8 @@ class ETLDatabase:
             table_name (str): The name of the table to merge into.
             df (DataFrame): The DataFrame containing the data to merge.
             force_nvarchar (bool): Whether to force all columns to be NVARCHAR(MAX).
+            use_logical_keys (bool): If True, uses logical keys for WHERE clauses
+                without database constraints.
 
         Returns:
             tuple(str, Iterator[dict[str, Any]]): The prepared SQL query and the
@@ -336,7 +369,10 @@ class ETLDatabase:
 
         # Build the query parts
         temp_schema = ", ".join([f"[{c}] {data_types[c]}" for c in columns_to_insert])
-        temp_schema += f", PRIMARY KEY ({', '.join([f'[{k}]' for k in indices])})"
+
+        # Only add PRIMARY KEY constraint if not using logical keys
+        if not use_logical_keys:
+            temp_schema += f", PRIMARY KEY ({', '.join([f'[{k}]' for k in indices])})"
         update = ", ".join([f"target.[{c}] = source.[{c}]" for c in columns_to_update])
 
         # Add COLLATE clause for string comparisons to handle collation conflicts
@@ -365,51 +401,100 @@ class ETLDatabase:
         """
         return query, self.prepare_values(df, force_nvarchar)
 
+    @_retry_conditions
     def execute_read_query(
         self, query: str, params: dict[str, Any] = {}
     ) -> list[dict[str, Any]]:
-        """Delegate to the database handler"""
+        """Execute read query with automatic retry on pool timeout errors"""
         return self.db.execute_read_query(query, params)
 
+    @_retry_conditions
     def execute_write_query(
         self, query: str, params: dict[str, Any] = {}, check_affected_rows: bool = False
     ) -> bool:
-        """Delegate to the database handler"""
+        """Execute write query with automatic retry on pool timeout errors"""
         return self.db.execute_write_query(query, params, check_affected_rows)
 
+    @_retry_conditions
     def execute_write_bulk_query(
         self, query: str, rows: list[dict[str, Any]] = []
     ) -> bool:
-        """Delegate to the database handler"""
+        """Execute bulk write query with automatic retry on pool timeout errors"""
         return self.db.execute_write_bulk_query(query, rows)
 
+    @_retry_conditions
     def execute_write_batch_query(
         self,
         query: str,
         rows: Iterator[dict[str, Any]] | list[dict[str, Any]] = [],
         batch_size: int = 1000,
     ) -> bool:
-        """Delegate to the database handler"""
+        """Execute batch write query with automatic retry on pool timeout errors"""
         return self.db.execute_write_batch_query(query, rows, batch_size)
 
+    @_retry_conditions
     def table_exists(self, table_name: str) -> bool:
-        """Delegate to the database handler"""
+        """Check if table exists with automatic retry on pool timeout errors"""
         return self.db.table_exists(table_name)
 
+    @_retry_conditions
     def create_table(
         self, table_name: str, columns: dict[str, str], keys: Optional[list[str]] = None
     ) -> bool:
         """Delegate to the database handler"""
         return self.db.create_table(table_name, columns, keys)
 
+    @_retry_conditions
+    def create_table_with_logical_keys(
+        self, table_name: str, columns: dict[str, str], logical_keys: list[str]
+    ) -> bool:
+        """
+        🔨 Creates a table with logical keys (no database constraints) but stores the
+        logical key information for use in WHERE clauses.
+
+        Args:
+            table_name (str): The name of the table.
+            columns (dict[str, str]): A dictionary of column names and their data types.
+            logical_keys (list[str]): A list of column names to use as logical keys
+                for WHERE clauses in update/merge operations.
+
+        Returns:
+            bool: True if the table was created, False otherwise.
+        """
+        # Store logical keys information for later use in queries
+        if not hasattr(self, "_logical_keys"):
+            self._logical_keys = {}
+        self._logical_keys[table_name] = logical_keys
+
+        # Create table without actual database constraints
+        return self.db.create_table(table_name, columns, keys=None)
+
+    def get_logical_keys(self, table_name: str) -> Optional[list[str]]:
+        """
+        🔍 Get the logical keys for a table if they were set using
+        create_table_with_logical_keys.
+
+        Args:
+            table_name (str): The name of the table.
+
+        Returns:
+            Optional[list[str]]: The logical keys for the table, or None if not set.
+        """
+        if hasattr(self, "_logical_keys"):
+            return self._logical_keys.get(table_name)
+        return None
+
+    @_retry_conditions
     def truncate_table(self, table_name: str) -> bool:
         """Delegate to the database handler"""
         return self.db.truncate_table(table_name)
 
+    @_retry_conditions
     def drop_table(self, table_name: str) -> bool:
         """Delegate to the database handler"""
         return self.db.drop_table(table_name)
 
+    @_retry_conditions
     def split_query_statements(self, query: str) -> list[str]:
         """Delegate to the database handler"""
         return self.db.split_query_statements(query)

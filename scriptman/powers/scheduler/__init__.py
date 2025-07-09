@@ -563,7 +563,11 @@ class Scheduler:
             self._service_loop()
             return None
         else:
-            self.__service_thread = Thread(target=self._service_loop, daemon=False)
+            self.__service_thread = Thread(
+                target=self._service_loop,
+                name="Scheduler Service",
+                daemon=False,
+            )
             self.__service_thread.start()
             return self.__service_thread
 
@@ -637,7 +641,7 @@ class Scheduler:
                 logger.info("👋 Goodbye! Shutting down the scheduler...")
                 self.__scheduler.shutdown()
         except Exception as e:
-            logger.warning(f"❌ Error shutting down scheduler: {e}")
+            logger.error(f"❌ Error shutting down scheduler: {e}")
 
     def schedule(
         self,

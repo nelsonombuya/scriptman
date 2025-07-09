@@ -29,7 +29,10 @@ class PyODBCHandler(DatabaseHandler):
         username: str,
         password: str,
         port: Optional[int] = None,
-        max_pool_size: int = 8,
+        pool_size: int = 20,
+        pool_timeout: int = 60,
+        pool_recycle_time: int = 3600,
+        pool_validate_connections: bool = True,
     ) -> None:
         """
         🚀 Initializes the PyODBCHandler class.
@@ -41,8 +44,13 @@ class PyODBCHandler(DatabaseHandler):
             username (str): The username for the database.
             password (str): The password for the database.
             port (Optional[int], optional): The port for the database. Defaults to None.
-            max_pool_size (Optional[int], optional): The maximum size of the connection
-                pool. Defaults to None.
+            pool_size (int, optional): The size of the connection pool. Defaults to 20.
+            pool_timeout (int, optional): The timeout in seconds for getting connection
+                from pool. Defaults to 60.
+            pool_recycle_time (int, optional): The time in seconds after which
+                connections are recreated. Defaults to 3600 (1 hour).
+            pool_validate_connections (bool, optional): Whether to validate connections
+                before use. Defaults to True.
         """
         super().__init__(
             port=port,
@@ -52,23 +60,97 @@ class PyODBCHandler(DatabaseHandler):
             username=username,
             password=password,
         )
-        self._max_pool_size = max_pool_size
+        self._pool_size = pool_size
+        self._pool_timeout = pool_timeout
+        self._pool_recycle_time = pool_recycle_time
+        self._connection_created_times: dict[int, float] = {}
+        self._pool_validate_connections = pool_validate_connections
         self._initialize_pool()
+
+    def upgrade_to_etl(self) -> "PyODBCHandler":
+        """
+        🚀 Upgrade this existing handler to heavy ETL connection pool settings.
+
+        This method reinitializes the connection pool with maximum ETL settings
+        while preserving all existing connection parameters.
+
+        Configuration applied:
+        - pool_size=100: Very large connection pool for maximum concurrency
+        - pool_timeout=300: Extended timeout (5 minutes)
+        - pool_recycle_time=900: Faster connection recycling (15 minutes)
+        - pool_validate_connections=True: Connection validation enabled
+
+        Returns:
+            PyODBCHandler: The same instance with upgraded pool settings
+        """
+        if self._is_etl_mode:
+            self.log.info("Already in ETL mode, skipping upgrade")
+            return self
+
+        self.log.info("Upgrading connection pool to heavy ETL settings...")
+        self.disconnect()
+
+        self._pool_size = 100
+        self._pool_timeout = 300
+        self._pool_recycle_time = 900
+        self._pool_validate_connections = True
+        self._connection_created_times.clear()
+
+        self._initialize_pool()
+        self._is_etl_mode = True
+        self.log.success("Successfully upgraded to heavy ETL mode")
+        return self
 
     def _initialize_pool(self) -> None:
         """🔄 Initializes the connection pool if it's empty."""
+        from time import time
+
         with self._pool_lock:
             if self._connection_pool.empty():
-                for _ in range(self._max_pool_size):
+                for _ in range(self._pool_size):
                     conn = connect(self.connection_string)
+                    self._connection_created_times[id(conn)] = time()
                     self._connection_pool.put(conn)
+
+                self.log.info(
+                    f"Initialized connection pool with {self._pool_size} connections, "
+                    f"timeout={self._pool_timeout}s, "
+                    f"recycle_time={self._pool_recycle_time}s"
+                )
 
     @contextmanager
     def get_connection(self) -> Generator[Connection, None, None]:
-        """🔒 Thread-safe connection context manager."""
+        """🔒 Thread-safe connection context manager with validation and recycling."""
+        from time import time
+
         connection: Optional[Connection] = None
         try:
-            connection = self._connection_pool.get(timeout=30)
+            connection = self._connection_pool.get(timeout=self._pool_timeout)
+
+            # Check if connection needs recycling
+            conn_id = id(connection)
+            if conn_id in self._connection_created_times:
+                age = time() - self._connection_created_times[conn_id]
+                if age > self._pool_recycle_time:
+                    # Connection is too old, replace it
+                    if not connection.closed:
+                        connection.close()
+                    connection = connect(self.connection_string)
+                    self._connection_created_times[id(connection)] = time()
+
+            # Validate connection if enabled
+            if self._pool_validate_connections and not connection.closed:
+                try:
+                    cursor = connection.cursor()
+                    cursor.execute("SELECT 1")
+                    cursor.close()
+                except Exception:
+                    # Connection is invalid, replace it
+                    if not connection.closed:
+                        connection.close()
+                    connection = connect(self.connection_string)
+                    self._connection_created_times[id(connection)] = time()
+
             yield connection
         finally:
             if connection:
@@ -77,6 +159,7 @@ class PyODBCHandler(DatabaseHandler):
                 else:
                     # Replace dead connection
                     new_conn = connect(self.connection_string)
+                    self._connection_created_times[id(new_conn)] = time()
                     self._connection_pool.put(new_conn)
 
     @contextmanager
@@ -147,7 +230,12 @@ class PyODBCHandler(DatabaseHandler):
         """
         try:
             with self.get_connection() as _:
-                self.log.success("Successfully connected to the database")
+                self.log.success(
+                    f"Successfully connected to {self.database} with pool configuration: "
+                    f"pool_size={self._pool_size}, timeout={self._pool_timeout}s, "
+                    f"recycle_time={self._pool_recycle_time}s, "
+                    f"validation={self._pool_validate_connections}"
+                )
                 return True
         except Error as error:
             self.log.error("Unable to connect to the database", error)
@@ -215,9 +303,6 @@ class PyODBCHandler(DatabaseHandler):
                 mapper = partial(self._map_row_to_dict, cursor)
                 return [mapper(row) for row in cursor.fetchall()]
         except Error as error:
-            if "deadlock" in str(error).lower():
-                self.log.warning("Deadlock detected, retrying query...")
-                return self.execute_read_query(query, params)
             self.log.error(
                 f"Unable to execute read query: \n"
                 f"Error: {error} \n"
@@ -253,9 +338,6 @@ class PyODBCHandler(DatabaseHandler):
                     raise ValueError("No rows were affected by the query.")
                 return True
         except (Error, ValueError) as error:
-            if "deadlock" in str(error).lower():
-                self.log.warning("Deadlock detected, retrying query...")
-                return self.execute_write_query(query, params, check_affected_rows)
             self.log.error(
                 f"Unable to execute write query: \n"
                 f"Error: {error} \n"
@@ -296,9 +378,6 @@ class PyODBCHandler(DatabaseHandler):
                 cursor.executemany(_query, _params_list)
             return True
         except Error as error:
-            if "deadlock" in str(error).lower():
-                self.log.warning("Deadlock detected, retrying query...")
-                return self.execute_write_bulk_query(query, rows)
             sample_rows = "\n\t".join(str(row) for row in rows[:5])
             if len(rows) > 5:
                 sample_rows += "\n\t... and more rows"
@@ -309,10 +388,3 @@ class PyODBCHandler(DatabaseHandler):
                 f"Rows: {sample_rows} \n"
             )
             raise DatabaseError("Unable to bulk execute query", error)
-
-    def __del__(self) -> None:
-        """
-        Destructor to disconnect from the database when the instance is
-        destroyed.
-        """
-        self.disconnect()

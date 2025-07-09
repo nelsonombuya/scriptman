@@ -13,7 +13,8 @@ try:
     from scriptman.powers.api._models import APIRequest, APIResponse
     from scriptman.powers.generics import Func, P
     from scriptman.powers.serializer import SERIALIZE_FOR_JSON, serialize
-    from scriptman.powers.tasks import TaskExecutor
+    from scriptman.powers.tasks._models import TaskException
+    from scriptman.powers.tasks._task_master import TaskMaster
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -77,7 +78,10 @@ def create_error_response(request: APIRequest, e: Exception) -> dict[str, Any]:
         dict[str, Any]: Formatted error API response data.
     """
     if not isinstance(e, APIException):
-        e = APIException(f"{e.__class__.__name__}: {str(e)}", exception=e)
+        if isinstance(e, TaskException):
+            e = APIException(e.message, exception=e)
+        else:
+            e = APIException(f"{e.__class__.__name__}: {str(e)}", exception=e)
 
     logger.error(f"❌ Request {request.request_id} failed with error: {e}")
     logger.debug(f"📤 Request details: \n{dumps(request.model_dump(), indent=4)}")
@@ -111,8 +115,8 @@ def api_route(
     @wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
         try:
-            _executor = TaskExecutor()
-            _task = _executor.background(func, *args, **kwargs)
+            _task_master = TaskMaster.get_instance()
+            _task = _task_master.submit(func, *args, **kwargs)
             _timeout = config.settings.get("task_timeout", timeout)
 
             if enqueue:
@@ -121,15 +125,13 @@ def api_route(
                     request=request,
                 )
             else:
-                result = _executor.wait(_task, float(_timeout))
+                result = _task.await_result(timeout=_timeout)
                 response = create_successful_response(
                     response=serialize(result, **SERIALIZE_FOR_JSON),
                     request=request,
                 )
-                _executor.cleanup(wait=True)
         except Exception as e:
             response = create_error_response(request=request, e=e)
-            _executor.cleanup(wait=False)
 
         return JSONResponse(content=response, status_code=response["status_code"])
 

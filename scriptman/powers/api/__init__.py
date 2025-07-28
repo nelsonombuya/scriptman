@@ -1,7 +1,7 @@
 try:
     from abc import ABC
     from json import dumps
-    from typing import Any, Optional, overload
+    from typing import Any, Optional, cast, overload
 
     from loguru import logger
     from pydantic import ValidationError
@@ -24,6 +24,8 @@ try:
         ResponseModelT,
     )
     from scriptman.powers.api._templates import api_route
+    from scriptman.powers.generics import SyncFunc
+    from scriptman.powers.retry import retry
 
 except ImportError as e:
     raise ImportError(
@@ -91,6 +93,7 @@ class BaseAPIClient(ABC):
         body: Optional[dict[str, Any]] = None,
         timeout: Optional[int] = None,
         rate_limit_waiting_time: int = 60,
+        retry_on_error: Optional[SyncFunc[[Exception], bool]] = None,
     ) -> ResponseModelT:
         """🚀 Send an HTTP request with strongly-typed response validation."""
         ...
@@ -105,6 +108,7 @@ class BaseAPIClient(ABC):
         body: Optional[dict[str, Any]] = None,
         timeout: Optional[int] = None,
         rate_limit_waiting_time: int = 60,
+        retry_on_error: Optional[SyncFunc[[Exception], bool]] = None,
     ) -> dict[str, Any]:
         """🚀 Send an HTTP request without response validation."""
         ...
@@ -118,6 +122,7 @@ class BaseAPIClient(ABC):
         body: Optional[dict[str, Any]] = None,
         timeout: Optional[int] = None,
         rate_limit_waiting_time: int = 60,
+        retry_on_error: Optional[SyncFunc[[Exception], bool]] = None,
     ) -> ResponseModelT | dict[str, Any]:
         """
         🚀 Send an HTTP request with optional response validation.
@@ -131,6 +136,8 @@ class BaseAPIClient(ABC):
             timeout (int, optional): Request timeout in seconds.
             rate_limit_waiting_time (int, optional): Waiting time for rate limit in
                 seconds.
+            retry_on_error (SyncFunc[[Exception], bool], optional): Function to
+                determine if the request should be retried on error.
 
         Returns:
             ResponseModelT: Validated response data as the specific model type if
@@ -141,7 +148,14 @@ class BaseAPIClient(ABC):
             ResponseValidationError: When response validation fails
             requests.RequestException: When request fails
         """
-        response = self._send_request(
+        max_retries: int = 3 if retry_on_error is not None else 0
+        response = retry(
+            min_delay=1,
+            base_delay=1,
+            max_delay=10,
+            max_retries=max_retries,
+            retry_condition=retry_on_error,
+        )(self._send_request)(
             rate_limit_waiting_time=rate_limit_waiting_time,
             url=self._clean_url(url),
             timeout=timeout,
@@ -149,10 +163,9 @@ class BaseAPIClient(ABC):
             params=params,
             body=body,
         )
-        data: dict[str, Any] = response.json()
 
         if not response_model:
-            return data
+            return cast(dict[str, Any], response.json())
 
         return self.validate_response(response, response_model)
 

@@ -25,8 +25,8 @@ class CleanUp:
             wd (Union[Path, str]): The current working directory.
             delete_empty_files (bool): Flag to delete empty files.
             delete_files_older_than (int): Days after which the file globs are deleted.
-            file_globs_to_delete (List[str]): List of file globs to delete.
-            folder_glob_to_delete (List[str]): List of folder globs to delete.
+            file_globs_to_delete (list[str]): List of file globs to delete.
+            folder_glob_to_delete (list[str]): List of folder globs to delete.
         """
         wd = Path(wd)
         now = datetime.now()

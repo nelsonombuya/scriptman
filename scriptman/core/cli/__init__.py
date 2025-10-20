@@ -29,7 +29,7 @@ class CLI:
         🌟 Start a new instance of the CLIHandler and execute scripts.
 
         Args:
-            argv (Optional[List[str]]): Command-line arguments to pass to the CLI.
+            argv (Optional[list[str]]): Command-line arguments to pass to the CLI.
                 If not provided, defaults to sys.argv[1:].
 
         Returns:
@@ -71,7 +71,7 @@ class CLI:
         🏃🏾‍♂️ Parse arguments and execute actions based on CLI configuration.
 
         Args:
-            argv (Optional[List[str]]): Command-line arguments.
+            argv (Optional[list[str]]): Command-line arguments.
 
         Returns:
             int: Exit code (0 for success, non-zero for failure)

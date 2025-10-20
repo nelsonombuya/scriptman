@@ -157,8 +157,8 @@ class _TableQueueManager:
 ```
 
 **Internal State**:
-- `__table_semaphores`: Dict[str, Semaphore] - One semaphore per table
-- `__active_operations`: Dict[str, Set[str]] - Track active operation IDs
+- `__table_semaphores`: dict[str, Semaphore] - One semaphore per table
+- `__active_operations`: dict[str, set[str]] - Track active operation IDs
 - `_queue_lock`: RLock for thread-safe access
 - `__last_cleanup`: Timestamp for periodic cleanup
 

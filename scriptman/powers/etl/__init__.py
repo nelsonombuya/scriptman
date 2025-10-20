@@ -28,7 +28,7 @@ class ETL:
     """🔍 Data processing utility for Extract, Transform, Load operations."""
 
     log = logger
-    _data: DataFrame = DataFrame()
+    _data: DataFrame
     _temp_tables: set[tuple[ETLDatabase, str]] = set()
 
     @classmethod
@@ -52,7 +52,7 @@ class ETL:
                 the ETL object with.
         """
         # Delegate DataFrame properties and methods
-        self._data: DataFrame = DataFrame(data) if data is not None else DataFrame()
+        self._data = DataFrame(data) if data is not None else DataFrame()
         self.columns = self._data.columns
         self.empty = self._data.empty
         self.index = self._data.index
@@ -270,7 +270,7 @@ class ETL:
             - Context: "Database" extraction context.
         """
         with cls.timed_context("Database", "extraction"):
-            return cls(db.execute_read_query(query, params))
+            return cls(ETLDatabase(db).execute_read_query(query=query, params=params))
 
     @classmethod
     def from_extractor(

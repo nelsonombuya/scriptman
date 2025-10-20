@@ -1,10 +1,14 @@
 try:
+    from contextlib import contextmanager
+    from re import IGNORECASE, search, sub
+    from time import time
     from typing import Any, Iterator, Optional
 
     from loguru import logger
     from pandas import DataFrame
 
     from scriptman.powers.database._database import DatabaseHandler
+    from scriptman.powers.etl._queue import _TableQueueManager
     from scriptman.powers.retry import retry
 except ImportError as e:
     raise ImportError(
@@ -13,16 +17,22 @@ except ImportError as e:
     )
 
 
-_retry_conditions = retry(
-    max_retries=5,
+_retry_database_errors = retry(
+    retry_condition=DatabaseHandler.retry_conditions,
     base_delay=10.0,
     max_delay=60.0,
-    retry_condition=DatabaseHandler.retry_conditions,
+    max_retries=5,
 )
 
 
 class ETLDatabase:
-    """📦 ETL database operations using composition instead of inheritance"""
+    """📦 ETL database operations using composition instead of inheritance
+
+    Features automatic table-level queueing to prevent deadlocks:
+    - Automatically extracts table names from SQL queries
+    - Queues operations on the same table to prevent conflicts
+    - Allows concurrent operations on different tables
+    """
 
     def __init__(
         self,
@@ -52,6 +62,9 @@ class ETLDatabase:
                 self.log.warning(f"Failed to auto-upgrade to heavy ETL mode: {e}")
                 self.log.info("Continuing with current connection pool settings")
 
+        self._database_identifier: str = f"{self.db.server}:{self.db.database}"
+        self._queue_manager: _TableQueueManager = _TableQueueManager()
+
     @property
     def database_name(self) -> str:
         """🔍 Get the database name from the underlying handler"""
@@ -61,6 +74,123 @@ class ETLDatabase:
     def database_type(self) -> str:
         """🔍 Get the database type from the underlying handler"""
         return self.db.database_type
+
+    def _get_table_key(self, table_name: str) -> str:
+        """🔑 Generate unique key for table across database instances"""
+        return f"{self._database_identifier}:{table_name}"
+
+    def _extract_table_name_from_query(self, query: str) -> str:
+        """🔍 Extract table name from SQL query for automatic queue management"""
+        if not query or not isinstance(query, str):
+            return ""
+
+        # Clean up the query - remove extra whitespace and normalize
+        clean_query = sub(r"\s+", " ", query.strip())
+
+        # Store original query for case-sensitive table name extraction
+        original_query = clean_query
+        clean_query = clean_query.upper()
+
+        # Patterns for different SQL operations
+        patterns = [
+            # MERGE patterns (for MSSQL/Oracle) - MUST be first to avoid UPDATE SET
+            # confusion
+            r'MERGE\s+(?:\[([^\]]+)\]|"([^"]+)"|([^\s,()]+))' r"\s+AS\s+TARGET",
+            r'MERGE\s+(?:\[([^\]]+)\]|"([^"]+)"|([^\s,()]+))',
+            # INSERT INTO patterns
+            r'INSERT\s+INTO\s+(?:\[([^\]]+)\]|"([^"]+)"|([^\s,()]+))',
+            # UPDATE patterns (exclude UPDATE SET from MERGE queries)
+            r"(?<!THEN\s)UPDATE\s+(?!\s*SET\s)" r'(?:\[([^\]]+)\]|"([^"]+)"|([^\s,()]+))',
+            # DELETE FROM patterns
+            r'DELETE\s+FROM\s+(?:\[([^\]]+)\]|"([^"]+)"|([^\s,()]+))',
+            # TRUNCATE patterns
+            r'TRUNCATE\s+TABLE\s+(?:\[([^\]]+)\]|"([^"]+)"|([^\s,()]+))',
+            # DROP TABLE patterns
+            r"DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?"
+            r'(?:\[([^\]]+)\]|"([^"]+)"|([^\s,()]+))',
+            # CREATE TABLE patterns
+            r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+            r'(?:\[([^\]]+)\]|"([^"]+)"|([^\s,()]+))',
+            # ALTER TABLE patterns
+            r'ALTER\s+TABLE\s+(?:\[([^\]]+)\]|"([^"]+)"|([^\s,()]+))',
+        ]
+
+        for pattern in patterns:
+            # Search in uppercase query for pattern matching
+            if search(pattern, clean_query):
+                # But extract from original query to preserve case
+                original_match = search(pattern, original_query, IGNORECASE)
+                if original_match:
+                    # Find the first non-None group (handles bracketed, quoted,
+                    # and unquoted table names)
+                    table_name = None
+                    for group in original_match.groups():
+                        if group:
+                            table_name = group
+                            break
+
+                    if table_name:
+                        # Remove any remaining quotes or brackets and clean up
+                        table_name = table_name.strip('"[]`')
+                        # Handle schema.table format - extract just the table name
+                        if "." in table_name:
+                            table_name = table_name.split(".")[-1]
+
+                        self.log.debug(f"Extracted table name '{table_name}' from query")
+                        return table_name
+
+        self.log.debug("🔍 Could not extract table name from query")
+        return ""
+
+    def _init_table_queue(self, table_name: str) -> None:
+        """🚦 Initialize table-specific queue if not exists"""
+        table_key = self._get_table_key(table_name)
+        self._queue_manager.get_semaphore(table_key)
+        self.log.debug(f"🚦 ETL queue initialized for table '{table_name}'")
+
+    @contextmanager
+    def _table_operation_lock(self, operation_type: str, query: str) -> Iterator[None]:
+        """🚦 Context manager for table-specific ETL operations"""
+        # Extract table name from query
+        table_name = self._extract_table_name_from_query(query)
+
+        # If no table name, execute without queue
+        if not table_name:
+            self.log.debug("🔍 No table name available - executing without queue")
+            yield
+            return
+
+        # Initialize queue for this table if needed and trigger cleanup
+        self.log.debug(f"🚦 Initializing queue for table '{table_name}'")
+        self._init_table_queue(table_name)
+        self._queue_manager.cleanup_if_needed()
+
+        table_key = self._get_table_key(table_name)
+        operation_id = f"{operation_type}_{int(time() * 1000)}"
+        semaphore = self._queue_manager.get_semaphore(table_key)
+        active_ops = self._queue_manager.get_active_operations(table_key)
+
+        self.log.debug(
+            f"🎫 Requesting ETL lock for {operation_type} on table '{table_name}'"
+        )
+
+        # Acquire semaphore (blocks if table is locked by another operation)
+        semaphore.acquire()
+        try:
+            with self._queue_manager._queue_lock:
+                active_ops.add(operation_id)
+
+            self.log.info(f"🚀 Starting {operation_type} on table '{table_name}'")
+
+            yield
+
+        finally:
+            with self._queue_manager._queue_lock:
+                active_ops.discard(operation_id)
+
+            semaphore.release()
+
+            self.log.info(f"✅ Completed {operation_type} on table '{table_name}'")
 
     def get_table_data_types(
         self, df: DataFrame, force_nvarchar: bool = False
@@ -250,7 +380,7 @@ class ETLDatabase:
         assert values is not None, "No values to upsert"
         return query, values
 
-    @_retry_conditions
+    @_retry_database_errors
     def synchronize_table_schema(
         self, table_name: str, df: DataFrame, force_nvarchar: bool = False
     ) -> bool:
@@ -401,50 +531,58 @@ class ETLDatabase:
         """
         return query, self.prepare_values(df, force_nvarchar)
 
-    @_retry_conditions
+    @_retry_database_errors
     def execute_read_query(
         self, query: str, params: dict[str, Any] = {}
     ) -> list[dict[str, Any]]:
-        """Execute read query with automatic retry on pool timeout errors"""
-        return self.db.execute_read_query(query, params)
+        """Execute read query with automatic retry and table-level queueing"""
+        # Execute with table-level queueing
+        with self._table_operation_lock("read", query):
+            return self.db.execute_read_query(query, params)
 
-    @_retry_conditions
+    @_retry_database_errors
     def execute_write_query(
-        self, query: str, params: dict[str, Any] = {}, check_affected_rows: bool = False
+        self,
+        query: str,
+        params: dict[str, Any] = {},
+        check_affected_rows: bool = False,
     ) -> bool:
-        """Execute write query with automatic retry on pool timeout errors"""
-        return self.db.execute_write_query(query, params, check_affected_rows)
+        """Execute write query with automatic retry and table-level queue management"""
+        with self._table_operation_lock("write", query):
+            return self.db.execute_write_query(query, params, check_affected_rows)
 
-    @_retry_conditions
+    @_retry_database_errors
     def execute_write_bulk_query(
         self, query: str, rows: list[dict[str, Any]] = []
     ) -> bool:
-        """Execute bulk write query with automatic retry on pool timeout errors"""
-        return self.db.execute_write_bulk_query(query, rows)
+        """Execute bulk write query with automatic retry and table-level queueing"""
+        with self._table_operation_lock("bulk_write", query):
+            return self.db.execute_write_bulk_query(query, rows)
 
-    @_retry_conditions
+    @_retry_database_errors
     def execute_write_batch_query(
         self,
         query: str,
         rows: Iterator[dict[str, Any]] | list[dict[str, Any]] = [],
         batch_size: int = 1000,
     ) -> bool:
-        """Execute batch write query with automatic retry on pool timeout errors"""
-        return self.db.execute_write_batch_query(query, rows, batch_size)
+        """Execute batch write query with automatic retry and table-level queueing"""
+        with self._table_operation_lock("batch_write", query):
+            return self.db.execute_write_batch_query(query, rows, batch_size)
 
-    @_retry_conditions
+    @_retry_database_errors
     def table_exists(self, table_name: str) -> bool:
         """Check if table exists with automatic retry on pool timeout errors"""
         return self.db.table_exists(table_name)
 
-    @_retry_conditions
+    @_retry_database_errors
     def create_table(
         self, table_name: str, columns: dict[str, str], keys: Optional[list[str]] = None
     ) -> bool:
         """Delegate to the database handler"""
         return self.db.create_table(table_name, columns, keys)
 
-    @_retry_conditions
+    @_retry_database_errors
     def create_table_with_logical_keys(
         self, table_name: str, columns: dict[str, str], logical_keys: list[str]
     ) -> bool:
@@ -484,17 +622,17 @@ class ETLDatabase:
             return self._logical_keys.get(table_name)
         return None
 
-    @_retry_conditions
+    @_retry_database_errors
     def truncate_table(self, table_name: str) -> bool:
         """Delegate to the database handler"""
         return self.db.truncate_table(table_name)
 
-    @_retry_conditions
+    @_retry_database_errors
     def drop_table(self, table_name: str) -> bool:
         """Delegate to the database handler"""
         return self.db.drop_table(table_name)
 
-    @_retry_conditions
+    @_retry_database_errors
     def split_query_statements(self, query: str) -> list[str]:
         """Delegate to the database handler"""
         return self.db.split_query_statements(query)

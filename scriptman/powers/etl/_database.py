@@ -409,6 +409,7 @@ class ETLDatabase:
             return self.db.create_table(table_name, target_schema)
 
         # Get current table schema
+        # Use ALTER TABLE syntax to trigger table extraction and queueing
         schema_query = f"""
             SELECT
                 COLUMN_NAME,
@@ -418,7 +419,9 @@ class ETLDatabase:
             FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_NAME = '{table_name}'
         """
-        current_schema = self.db.execute_read_query(schema_query)
+        # Execute through our queueing system to prevent deadlocks
+        with self._table_operation_lock("schema_read", f"ALTER TABLE {table_name}"):
+            current_schema = self.db.execute_read_query(schema_query)
 
         # Convert current schema to a dictionary
         current_columns = {
@@ -443,23 +446,27 @@ class ETLDatabase:
                 if current_type != target_type:
                     type_updates[column] = target_type
 
-        # Add missing columns
+        # Add missing columns (execute through queue to prevent deadlocks)
         if missing_columns:
             alter_queries = []
             for column, data_type in missing_columns.items():
                 alter_queries.append(
                     f"ALTER TABLE [{table_name}] ADD [{column}] {data_type}"
                 )
-            self.db.execute_multiple_write_queries(";".join(alter_queries))
+            combined_query = ";".join(alter_queries)
+            with self._table_operation_lock("alter_add_columns", combined_query):
+                self.db.execute_multiple_write_queries(combined_query)
 
-        # Update column types if needed
+        # Update column types if needed (execute through queue to prevent deadlocks)
         if type_updates:
             alter_queries = []
             for column, new_type in type_updates.items():
                 alter_queries.append(
                     f"ALTER TABLE [{table_name}] ALTER COLUMN [{column}] {new_type}"
                 )
-            self.db.execute_multiple_write_queries(";".join(alter_queries))
+            combined_query = ";".join(alter_queries)
+            with self._table_operation_lock("alter_update_columns", combined_query):
+                self.db.execute_multiple_write_queries(combined_query)
 
         return True
 

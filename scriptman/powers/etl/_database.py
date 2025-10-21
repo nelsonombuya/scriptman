@@ -401,74 +401,73 @@ class ETLDatabase:
         Returns:
             bool: True if schema was synchronized successfully, False otherwise
         """
-        # Get the target schema from the DataFrame
-        target_schema = self.get_table_data_types(df, force_nvarchar)
+        # Acquire lock for entire schema synchronization (prevents race conditions)
+        with self._table_operation_lock("schema_sync", f"ALTER TABLE {table_name}"):
+            # Get the target schema from the DataFrame
+            target_schema = self.get_table_data_types(df, force_nvarchar)
 
-        if not self.db.table_exists(table_name):
-            # Create new table with the DataFrame's schema
-            return self.db.create_table(table_name, target_schema)
+            if not self.db.table_exists(table_name):
+                # Create new table with the DataFrame's schema
+                return self.db.create_table(table_name, target_schema)
 
-        # Get current table schema
-        # Use ALTER TABLE syntax to trigger table extraction and queueing
-        schema_query = f"""
-            SELECT
-                COLUMN_NAME,
-                DATA_TYPE,
-                CHARACTER_MAXIMUM_LENGTH,
-                IS_NULLABLE
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = '{table_name}'
-        """
-        # Execute through our queueing system to prevent deadlocks
-        with self._table_operation_lock("schema_read", f"ALTER TABLE {table_name}"):
+            # Get current table schema
+            schema_query = f"""
+                SELECT
+                    COLUMN_NAME,
+                    DATA_TYPE,
+                    CHARACTER_MAXIMUM_LENGTH,
+                    IS_NULLABLE
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = '{table_name}'
+            """
             current_schema = self.db.execute_read_query(schema_query)
 
-        # Convert current schema to a dictionary
-        current_columns = {
-            row["COLUMN_NAME"]: {
-                "type": row["DATA_TYPE"],
-                "max_length": row["CHARACTER_MAXIMUM_LENGTH"],
-                "nullable": row["IS_NULLABLE"] == "YES",
+            # Convert current schema to a dictionary
+            current_columns = {
+                row["COLUMN_NAME"]: {
+                    "type": row["DATA_TYPE"],
+                    "max_length": row["CHARACTER_MAXIMUM_LENGTH"],
+                    "nullable": row["IS_NULLABLE"] == "YES",
+                }
+                for row in current_schema
             }
-            for row in current_schema
-        }
 
-        # Find missing columns and columns that need type updates
-        missing_columns = {}
-        type_updates = {}
+            # Find missing columns and columns that need type updates
+            missing_columns = {}
+            type_updates = {}
 
-        for column, target_type in target_schema.items():
-            if column not in current_columns:
-                missing_columns[column] = target_type
-            else:
-                current_type = current_columns[column]["type"]
-                # Check if type needs to be updated
-                if current_type != target_type:
-                    type_updates[column] = target_type
+            for column, target_type in target_schema.items():
+                if column not in current_columns:
+                    missing_columns[column] = target_type
+                else:
+                    current_type = current_columns[column]["type"]
+                    # Check if type needs to be updated
+                    if current_type != target_type:
+                        type_updates[column] = target_type
 
-        # Add missing columns (execute through queue to prevent deadlocks)
-        if missing_columns:
-            alter_queries = []
-            for column, data_type in missing_columns.items():
-                alter_queries.append(
-                    f"ALTER TABLE [{table_name}] ADD [{column}] {data_type}"
+            # Add missing columns
+            if missing_columns:
+                alter_queries = []
+                for column, data_type in missing_columns.items():
+                    alter_queries.append(
+                        f"ALTER TABLE [{table_name}] ADD [{column}] {data_type}"
+                    )
+                self.db.execute_multiple_write_queries(";".join(alter_queries))
+                self.log.info(f"Added {len(missing_columns)} column(s) to [{table_name}]")
+
+            # Update column types if needed
+            if type_updates:
+                alter_queries = []
+                for column, new_type in type_updates.items():
+                    alter_queries.append(
+                        f"ALTER TABLE [{table_name}] ALTER COLUMN [{column}] {new_type}"
+                    )
+                self.db.execute_multiple_write_queries(";".join(alter_queries))
+                self.log.info(
+                    f"Updated {len(type_updates)} column type(s) in [{table_name}]"
                 )
-            combined_query = ";".join(alter_queries)
-            with self._table_operation_lock("alter_add_columns", combined_query):
-                self.db.execute_multiple_write_queries(combined_query)
 
-        # Update column types if needed (execute through queue to prevent deadlocks)
-        if type_updates:
-            alter_queries = []
-            for column, new_type in type_updates.items():
-                alter_queries.append(
-                    f"ALTER TABLE [{table_name}] ALTER COLUMN [{column}] {new_type}"
-                )
-            combined_query = ";".join(alter_queries)
-            with self._table_operation_lock("alter_update_columns", combined_query):
-                self.db.execute_multiple_write_queries(combined_query)
-
-        return True
+            return True
 
     def generate_merge_query(
         self,

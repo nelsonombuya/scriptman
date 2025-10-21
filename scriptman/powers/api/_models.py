@@ -270,8 +270,6 @@ class BaseEntityModel(BaseModel):
     @classmethod
     def set_empty_fields_to_none(cls, values: dict[str, Any]) -> dict[str, Any]:
         """🎨 Convert empty string fields to None."""
-        if isinstance(values, Exception):
-            return values  # Return the exception
         return {
             k: None if isinstance(v, str) and not v.strip() else v
             for k, v in values.items()
@@ -281,8 +279,6 @@ class BaseEntityModel(BaseModel):
     @classmethod
     def strip_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
         """🎨 Strip whitespace from string fields."""
-        if isinstance(values, Exception):
-            return values  # Return the exception
         return {k: v.strip() if isinstance(v, str) else v for k, v in values.items()}
 
     @classmethod
@@ -331,13 +327,7 @@ class BaseEntityModel(BaseModel):
             if getattr(values, "model_dump", None):
                 values = getattr(values, "model_dump")()
 
-            if isinstance(values, Exception):
-                return values  # Return the exception
-
-            entity_identifier = values.get(
-                cls._identifier_field,
-                "unknown",  # Fallback if somehow the identifier isn't set
-            )
+            entity_identifier = values.get(cls._identifier_field, "unknown")
         except Exception as e:
             logger.error(f"Error getting entity identifier for {cls.__name__}: {str(e)}")
             entity_identifier = "unknown"

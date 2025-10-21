@@ -1151,91 +1151,98 @@ class ETL:
         self._temp_tables.add((database_handler, temp_table))
         merge_query = query.format(source_table=temp_table)
 
-        while database_handler.table_exists(temp_table):
-            self.log.warning(f"Temp table {temp_table} already exists, retrying...")
-            sleep(randint(1, 100) / 1000)  # Random backoff
-            temp_table = self._generate_temp_table_name(table_name)
-
-        try:
-            if use_logical_keys:
-                database_handler.create_table_with_logical_keys(
-                    table_name=temp_table,
-                    logical_keys=[str(_) for _ in data_to_use.index.names],
-                    columns=database_handler.get_table_data_types(
-                        data_to_use.reset_index(), force_nvarchar
-                    ),
-                )
-            else:
-                database_handler.create_table(
-                    table_name=temp_table,
-                    keys=[str(_) for _ in data_to_use.index.names],
-                    columns=database_handler.get_table_data_types(
-                        data_to_use.reset_index(), force_nvarchar
-                    ),
-                )
-
-            temp_query, temp_values = database_handler.generate_prepared_insert_query(
-                temp_table, data_to_use, force_nvarchar
-            )
+        # Wrap entire merge operation in target table's lock to prevent race conditions
+        with database_handler._table_operation_lock("merge", f"MERGE {table_name}"):
+            while database_handler.table_exists(temp_table):
+                self.log.warning(f"Temp table {temp_table} already exists, retrying...")
+                sleep(randint(1, 100) / 1000)  # Random backoff
+                temp_table = self._generate_temp_table_name(table_name)
+                merge_query = query.format(source_table=temp_table)
 
             try:
-                database_handler.execute_write_batch_query(
-                    temp_query, temp_values, batch_size
-                )
-            except DatabaseError as error:
-                if any(
-                    keyword in str(error).lower()
-                    for keyword in [
-                        "duplicate key",
-                        "already exists",
-                        "constraint",
-                        "violation",
-                    ]
-                ):
-                    self.log.warning(f"Duplicate key error: {error}. Retrying...")
-                    sleep(randint(1, 100) / 1000)  # Random backoff
-                    self._merge(
-                        query=query,
-                        table_name=table_name,
-                        batch_size=batch_size,
-                        working_data=working_data,
-                        force_nvarchar=force_nvarchar,
-                        allow_fallback=allow_fallback,
-                        database_handler=database_handler,
-                        use_logical_keys=use_logical_keys,
+                if use_logical_keys:
+                    database_handler.create_table_with_logical_keys(
+                        table_name=temp_table,
+                        logical_keys=[str(_) for _ in data_to_use.index.names],
+                        columns=database_handler.get_table_data_types(
+                            data_to_use.reset_index(), force_nvarchar
+                        ),
                     )
-                raise error
+                else:
+                    database_handler.create_table(
+                        table_name=temp_table,
+                        keys=[str(_) for _ in data_to_use.index.names],
+                        columns=database_handler.get_table_data_types(
+                            data_to_use.reset_index(), force_nvarchar
+                        ),
+                    )
 
-            """
-            ✍🏾 Merge the data into the target table
+                temp_query, temp_values = database_handler.generate_prepared_insert_query(
+                    temp_table, data_to_use, force_nvarchar
+                )
 
-            NOTE: Since the data is already in the temporary table, we can just
-            execute the merge query without values.
-            """
-            return database_handler.execute_write_query(
-                merge_query, check_affected_rows=True
-            )
+                try:
+                    database_handler.execute_write_batch_query(
+                        temp_query, temp_values, batch_size
+                    )
+                except DatabaseError as error:
+                    if any(
+                        keyword in str(error).lower()
+                        for keyword in [
+                            "duplicate key",
+                            "already exists",
+                            "constraint",
+                            "violation",
+                        ]
+                    ):
+                        self.log.warning(f"Duplicate key error: {error}. Retrying...")
+                        sleep(randint(1, 100) / 1000)  # Random backoff
+                        self._merge(
+                            query=query,
+                            table_name=table_name,
+                            batch_size=batch_size,
+                            working_data=working_data,
+                            force_nvarchar=force_nvarchar,
+                            allow_fallback=allow_fallback,
+                            database_handler=database_handler,
+                            use_logical_keys=use_logical_keys,
+                        )
+                    raise error
 
-        except DatabaseError as error:
-            if not allow_fallback:
-                self.log.error(f"Database Error: {error}. Aborting...")
-                raise error
+                """
+                ✍🏾 Merge the data into the target table
 
-            self.log.error(f"Database Error: {error}. Retrying using insert/update...")
-            return self.insert_or_update(
-                table_name=table_name,
-                force_nvarchar=force_nvarchar,
-                database_handler=database_handler,
-            )
+                NOTE: Since the data is already in the temporary table, we can just
+                execute the merge query without values.
+                """
+                return database_handler.execute_write_query(
+                    merge_query, check_affected_rows=True
+                )
 
-        finally:
-            try:
-                if database_handler.table_exists(temp_table):
-                    database_handler.drop_table(temp_table)
-                    self.log.debug(f"Cleaned up temporary table: {temp_table}")
-                self._temp_tables.discard((database_handler, temp_table))
-            except Exception as e:
-                self.log.warning(f"Failed to cleanup temporary table {temp_table}: {e}")
+            except DatabaseError as error:
+                if not allow_fallback:
+                    self.log.error(f"Database Error: {error}. Aborting...")
+                    raise error
+
+                self.log.error(
+                    f"Database Error: {error}. Retrying using insert/update..."
+                )
+                return self.insert_or_update(
+                    table_name=table_name,
+                    force_nvarchar=force_nvarchar,
+                    database_handler=database_handler,
+                )
+
+            finally:
+                try:
+                    if database_handler.table_exists(temp_table):
+                        database_handler.drop_table(temp_table)
+                        self.log.debug(f"Cleaned up temporary table: {temp_table}")
+                    self._temp_tables.discard((database_handler, temp_table))
+                except Exception as e:
+                    self.log.warning(
+                        f"Failed to cleanup temporary table {temp_table}: {e}"
+                    )
 
     def insert_or_update(
         self,

@@ -1,25 +1,3 @@
 {
-  "cSpell.words": [
-    "chromedriver",
-    "crdownload",
-    "drivedownload",
-    "driveupload",
-    "DUMPFILE",
-    "executemany",
-    "geckodriver",
-    "getpid",
-    "infobars",
-    "mariadb",
-    "mypy",
-    "mysql",
-    "onedrive",
-    "postgresql",
-    "pycache",
-    "pytest",
-    "qodo",
-    "queuepool",
-    "safebrowsing",
-    "scriptman",
-    "tarteaucitron"
-  ]
+  "cSpell.words": ["scriptman"]
 }

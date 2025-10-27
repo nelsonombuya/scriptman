@@ -170,9 +170,9 @@ class CacheManager:
                     logger.info(f"❔ Cache miss for key: {key}")
                     if iscoroutinefunction(func):
                         logger.debug("🔄 Executing async cached function")
-                        from scriptman.powers.tasks import TaskExecutor
+                        from scriptman.powers.tasks import TaskManager
 
-                        result = TaskExecutor.await_async(func(*args, **kwargs))
+                        result = TaskManager.await_async(func(*args, **kwargs))
                     else:
                         logger.debug("🔄 Executing sync cached function")
                         result = func(*args, **kwargs)

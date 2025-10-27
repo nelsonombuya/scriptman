@@ -17,7 +17,7 @@ try:
     from scriptman.core._summary import JobSummaryService
     from scriptman.powers.generics import P, R
     from scriptman.powers.scheduler._models import Job
-    from scriptman.powers.tasks import TaskExecutor
+    from scriptman.powers.tasks import TaskManager
 
 except ImportError as e:
     raise ImportError(
@@ -79,10 +79,7 @@ class Scheduler:
             # Script & Function Scheduling
             self.__scripts = Scripts()
             self.__summary = JobSummaryService()
-            self.__executor = TaskExecutor(
-                thread_pool_size=thread_pool_size,
-                process_pool_size=process_pool_size,
-            )
+            self.__executor = TaskManager()
 
             # Schedule the daily summary release job
             self._schedule_daily_summary_release()
@@ -681,7 +678,7 @@ class Scheduler:
             def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                 if iscoroutinefunction(func):
                     logger.debug("🔄 Executing async scheduled function")
-                    return cast(R, TaskExecutor.await_async(func(*args, **kwargs)))
+                    return cast(R, TaskManager.await_async(func(*args, **kwargs)))
                 else:
                     logger.debug("🔄 Executing sync scheduled function")
                     return func(*args, **kwargs)

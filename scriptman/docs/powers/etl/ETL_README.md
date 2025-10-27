@@ -232,9 +232,9 @@ etl.to_db(
 ### 5. Parallel Processing Different Tables
 
 ```python
-from scriptman.powers.tasks import TaskExecutor
+from scriptman.powers.tasks import TaskManager
 
-executor = TaskExecutor()
+executor = TaskManager()
 
 # These run in parallel (different tables)
 tasks = executor.multithread([

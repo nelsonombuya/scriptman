@@ -13,8 +13,8 @@ try:
     from scriptman.powers.api._models import APIRequest, APIResponse
     from scriptman.powers.generics import Func, P
     from scriptman.powers.serializer import SERIALIZE_FOR_JSON, serialize
+    from scriptman.powers.tasks import TaskManager
     from scriptman.powers.tasks._models import TaskException
-    from scriptman.powers.tasks._task_master import TaskMaster
 except ImportError as e:
     raise ImportError(
         f"An error occurred: {e} \n"
@@ -115,13 +115,13 @@ def api_route(
     @wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
         try:
-            _task_master = TaskMaster.get_instance()
-            _task = _task_master.submit(func, *args, **kwargs)
+            _task_manager = TaskManager()
+            _task = _task_manager.background(func, *args, **kwargs)
             _timeout = config.settings.get("task_timeout", timeout)
 
             if enqueue:
                 response = create_timeout_response(
-                    task_id=_task.task_id or request.request_id,
+                    task_id=request.request_id,
                     request=request,
                 )
             else:

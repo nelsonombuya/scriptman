@@ -598,7 +598,7 @@ def update_scd_type2(new_data_etl: ETL, table_name: str):
 ### Parallel Processing Multiple Tables
 
 ```python
-from scriptman.powers.tasks import TaskExecutor
+from scriptman.powers.tasks import TaskManager
 from concurrent.futures import ThreadPoolExecutor
 
 def parallel_table_load(tables: list[tuple[ETL, str]]):

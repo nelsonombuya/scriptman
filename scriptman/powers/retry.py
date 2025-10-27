@@ -7,7 +7,7 @@ from loguru import logger
 
 from scriptman.core.config import config
 from scriptman.powers.generics import P, R
-from scriptman.powers.tasks import TaskExecutor
+from scriptman.powers.tasks import TaskManager
 
 
 def retry(
@@ -44,7 +44,7 @@ def retry(
                 try:
                     if iscoroutinefunction(func):
                         logger.debug("🔄 Trying async function")
-                        result = TaskExecutor.await_async(func(*args, **kwargs))
+                        result = TaskManager.await_async(func(*args, **kwargs))
                     else:
                         logger.debug("🔄 Trying sync function")
                         result = func(*args, **kwargs)

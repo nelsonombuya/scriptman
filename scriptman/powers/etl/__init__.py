@@ -12,7 +12,7 @@ try:
     from scriptman.powers.database._exceptions import DatabaseError
     from scriptman.powers.etl._database import ETLDatabase
     from scriptman.powers.generics import P
-    from scriptman.powers.tasks import TaskExecutor
+    from scriptman.powers.tasks import TaskManager
     from scriptman.powers.time_calculator import TimeCalculator
 except ImportError as e:
     raise ImportError(
@@ -995,7 +995,7 @@ class ETL:
             working_data = self._data.copy()
 
         # Wrap the handler with ETLDatabase for extended functionality
-        executor = TaskExecutor()
+        executor = TaskManager()
         db = ETLDatabase(db_handler)
         table_exists: bool = db.table_exists(table_name)
 
@@ -1278,7 +1278,7 @@ class ETL:
                 return database_handler.execute_write_query(update_query, record)
 
         return (
-            TaskExecutor()
+            TaskManager()
             .multithread(
                 [
                     (_insert_or_update_single_record, (record,), {})

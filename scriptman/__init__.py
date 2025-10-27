@@ -25,7 +25,7 @@ from scriptman.powers.serializer import (
     SERIALIZE_FOR_PICKLE,
     serialize,
 )
-from scriptman.powers.tasks import Task, TaskExecutor, TaskMaster, Tasks
+from scriptman.powers.tasks import Task, TaskManager, Tasks
 from scriptman.powers.time_calculator import TimeCalculator
 
 # Optional powers that depend on extra packages
@@ -141,10 +141,9 @@ __all__: list[str] = [
     # Cleanup
     "CleanUp",
     # Concurrency
-    "TaskExecutor",
+    "TaskManager",
     "Task",
     "Tasks",
-    "TaskMaster",
     # Config
     "config",
     # Generics

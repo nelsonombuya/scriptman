@@ -90,6 +90,11 @@ class Task(Generic[T]):
     """
     🎯 Task container for managing individual task execution.
 
+    # TODO: Future enhancements
+    # - Add cancel() method for task cancellation
+    # - Add progress tracking for long-running tasks
+    # - Add task dependencies support
+
     A simplified Task class that wraps a Future and provides essential
     functionality without caching complexity.
 

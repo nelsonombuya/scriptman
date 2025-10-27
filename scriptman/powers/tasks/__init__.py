@@ -4,7 +4,7 @@ from threading import Lock, Thread
 from time import perf_counter, sleep
 from typing import Any, Awaitable, Callable, Optional
 
-from loguru import Logger, logger
+from loguru import logger
 from tqdm import tqdm
 
 from scriptman.core.config import config
@@ -79,7 +79,8 @@ class TaskManager:
     __idle_timeout: int = config.settings.get("tasks.idle_timeout", 30)
     __resource_percentage: float = config.settings.get("tasks.resource_percentage", 50.0)
 
-    log: Logger = logger
+    # Logging Capabilities
+    log = logger
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "TaskManager":
         """🚀 Create or return singleton instance"""

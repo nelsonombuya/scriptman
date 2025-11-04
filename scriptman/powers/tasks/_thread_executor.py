@@ -1,13 +1,20 @@
-from concurrent.futures import Future, ThreadPoolExecutor
-from inspect import iscoroutinefunction
-from threading import Lock
-from time import time
-from typing import Any, Awaitable, Optional, cast
+try:
+    from concurrent.futures import Future, ThreadPoolExecutor
+    from inspect import iscoroutinefunction
+    from threading import Lock
+    from time import time
+    from typing import Any, Awaitable, Optional, cast
 
-from loguru import logger
+    from loguru import logger
 
-from scriptman.powers.generics import Func, P, R
-from scriptman.powers.tasks._execution_manager import ExecutionManager
+    from scriptman.powers.generics import Func, P, R
+    from scriptman.powers.tasks._execution_manager import ExecutionManager
+except ImportError as e:
+    raise ImportError(
+        f"An error occurred: {e} \n"
+        "Kindly install the dependencies on your package manager using "
+        "scriptman[tasks]"
+    )
 
 
 class ThreadExecutor(ExecutionManager):
@@ -82,6 +89,13 @@ class ThreadExecutor(ExecutionManager):
                 future = self.__executor.submit(self.await_async, func(*args, **kwargs))
             else:
                 future = self.__executor.submit(func, *args, **kwargs)
+
+            def _on_done(_f: Future[Any]) -> None:
+                with self.__lock:
+                    self.__active_task_count -= 1
+                    self.__last_activity_time = time()
+
+            future.add_done_callback(_on_done)
             return cast(Future[R], future)
         except Exception as e:
             with self.__lock:
@@ -122,7 +136,8 @@ class ThreadExecutor(ExecutionManager):
         """🔍 Check if executor has been idle"""
         if self.__is_shutdown:
             return True
-
+        if self.__active_task_count > 0:
+            return False
         return time() - self.__last_activity_time > self._idle_timeout
 
     @property
@@ -218,7 +233,8 @@ class ThreadExecutor(ExecutionManager):
             logger.warning(f"⚠️ Could not calculate optimal workers: {e}")
             return 4  # Safe default
 
-    def get_debug_info(self) -> dict[str, Any]:
+    @property
+    def info(self) -> dict[str, Any]:
         """🐛 Get comprehensive debug information"""
         return {
             "is_shutdown": self.__is_shutdown,

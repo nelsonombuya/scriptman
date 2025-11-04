@@ -1,8 +1,15 @@
 from abc import ABC, abstractmethod
 from concurrent.futures import Future
-from typing import Optional
+from enum import Enum
+from typing import Any, Optional
 
 from scriptman.powers.generics import Func, P, R
+
+
+class ExecutorType(str, Enum):
+    THREAD = "thread"
+    PROCESS = "process"
+    ASYNC = "async"
 
 
 class ExecutionManager(ABC):
@@ -74,6 +81,17 @@ class ExecutionManager(ABC):
 
         Returns:
             float: Timestamp of last activity
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def info(self) -> dict[str, Any]:
+        """
+        🔍 Get comprehensive information about the executor
+
+        Returns:
+            dict[str, Any]: Comprehensive information about the executor
         """
         pass
 

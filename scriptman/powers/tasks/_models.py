@@ -47,7 +47,6 @@ class TaskException(Exception):
             for index, frame in enumerate(extract_tb(exc_info()[2]), 1)
         ]
 
-    @property
     def to_dict(self) -> dict[str, Any]:
         """
         📊 Converts the exception to a dictionary representation.
@@ -104,6 +103,8 @@ class Task(Generic[T]):
     """
 
     future: Future[T]
+    task_id: Optional[str] = None
+    timeout: Optional[float] = None
     start_time: float = field(default_factory=perf_counter)
 
     @overload
@@ -152,6 +153,13 @@ class Task(Generic[T]):
             if raise_exceptions:
                 raise e
             return TaskException(str(e), exception=e)
+
+    def cancel(self) -> bool:
+        """🛑 Attempt to cancel the task (succeeds only if not yet started)."""
+        try:
+            return self.future.cancel()
+        except Exception:
+            return False
 
     @property
     def is_done(self) -> bool:

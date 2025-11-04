@@ -30,6 +30,9 @@ def serialize(
     - Lists and tuples
     - Datetime objects
     - Decimal objects
+    - Enums (serialized to their value)
+    - UUIDs (serialized to string)
+    - Sets (serialized to lists)
     - Exceptions
 
     Args:
@@ -49,6 +52,8 @@ def serialize(
         {'field1': 'value1', 'field2': 2}
         >>> serialize([1, 2, datetime.now()])
         [1, 2, '2024-03-14T12:00:00']
+        >>> serialize(MyEnum.MY_VALUE)
+        'my_value'  # or the enum's actual value
     """
     from datetime import datetime
     from decimal import Decimal
@@ -87,6 +92,29 @@ def serialize(
             }
 
         if isinstance(value, (list, tuple)):
+            return [serialize(item, use_pickle, fallback_to_str) for item in value]
+
+        # Handle Enums - serialize to their value attribute
+        try:
+            from enum import Enum
+
+            if isinstance(value, Enum):
+                # Serialize enum to its value (e.g., "GET" for HTTPMethod.GET)
+                return serialize(value.value, use_pickle, fallback_to_str)
+        except ImportError:
+            pass
+
+        # Handle UUIDs - serialize to string
+        try:
+            from uuid import UUID
+
+            if isinstance(value, UUID):
+                return str(value)
+        except ImportError:
+            pass
+
+        # Handle sets - serialize to list
+        if isinstance(value, set):
             return [serialize(item, use_pickle, fallback_to_str) for item in value]
 
         if fallback_to_str:

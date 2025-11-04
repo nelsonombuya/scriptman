@@ -22,6 +22,28 @@ except ImportError as e:
     )
 
 
+def serialize_api_response(
+    api_response: APIResponse, exclude_stacktrace: bool = True
+) -> dict[str, Any]:
+    """
+    🔄 Serializes an APIResponse to a dictionary, ensuring enums and other types
+    are properly converted.
+
+    Args:
+        api_response (APIResponse): The API response to serialize.
+        exclude_stacktrace (bool): Whether to exclude the stacktrace field.
+            Default is True.
+
+    Returns:
+        dict[str, Any]: The serialized response dictionary.
+    """
+    exclude = {"stacktrace"} if exclude_stacktrace else None
+    dumped = api_response.model_dump(exclude=exclude)
+    serialized = serialize(dumped, **SERIALIZE_FOR_JSON)
+    assert isinstance(serialized, dict), "Expected dict from serialize"
+    return serialized
+
+
 def create_successful_response(
     request: APIRequest, response: dict[str, Any]
 ) -> dict[str, Any]:
@@ -37,12 +59,13 @@ def create_successful_response(
     """
     logger.info(f"✅ Request {request.request_id} completed successfully.")
     logger.debug(f"📤 Request details: \n{dumps(request.model_dump(), indent=4)}")
-    return APIResponse(
+    api_response = APIResponse(
         request=request,
         response=response.get("response", response),
         message=response.get("message", "Request Successful."),
         status_code=response.get("status_code", status.HTTP_200_OK),
-    ).model_dump(exclude={"stacktrace"})
+    )
+    return serialize_api_response(api_response, exclude_stacktrace=True)
 
 
 def create_timeout_response(request: APIRequest, task_id: str) -> dict[str, Any]:
@@ -58,12 +81,13 @@ def create_timeout_response(request: APIRequest, task_id: str) -> dict[str, Any]
     """
     logger.info(f"⏳ Request task {task_id} is enqueued. Continuing in background...")
     logger.debug(f"📤 Request details: \n{dumps(request.model_dump(), indent=4)}")
-    return APIResponse(
+    api_response = APIResponse(
         request=request,
         status_code=status.HTTP_202_ACCEPTED,
         message="Request has been queued for processing.",
         response={"status": "queued", "task_id": task_id},
-    ).model_dump(exclude={"stacktrace"})
+    )
+    return serialize_api_response(api_response, exclude_stacktrace=True)
 
 
 def create_error_response(request: APIRequest, e: Exception) -> dict[str, Any]:
@@ -87,7 +111,8 @@ def create_error_response(request: APIRequest, e: Exception) -> dict[str, Any]:
     logger.debug(f"📤 Request details: \n{dumps(request.model_dump(), indent=4)}")
     logger.debug(f"🔍 Stacktrace: \n{dumps(e.stacktrace, indent=4)}")
 
-    return APIResponse.from_api_exception(request, e).model_dump()
+    api_response = APIResponse.from_api_exception(request, e)
+    return serialize_api_response(api_response, exclude_stacktrace=False)
 
 
 def api_route(

@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.9.573"
+version = "2.9.578"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -42,6 +42,17 @@ sqlalchemy = ["sqlalchemy>=2.0.37", "pyodbc>=5.2.0"]
 scriptman = "scriptman.core.cli:CLI.start_cli_instance"
 
 # Development dependency groups (used only during development)
+[tool.poetry.group.dev.dependencies]
+black = "^24.10.0"
+icecream = "^2.1.4"
+isort = "^5.13.2"
+mypy = "^1.13.0"
+poetry = "^2.2.0"
+pytest = "^8.3.4"
+pytest-asyncio = "^0.25.0"
+pytest-cov = "^6.0.0"
+pytest-mock = "^3.14.0"
+
 [tool.poetry.group.api.dependencies]
 fastapi = "^0.115.8"
 pydantic = { extras = ["email"], version = "^2.10.6" }

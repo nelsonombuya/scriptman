@@ -117,6 +117,10 @@ def serialize(
         if isinstance(value, set):
             return [serialize(item, use_pickle, fallback_to_str) for item in value]
 
+        # Preserve primitive JSON types when falling back to string conversion
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+
         if fallback_to_str:
             return str(value)
 

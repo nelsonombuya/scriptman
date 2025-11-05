@@ -47,4 +47,3 @@ class Job:
 
 
 __all__ = ["Job"]
-

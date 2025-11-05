@@ -101,4 +101,3 @@ class OneTimeTrigger(SchedulerTrigger):
 
 
 __all__ = ["SchedulerTrigger", "IntervalTrigger", "TimeOfDayTrigger", "OneTimeTrigger"]
-

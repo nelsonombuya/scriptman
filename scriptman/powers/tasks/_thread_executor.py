@@ -1,9 +1,9 @@
 try:
     from concurrent.futures import Future, ThreadPoolExecutor
     from inspect import iscoroutinefunction
-    from threading import Lock
+    from threading import Lock, Thread
     from time import time
-    from typing import Any, Awaitable, Optional, cast
+    from typing import Any, Awaitable, Callable, Optional, cast
 
     from loguru import logger
 
@@ -32,13 +32,19 @@ class ThreadExecutor(ExecutionManager):
     - Activity tracking for idle detection 📊
     """
 
-    def __init__(self, max_workers: Optional[int] = None, idle_timeout: int = 30) -> None:
+    def __init__(
+        self,
+        max_workers: Optional[int] = None,
+        idle_timeout: int = 30,
+        daemonize: bool = True,
+    ) -> None:
         """
         🚀 Initialize the ThreadExecutor
 
         Args:
             max_workers: Maximum number of threads (default: resource-aware calculation)
             idle_timeout: Time in seconds before considering executor idle
+            daemonize: Whether to spawn daemon threads (default: True).
         """
         # Private state variables
         self.__executor: Optional[ThreadPoolExecutor] = None
@@ -49,10 +55,37 @@ class ThreadExecutor(ExecutionManager):
         # Configuration
         self._max_workers = max_workers or self.__calculate_optimal_workers()
         self._idle_timeout = idle_timeout
+        self._daemonize = daemonize
 
         # Thread safety
         self.__lock: Lock = Lock()
-        logger.debug(f"🧵 ThreadExecutor initialized with {self._max_workers} workers")
+        logger.debug(
+            f"🔧 ThreadExecutor initialized with {self._max_workers} workers "
+            f"and daemonize={self._daemonize}",
+        )
+
+    @property
+    def daemonize(self) -> bool:
+        """🔍 Get the daemonize flag"""
+        return self._daemonize
+
+    @daemonize.setter
+    def daemonize(self, value: bool) -> None:
+        """🔧 Set the daemonize flag and update the executor with the new value."""
+        if self._daemonize == value:
+            return
+
+        self._daemonize = value
+
+        with self.__lock:
+            if self.__executor is None:
+                return
+
+            old_executor = self.__executor
+            try:
+                old_executor.shutdown(wait=False)
+            finally:
+                self.__executor = self._create_executor()
 
     def submit_task(
         self, func: Func[P, R], *args: P.args, **kwargs: P.kwargs
@@ -167,10 +200,7 @@ class ThreadExecutor(ExecutionManager):
             self._max_workers = max_workers
 
             # Create new executor with updated limits
-            self.__executor = ThreadPoolExecutor(
-                max_workers=self._max_workers,
-                thread_name_prefix="ThreadExecutor-",
-            )
+            self.__executor = self._create_executor()
 
         logger.info(f"✅ Worker limit updated to {self._max_workers}")
 
@@ -181,10 +211,26 @@ class ThreadExecutor(ExecutionManager):
 
         if self.__executor is None or self.__executor._shutdown:
             logger.debug("🔧 Creating new ThreadPoolExecutor")
-            self.__executor = ThreadPoolExecutor(
-                max_workers=self._max_workers,
-                thread_name_prefix="ThreadExecutor-",
-            )
+            self.__executor = self._create_executor()
+
+    def _create_executor(self) -> ThreadPoolExecutor:
+        executor = ThreadPoolExecutor(
+            max_workers=self._max_workers,
+            thread_name_prefix="Thread Executor: Thread",
+        )
+        factory_attr = getattr(executor, "_thread_factory", None)
+        if factory_attr is None:
+            return executor
+
+        factory = cast(Callable[..., Thread], factory_attr)
+
+        def configured_factory(*args: Any, **kwargs: Any) -> Thread:
+            thread = factory(*args, **kwargs)
+            thread.daemon = self._daemonize
+            return thread
+
+        setattr(executor, "_thread_factory", configured_factory)
+        return executor
 
     @staticmethod
     def await_async[R](awaitable: Awaitable[R]) -> R:

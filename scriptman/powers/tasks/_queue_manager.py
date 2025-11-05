@@ -2,7 +2,7 @@ from collections import deque
 from dataclasses import dataclass
 from threading import Lock
 from time import time
-from typing import Any, Deque
+from typing import Any, Callable, Deque
 from uuid import uuid4
 
 from scriptman.powers.tasks._execution_manager import ExecutorType
@@ -11,12 +11,40 @@ from scriptman.powers.tasks._execution_manager import ExecutorType
 @dataclass
 class QueueRecord:
     task_id: str
-    func_path: str  # "module:qualname"
+    func: Callable[..., Any]
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
     executor: ExecutorType
     enqueued_at: float
-    retries: int = 0
+
+    @property
+    def name(self) -> str:
+        """🔍 Get the name of the function."""
+        return f"{self.func.__module__}.{self.func.__name__}"
+
+    def __str__(self) -> str:
+        """🔍 Return a string representation of the queue record."""
+        return (
+            f"QueueRecord("
+            f"name={self.name}, "
+            f"task_id={self.task_id}, "
+            f"executor={self.executor}, "
+            f"enqueued_at={self.enqueued_at}, "
+            f")"
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        """🔍 Return True if the queue records are equal."""
+        if not isinstance(other, QueueRecord):
+            return False
+        return (
+            self.task_id == other.task_id
+            and self.func == other.func
+            and self.args == other.args
+            and self.kwargs == other.kwargs
+            and self.executor == other.executor
+            and self.enqueued_at == other.enqueued_at
+        )
 
 
 class QueueManager:
@@ -35,7 +63,7 @@ class QueueManager:
 
     def enqueue(
         self,
-        func_path: str,
+        func: Callable[..., Any],
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
         executor: ExecutorType = ExecutorType.THREAD,
@@ -44,7 +72,7 @@ class QueueManager:
         🚀 Enqueue a task into the pending queue.
 
         Args:
-            func_path: The path to the function to execute.
+            func: The function to execute.
             args: The positional arguments to pass to the function.
             kwargs: The keyword arguments to pass to the function.
             executor: The executor to use to execute the function.
@@ -54,7 +82,7 @@ class QueueManager:
         """
         record = QueueRecord(
             task_id=str(uuid4()),
-            func_path=func_path,
+            func=func,
             args=args,
             kwargs=kwargs,
             executor=executor,

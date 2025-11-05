@@ -1,5 +1,5 @@
 from concurrent.futures import Future, TimeoutError, wait
-from threading import Lock, Thread
+from threading import Lock, Thread, current_thread
 from time import perf_counter, sleep
 from typing import Any, Awaitable, Callable, Optional
 
@@ -75,7 +75,8 @@ class TaskManager:
     __lock: Lock = Lock()
 
     # Global configuration
-    __idle_timeout: int = config.settings.get("tasks.idle_timeout", 30)
+    __daemonize_threads: bool = True
+    __idle_timeout: int = config.settings.get("tasks.idle_timeout", 10)
     __resource_percentage: float = config.settings.get("tasks.resource_percentage", 50.0)
 
     # Logging Capabilities
@@ -114,6 +115,7 @@ class TaskManager:
 
         self.__initialized = True
         logger.info("🎯 TaskManager initialized")
+        self.__last_activity_time: float = perf_counter()
 
     @property
     def threads(self) -> ThreadExecutor:
@@ -122,10 +124,23 @@ class TaskManager:
             if self.__thread_executor is None:
                 self.__thread_executor = ThreadExecutor(
                     max_workers=self.__calculate_thread_workers(),
+                    daemonize=self.__daemonize_threads,
                     idle_timeout=self.__idle_timeout,
                 )
                 self.__start_global_monitoring()
             return self.__thread_executor
+
+    @property
+    def daemonize_threads(self) -> bool:
+        """🔍 Get daemonize threads flag"""
+        return self.__daemonize_threads
+
+    @daemonize_threads.setter
+    def daemonize_threads(self, value: bool) -> None:
+        """🔧 Set daemonize threads flag"""
+        self.__daemonize_threads = value
+        if self.__thread_executor:
+            self.__thread_executor.daemonize = value
 
     @property
     def process(self) -> ExecutionManager:
@@ -148,7 +163,7 @@ class TaskManager:
             self.__monitoring = True
             self.__global_monitor_thread = Thread(
                 daemon=True,
-                name="TaskManager-GlobalMonitor",
+                name="Task Manager: Global Monitor",
                 target=self.__monitor_all_executors,
             )
             self.__global_monitor_thread.start()
@@ -244,7 +259,14 @@ class TaskManager:
                         self.__monitoring = False
                         break
 
+                # Check for idle shutdown and shutdown if needed
+                if self.__shutdown_if_idle() and self.__is_shutdown:
+                    break  # type: ignore[unreachable]
+
                 sleep(config.settings.get("tasks.monitor_interval", 5))
+            except KeyboardInterrupt:
+                self.__handle_keyboard_interrupt()
+                break
             except Exception as e:
                 logger.debug(f"⚠️ Global monitoring error (ignored): {e}")
                 sleep(config.settings.get("tasks.monitor_interval", 5))
@@ -306,6 +328,53 @@ class TaskManager:
             logger.warning(f"⚠️ Could not calculate thread workers: {e}")
             return 4  # Safe default
 
+    def __is_idle(self) -> bool:
+        """🔍 Check if TaskManager has no active work"""
+        with self.__tasks_lock:
+            has_active = len(self.__active_tasks) > 0
+            has_pending = len(self.__pending_tasks) > 0
+            has_executing = len(self.__executing_tasks) > 0
+
+        queue_stats = self.__queue.stats()
+        has_queue_tasks = (
+            queue_stats.get("pending", 0) > 0 or queue_stats.get("processing", 0) > 0
+        )
+
+        return not (has_pending or has_executing or has_active or has_queue_tasks)
+
+    def __should_shutdown(self) -> bool:
+        """🔍 Check if should shutdown based on idle timeout"""
+        if self.__is_shutdown or not self.__is_idle():
+            return False
+
+        if self.__idle_timeout == 0:
+            return True  # Immediate shutdown when idle
+
+        idle_duration = perf_counter() - self.__last_activity_time
+        return idle_duration >= self.__idle_timeout
+
+    def __shutdown_if_idle(self) -> bool:
+        """
+        🔍 Check idle state and shutdown if timeout exceeded and return True if should
+        shutdown, otherwise return False.
+
+        Returns:
+            bool: True if should shutdown, False otherwise
+        """
+        if self.__should_shutdown():
+            logger.info("TaskManager idle, shutting down...")
+            self.cleanup_all(wait=True, timeout=5.0)
+            return True
+        return False
+
+    def __handle_keyboard_interrupt(self) -> None:
+        """⌨ Gracefully handle a KeyboardInterrupt by cleaning up executors."""
+        logger.warning("KeyboardInterrupt received – initiating TaskManager cleanup")
+        try:
+            self.cleanup_all(wait=False, timeout=2.0)
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"Cleanup after KeyboardInterrupt failed: {exc}")
+
     # Context manager support
     def __enter__(self) -> "TaskManager":
         """🚪 Context manager entry"""
@@ -314,64 +383,6 @@ class TaskManager:
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """🚪 Context manager exit"""
         self.cleanup_all()
-
-    # Helpers for callable path <-> object
-    @staticmethod
-    def __to_func_path(func: Callable[..., Any]) -> str:
-        """🔍 Convert a callable to a function path"""
-        module = getattr(func, "__module__", None)
-        qualname = getattr(func, "__qualname__", None)
-        if not module or not qualname:
-            raise ValueError("Function must be a module-level callable")
-        return f"{module}:{qualname}"
-
-    @staticmethod
-    def __locate_callable(func_path: str) -> Any:
-        """🔍 Locate a callable from a function path"""
-        try:
-            module_name, qualname = func_path.split(":", 1)
-        except ValueError as e:
-            raise ValueError(
-                f"Invalid function path format '{func_path}'. "
-                f"Expected format: 'module:qualname'. Error: {e}"
-            ) from e
-
-        try:
-            mod = __import__(module_name, fromlist=["*"])
-        except ImportError as e:
-            raise ImportError(
-                f"Failed to import module '{module_name}' from function path "
-                f"'{func_path}'. Error: {e}"
-            ) from e
-
-        obj: Any = mod
-        try:
-            attrs = qualname.split(".")
-            for attr in attrs:
-                if not hasattr(obj, attr):
-                    obj_name = (
-                        obj.__name__ if hasattr(obj, "__name__") else type(obj).__name__
-                    )
-                    raise AttributeError(
-                        f"Attribute '{attr}' not found in {obj_name} "
-                        f"when resolving function path '{func_path}'"
-                    )
-                obj = getattr(obj, attr)
-        except AttributeError as e:
-            # Re-raise with more context if it's our custom error, otherwise wrap it
-            if "when resolving function path" in str(e):
-                raise
-            raise AttributeError(
-                f"Failed to resolve attribute during traversal of "
-                f"'{func_path}'. Error: {e}"
-            ) from e
-
-        if not callable(obj):
-            raise ValueError(
-                f"Resolved object from '{func_path}' is not callable. "
-                f"Got type: {type(obj).__name__}"
-            )
-        return obj
 
     def background(self, func: Callable[P, R], *args: Any, **kwargs: Any) -> Task[R]:
         """
@@ -395,14 +406,14 @@ class TaskManager:
 
         # Create a promised future we will fulfill when the worker finishes
         promise: Future[R] = Future[R]()
-        start_time = perf_counter()
+        self.__last_activity_time = start_time = perf_counter()
 
         # Enqueue record
         task_id = self.__queue.enqueue(
+            func=func,
             executor=ExecutorType.THREAD,
             args=tuple[Any, ...](args or ()),
             kwargs=dict[str, Any](kwargs or {}),
-            func_path=self.__to_func_path(func),
         )
 
         # Track
@@ -447,9 +458,13 @@ class TaskManager:
         batch = Tasks[R]()
         iterator = tqdm(tasks, desc="Executing tasks") if show_progress else tasks
 
-        for func, args, kwargs in iterator:
-            task = self.background(func, *args, **kwargs)
-            batch._tasks.append(task)
+        try:
+            for func, args, kwargs in iterator:
+                task = self.background(func, *args, **kwargs)
+                batch._tasks.append(task)
+        except KeyboardInterrupt:
+            self.__handle_keyboard_interrupt()
+            raise
 
         return batch
 
@@ -502,37 +517,43 @@ class TaskManager:
         if not tasks:
             raise ValueError("Tasks list cannot be empty")
 
-        # Submit all tasks using threads
-        task_objects = []
-        for func, args, kwargs in tasks:
-            task = self.background(func, *args, **kwargs)
-            task_objects.append(task)
+        try:
+            # Submit all tasks using threads
+            task_objects = []
+            for func, args, kwargs in tasks:
+                task = self.background(func, *args, **kwargs)
+                task_objects.append(task)
 
-        # Wait for first completion
-        futures = [task.future for task in task_objects]
-        done, not_done = wait(futures, timeout=timeout, return_when="FIRST_COMPLETED")
+            # Wait for first completion
+            futures = [task.future for task in task_objects]
+            done, not_done = wait(futures, timeout=timeout, return_when="FIRST_COMPLETED")
 
-        if not done:
-            # Timeout occurred
-            if timeout:
-                raise TimeoutError(f"No task completed within {timeout} seconds")
+            if not done:
+                # Timeout occurred
+                if timeout:
+                    raise TimeoutError(f"No task completed within {timeout} seconds")
+                return Task(Future())
+
+            # Find the first successful task
+            for task in task_objects:
+                if task.future in done and task.is_successful:
+                    return task
+
+            # If no successful task, use preferred or last completed
+            if preferred_task_idx is not None and 0 <= preferred_task_idx < len(
+                task_objects
+            ):
+                return task_objects[preferred_task_idx]
+
+            # Return the first completed task (even if failed)
+            for task in task_objects:
+                if task.future in done:
+                    return task
+
             return Task(Future())
-
-        # Find the first successful task
-        for task in task_objects:
-            if task.future in done and task.is_successful:
-                return task
-
-        # If no successful task, use preferred or last completed
-        if preferred_task_idx is not None and 0 <= preferred_task_idx < len(task_objects):
-            return task_objects[preferred_task_idx]
-
-        # Return the first completed task (even if failed)
-        for task in task_objects:
-            if task.future in done:
-                return task
-
-        return Task(Future())
+        except KeyboardInterrupt:
+            self.__handle_keyboard_interrupt()
+            raise
 
     @staticmethod
     def await_async[R](awaitable: Awaitable[R]) -> R:
@@ -564,26 +585,52 @@ class TaskManager:
                 return
             self.__queue_worker_thread = Thread(
                 daemon=True,
-                name="TaskManager-QueueWorker",
+                name="Task Manager: Queue Worker",
                 target=self.__queue_worker_loop,
             )
             self.__queue_worker_thread.start()
 
     def __queue_worker_loop(self) -> None:
         """🔍 Queue worker loop"""
+        last_idle_check = perf_counter()
         while not self.__is_shutdown:
             try:
                 record = self.__queue.dequeue()
                 if record is None:
+                    # Check for idle shutdown every 0.5 seconds
+                    if perf_counter() - last_idle_check >= 0.5:
+                        last_idle_check = perf_counter()
+                        if self.__shutdown_if_idle() and self.__is_shutdown:
+                            break  # type: ignore[unreachable]
+
                     sleep(0.1)
                     continue
 
-                # Resolve callable
+                # Reset activity time when processing work
+                self.__last_activity_time = perf_counter()
+
+                # Submit to appropriate executor based on record.executor
                 try:
-                    func = self.__locate_callable(record.func_path)
-                except (ValueError, ImportError, AttributeError) as e:
-                    logger.warning(
-                        f"Failed to locate callable from path '{record.func_path}': {e}"
+                    if record.executor == ExecutorType.THREAD:
+                        fut = self.threads.submit_task(
+                            record.func, *record.args, **record.kwargs
+                        )
+                    elif record.executor == ExecutorType.PROCESS:
+                        fut = self.process.submit_task(
+                            record.func, *record.args, **record.kwargs
+                        )
+                    elif record.executor == ExecutorType.ASYNC:
+                        fut = self.asynchronous.submit_task(
+                            record.func, *record.args, **record.kwargs
+                        )
+                    else:
+                        raise ValueError(
+                            f"Unknown executor type: {record.executor} "
+                            f"for task {record.task_id}"
+                        )
+                except RuntimeError as e:
+                    logger.error(
+                        f"Failed to submit task '{record.func.__name__}' to executor: {e}"
                     )
                     # Mark task as failed and continue
                     with self.__tasks_lock:
@@ -593,68 +640,41 @@ class TaskManager:
                     self.__queue.complete(record.task_id)
                     continue
 
-                task_id = record.task_id
-
-                # Submit to appropriate executor based on record.executor
-                try:
-                    if record.executor == ExecutorType.THREAD:
-                        fut = self.threads.submit_task(
-                            func, *record.args, **record.kwargs
-                        )
-                    elif record.executor == ExecutorType.PROCESS:
-                        fut = self.process.submit_task(
-                            func, *record.args, **record.kwargs
-                        )
-                    elif record.executor == ExecutorType.ASYNC:
-                        fut = self.asynchronous.submit_task(
-                            func, *record.args, **record.kwargs
-                        )
-                    else:
-                        raise ValueError(
-                            f"Unknown executor type: {record.executor} for task {task_id}"
-                        )
-                except RuntimeError as e:
-                    logger.error(
-                        f"Failed to submit task '{record.func_path}' to executor: {e}"
-                    )
-                    # Mark task as failed and continue
-                    with self.__tasks_lock:
-                        promise = self.__pending_tasks.pop(task_id, None)
-                    if promise is not None:
-                        promise.set_exception(e)
-                    self.__queue.complete(task_id)
-                    continue
-
                 with self.__tasks_lock:
-                    self.__executing_tasks[task_id] = fut
+                    self.__executing_tasks[record.task_id] = fut
 
                 # Bridge result back to promise future
-                def _on_done(_f: Future[Any]) -> None:
+                task_id = record.task_id
+
+                def _on_done(_f: Future[Any], *, _task_id: str = task_id) -> None:
                     try:
                         result = _f.result()
                         with self.__tasks_lock:
-                            promise = self.__pending_tasks.pop(task_id, None)
+                            promise = self.__pending_tasks.pop(_task_id, None)
                         if promise is not None and not promise.done():
                             promise.set_result(result)
                     except Exception as e:  # noqa: BLE001
                         with self.__tasks_lock:
-                            promise = self.__pending_tasks.pop(task_id, None)
+                            promise = self.__pending_tasks.pop(_task_id, None)
                         if promise is not None and not promise.done():
                             promise.set_exception(e)
                     finally:
                         try:
-                            self.__queue.complete(task_id)
+                            self.__queue.complete(_task_id)
                         except Exception:
                             pass
                         with self.__tasks_lock:
-                            self.__active_tasks.pop(task_id, None)
-                            self.__executing_tasks.pop(task_id, None)
+                            self.__active_tasks.pop(_task_id, None)
+                            self.__executing_tasks.pop(_task_id, None)
 
                 fut.add_done_callback(_on_done)
 
             except Exception as e:
                 logger.debug(f"Queue worker error (ignored): {e}")
                 sleep(0.25)
+            except KeyboardInterrupt:
+                self.__handle_keyboard_interrupt()
+                break
 
     def cleanup_all(self, wait: bool = True, timeout: Optional[float] = None) -> None:
         """
@@ -672,12 +692,14 @@ class TaskManager:
 
         # Join monitoring thread
         if self.__global_monitor_thread and self.__global_monitor_thread.is_alive():
-            self.__global_monitor_thread.join(timeout=timeout or 1.0)
+            if self.__global_monitor_thread is not current_thread():
+                self.__global_monitor_thread.join(timeout=timeout or 1.0)
 
         # Join queue worker thread
         with self.__queue_lock:
             if self.__queue_worker_thread and self.__queue_worker_thread.is_alive():
-                self.__queue_worker_thread.join(timeout=timeout or 1.0)
+                if self.__queue_worker_thread is not current_thread():
+                    self.__queue_worker_thread.join(timeout=timeout or 1.0)
 
         # Cleanup all executors
         with self.__executors_lock:

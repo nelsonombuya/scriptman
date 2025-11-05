@@ -1,13 +1,22 @@
-"""
-######################################################################################
-##                                                                                  ##
-## #######  #######  #######  ######   ####### ########  ##   ##  #######  ###  ##  ##
-##                        ##    ##          ##    ##     ### ###       ##  #### ##  ##
-## #######  ##       #######    ##     #######    ##     #######  #######  ## ####  ##
-##      ##  ##       ##  ##     ##     ##         ##     ## # ##  ##   ##  ##  ###  ##
-## #######  #######  ##   ##  ######   ##         ##     ##   ##  ##   ##  ##   ##  ##
-##                                                                                  ##
-######################################################################################
+"""🦸‍♂️ Scriptman.
+
+Scriptman is a batteries-included automation toolkit for web automation, ETL,
+and workflow scheduling. Importing from the top-level package gives you:
+
+* **Task execution** – `TaskManager` coordinates background jobs, multithreaded
+  execution, and cooperative services.
+* **Service infrastructure** – simple decorators for registering long-lived
+  loops that integrate with TaskManager lifecycle management.
+* **Scheduling utilities** – interval, daily, and one-off triggers coupled with
+  a decorator-friendly scheduler façade.
+* **Quality-of-life helpers** – retry logic, cleanup primitives, serializers,
+  Selenium automation, and other conveniences used across Scriptman powers.
+
+The ``scriptman/docs`` directory (for example, the ETL quick-start and
+architecture guides) expands on these exports with deeper usage notes. Whether
+you are wiring cron-like jobs, exposing background services, or orchestrating
+data pipelines, importing from :mod:`scriptman` gives you the curated surface
+area needed to build and run automations quickly.
 """
 
 from loguru import logger
@@ -19,23 +28,31 @@ from scriptman.core.config import config
 from scriptman.powers.cleanup import CleanUp
 from scriptman.powers.generics import AsyncFunc, Func, P, R, SyncFunc, T
 from scriptman.powers.retry import retry
+from scriptman.powers.scheduler import IntervalTrigger
+from scriptman.powers.scheduler import Job as SchedulerJob
+from scriptman.powers.scheduler import (
+    OneTimeTrigger,
+    SchedulerService,
+    SchedulerTrigger,
+    TaskScheduler,
+    TimeOfDayTrigger,
+    scheduler,
+)
 from scriptman.powers.serializer import (
     SERIALIZE_FOR_CACHE,
     SERIALIZE_FOR_JSON,
     SERIALIZE_FOR_PICKLE,
     serialize,
 )
-from scriptman.powers.tasks import Task, TaskManager, Tasks
-from scriptman.powers.scheduler import (
-    IntervalTrigger,
-    OneTimeTrigger,
-    SchedulerService,
-    SchedulerTrigger,
-    TaskScheduler,
-    TimeOfDayTrigger,
+from scriptman.powers.service import (
+    ServiceCallable,
+    ServiceContext,
+    ServiceDefinition,
+    ServiceManager,
+    ServiceRegistry,
+    service_manager,
 )
-from scriptman.powers.scheduler import Job as SchedulerJob
-from scriptman.powers.service import ServiceDefinition, ServiceManager
+from scriptman.powers.tasks import Task, TaskManager, Tasks
 from scriptman.powers.time_calculator import TimeCalculator
 
 # Optional powers that depend on extra packages
@@ -192,12 +209,30 @@ __all__: list[str] = [
     "OneTimeTrigger",
     "SchedulerTrigger",
     "SchedulerService",
+    "scheduler",
     # Services
     "ServiceDefinition",
     "ServiceManager",
+    "ServiceContext",
+    "ServiceRegistry",
+    "ServiceCallable",
+    "service_manager",
     # Selenium
     "SeleniumInstance",
 ]
+
+# Scriptman insignia
+"""
+######################################################################################
+##                                                                                  ##
+## #######  #######  #######  ######   ####### ########  ##   ##  #######  ###  ##  ##
+##                        ##    ##          ##    ##     ### ###       ##  #### ##  ##
+## #######  ##       #######    ##     #######    ##     #######  #######  ## ####  ##
+##      ##  ##       ##  ##     ##     ##         ##     ## # ##  ##   ##  ##  ###  ##
+## #######  #######  ##   ##  ######   ##         ##     ##   ##  ##   ##  ##   ##  ##
+##                                                                                  ##
+######################################################################################
+"""
 
 # Add version info
 __version__ = config.version

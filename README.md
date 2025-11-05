@@ -1,16 +1,17 @@
 # Scriptman
 
-A powerful Python automation framework for web scraping, data processing, and task orchestration.
+Scriptman is a batteries-included Python automation toolkit that helps you build
+web automation, ETL pipelines, and scheduled workflows with minimal ceremony.
 
 ## Features
 
-- 🚀 **Selenium Automation**: Cross-platform browser automation with intelligent fallback mechanisms
-- 📊 **ETL Operations**: Extract, Transform, Load data processing with pandas integration
-- 🗄️ **Database Support**: Multi-database support with SQLAlchemy and pyodbc
-- ⏰ **Task Scheduling**: Advanced task scheduling and resource management
-- 🔄 **Retry Mechanisms**: Robust retry logic with exponential backoff
-- 🧹 **Cleanup Utilities**: Automatic cleanup of temporary files and caches
-- ⚙️ **Configuration Management**: Flexible configuration with TOML support
+- 🚀 **Selenium Automation** – Cross-platform browser automation with intelligent download handling
+- 📊 **ETL Operations** – Pandas-powered Extract/Transform/Load helpers for CSV, JSON, and databases
+- 🧠 **Task Manager & Services** – Cooperative services, multithreaded execution, and retry utilities
+- ⏰ **Scheduling** – Interval, daily, and one-off triggers with decorator-friendly APIs
+- 🗄️ **Database Support** – SQLAlchemy and pyodbc integrations out of the box
+- ⚙️ **Configuration** – Flexible TOML configuration with sensible defaults
+- 📚 **Documentation** – In-depth guides under [`scriptman/docs`](scriptman/docs)
 
 ## Quick Start
 
@@ -20,47 +21,80 @@ A powerful Python automation framework for web scraping, data processing, and ta
 pip install scriptman
 ```
 
-### Basic Usage
+### Hello Scriptman
+
+```python
+from datetime import timedelta
+
+from scriptman import TaskManager, scheduler
+
+manager = TaskManager()
+
+# Register a cooperative service loop
+def send_heartbeat() -> None: ...  # your implementation
+
+@manager.service(name="heartbeat", autostart=True)
+def heartbeat(ctx):
+    while not ctx.should_stop:
+        send_heartbeat()
+        if not ctx.sleep(60):  # exit early if shutdown requested
+            break
+
+# Schedule a periodic task
+@scheduler.schedule(trigger=scheduler.IntervalTrigger(timedelta(minutes=30)))
+def sync_remote_data():
+    ...  # your sync routine
+
+if __name__ == "__main__":
+    manager.start_service("heartbeat")
+```
+
+## Task Manager, Services & Scheduler
+
+```python
+from datetime import time
+
+from scriptman import TaskManager, scheduler
+
+manager = TaskManager()
+
+@manager.service(name="report-generator", autostart=True)
+def report_service(ctx):
+    while not ctx.should_stop:
+        generate_incremental_report()
+        if not ctx.sleep(300):
+            break
+
+@manager.service(name="summary", autostart=False)
+def summary_service(ctx):
+    generate_summary()
+
+@scheduler.schedule(trigger=scheduler.TimeOfDayTrigger(at=time(hour=21)))
+def nightly_rollup() -> None:
+    finalize_daily_metrics()
+
+manager.start_service("report-generator")
+```
+
+The scheduler proxy (`scriptman.scheduler`) is always available, even before a
+`TaskManager` is explicitly constructed, and the service proxy
+(`scriptman.service_manager`) lets you introspect currently registered services.
+
+## Selenium & Downloads
 
 ```python
 from scriptman.powers.selenium import SeleniumInstance
 
-# Initialize Selenium with automatic downloads directory
 selenium = SeleniumInstance()
-
-# Navigate to a website
 selenium.driver.get("https://example.com")
-
-# Download a file (will be saved to your system's Downloads folder)
-# ... download logic here ...
-
-# Wait for download to complete
-downloaded_file = selenium.wait_for_downloads_to_finish()
-print(f"File downloaded to: {downloaded_file}")
+selenium.interact_with_element("//button[@id='download']", mode="click")
+downloaded_file = selenium.wait_for_downloads_to_finish("report.pdf")
+print(f"Downloaded: {downloaded_file}")
 ```
 
-## Downloads Directory
-
-Scriptman automatically uses your system's default Downloads directory:
-
-- **Windows**: `C:\Users\<username>\Downloads` (with OneDrive fallback)
-- **macOS**: `/Users/<username>/Downloads`
-- **Linux**: `/home/<username>/Downloads`
-
-### Smart Download Handling
-
-Scriptman uses an intelligent download mechanism that:
-
-1. **Lets Chrome use its default download directory** (usually your Downloads folder)
-2. **Monitors for completed downloads** in Chrome's default location
-3. **Automatically moves files** to your configured downloads directory
-4. **Handles filename conflicts** by adding counters to duplicate names
-
-This approach prevents download issues that can occur when forcing Chrome to use a specific download directory.
-
-### Configuration
-
-You can customize the downloads directory in your configuration:
+Scriptman defaults to your system Downloads directory, automatically monitoring
+Chrome’s default location and relocating finished downloads. Override it in
+configuration if you need a custom path:
 
 ```toml
 # scriptman.toml
@@ -68,166 +102,46 @@ You can customize the downloads directory in your configuration:
 downloads_dir = "/path/to/custom/downloads"
 ```
 
-### File Organization
-
-- **Selenium Downloads**: Files downloaded through Selenium are saved to the configured directory
-- **Chrome/Selenium Files**: Browser executables are stored in `.selenium/chrome/` subdirectory
-- **Temporary Files**: Fallback to system temp directory if Downloads is not writable
-
-## Selenium Features
-
-### Cross-Platform Support
-
-Scriptman's Selenium implementation includes:
-
-- **Automatic Browser Management**: Downloads and manages Chrome/ChromeDriver
-- **Fallback Mechanisms**: Graceful handling of permission issues
-- **Headless Mode**: Optimized for server environments
-- **Download Monitoring**: Automatic detection and relocation of completed downloads
-
-### Example: Web Scraping
-
-```python
-from scriptman.powers.selenium import SeleniumInstance
-
-selenium = SeleniumInstance()
-
-# Navigate and interact
-selenium.driver.get("https://example.com")
-selenium.interact_with_element("//button[@id='download']", mode="click")
-
-# Wait for download and get file path
-file_path = selenium.wait_for_downloads_to_finish("report.pdf")
-print(f"Downloaded: {file_path}")
-```
-
-### Download Process Flow
-
-1. **Chrome downloads** to its default directory (usually Downloads)
-2. **Scriptman monitors** the default directory for new files
-3. **File detection** occurs when download completes
-4. **Automatic move** to configured directory
-5. **Filename conflict resolution** if needed
-6. **Return final path** in configured directory
-
-## ETL Operations
+## ETL & Data Pipelines
 
 ```python
 from scriptman.powers.etl import ETL
 
-# Load data from various sources
-data = ETL.from_csv("data.csv")
-data = ETL.from_json("data.json")
-data = ETL.from_db(database_handler, "SELECT * FROM table")
-
-# Transform data
-transformed = data.filter(lambda x: x['status'] == 'active')
-transformed = transformed.to_snake_case()
-
-# Save results
-transformed.to_csv("output.csv")
-transformed.to_db(database_handler, "output_table")
+etl = (
+    ETL.from_db(prod_db, "SELECT * FROM sales")
+    .transform(add_calculated_fields)
+    .to_db(warehouse_db, "sales_fact", method="upsert")
+)
 ```
 
-## Configuration
+Full ETL documentation—including architecture, examples, and API reference—lives
+under [`scriptman/docs/powers/etl`](scriptman/docs/powers/etl).
 
-Scriptman uses TOML configuration files:
+## Configuration Snapshot
 
 ```toml
 # scriptman.toml
 [scriptman]
-# Downloads directory (defaults to system Downloads folder)
+log_level = "INFO"
 downloads_dir = "~/Downloads"
 
-# Selenium settings
-selenium_optimizations = true
-selenium_headless = true
-selenium_local_mode = true
+[scriptman.selenium]
+headless = true
+local_mode = true
 
-# Logging
-log_level = "INFO"
-
-# Task settings
-concurrent = true
+[scriptman.tasks]
 retries = 3
 task_timeout = 30
 ```
 
-## Advanced Features
+## Documentation
 
-### Task Scheduling
-
-```python
-from datetime import time, timedelta
-
-from scriptman.powers.tasks import IntervalTrigger, TaskManager, TimeOfDayTrigger
-
-manager = TaskManager()
-scheduler = manager.scheduler
-
-# Schedule a daily task at 9:00
-scheduler.schedule_function(
-    task_function,
-    job_id="daily_report",
-    trigger=TimeOfDayTrigger(at=time(hour=9, minute=0)),
-)
-
-# Schedule a periodic task every 30 minutes
-scheduler.schedule_function(
-    sync_function,
-    job_id="data_sync",
-    trigger=IntervalTrigger(timedelta(minutes=30)),
-)
-```
-
-### Database Operations
-
-```python
-from scriptman.powers.database import DatabaseHandler
-
-# Connect to database
-db = DatabaseHandler(
-    connection_string="sqlite:///data.db"
-)
-
-# Execute queries
-results = db.execute_read_query("SELECT * FROM users")
-db.execute_write_query("INSERT INTO logs VALUES (?)", ["log_entry"])
-```
-
-### Cleanup Utilities
-
-```python
-from scriptman.powers.cleanup import CleanUp
-
-cleaner = CleanUp()
-
-# Clean up various resources
-cleaner.cleanup()  # General cleanup
-cleaner.selenium_cleanup()  # Selenium downloads
-cleaner.diskcache_cleanup()  # Cache files
-```
-
-## Development
-
-### Installation for Development
-
-```bash
-git clone <repository>
-cd scriptman
-pip install -e ".[dev]"
-```
-
-### Running Tests
-
-```bash
-pytest
-```
+Detailed guides and API references live in the [`scriptman/docs`](scriptman/docs)
+directory. Start with the module READMEs (e.g. the ETL quick-start) and keep an
+eye out for upcoming documentation on tasks, services, scheduler, Selenium, and
+database helpers.
 
 ## License
 
-[Add your license information here]
-
-## Contributing
-
-[Add contribution guidelines here]
+This project is licensed under the MIT License—see the [LICENSE](LICENSE) file
+for details.

@@ -4,6 +4,10 @@ version = "2.9.581"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+]
 authors = [
     { name = "Nelson Ombuya", email = "developer@incognitouser.anonaddy.me" },
 ]

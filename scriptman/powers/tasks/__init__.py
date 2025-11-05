@@ -1,7 +1,7 @@
 from concurrent.futures import Future, TimeoutError, wait
 from threading import Lock, Thread, current_thread
 from time import perf_counter, sleep
-from typing import Any, Awaitable, Callable, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional
 
 from loguru import logger
 from tqdm import tqdm
@@ -11,7 +11,25 @@ from scriptman.powers.generics import P, R
 from scriptman.powers.tasks._execution_manager import ExecutionManager, ExecutorType
 from scriptman.powers.tasks._models import Task, Tasks
 from scriptman.powers.tasks._queue_manager import QueueManager
+from scriptman.powers.tasks._scheduler_service import (
+    IntervalTrigger,
+    SchedulerService,
+    SchedulerTrigger,
+    TimeOfDayTrigger,
+)
+from scriptman.powers.tasks._service_manager import (
+    ServiceCallable,
+    ServiceContext,
+    ServiceDefinition,
+)
+from scriptman.powers.tasks._service_manager import ServiceManager as TaskServiceManager
+from scriptman.powers.tasks._service_manager import ServiceRegistry
+from scriptman.powers.tasks._task_scheduler import Job as SchedulerJob
+from scriptman.powers.tasks._task_scheduler import TaskScheduler
 from scriptman.powers.tasks._thread_executor import ThreadExecutor
+
+if TYPE_CHECKING:  # pragma: no cover - only used for typing
+    pass
 
 
 class TaskManager:
@@ -113,6 +131,15 @@ class TaskManager:
         self.__executors_lock: Lock = Lock()
         self.__monitoring: bool = False
 
+        # Services
+        self.__task_scheduler: Optional[TaskScheduler] = None
+        self.__service_manager: Optional[TaskServiceManager] = None
+        self.__scheduler_service: Optional[SchedulerService] = None
+        self.__service_definitions: dict[str, ServiceDefinition] = {}
+
+        if ServiceRegistry.has_queued():
+            self.__ensure_service_manager()
+
         self.__initialized = True
         logger.info("🎯 TaskManager initialized")
         self.__last_activity_time: float = perf_counter()
@@ -120,6 +147,7 @@ class TaskManager:
     @property
     def threads(self) -> ThreadExecutor:
         """⛓️ Get thread executor (lazy initialization)"""
+        self.__ensure_running()
         with self.__executors_lock:
             if self.__thread_executor is None:
                 self.__thread_executor = ThreadExecutor(
@@ -271,6 +299,65 @@ class TaskManager:
                 logger.debug(f"⚠️ Global monitoring error (ignored): {e}")
                 sleep(config.settings.get("tasks.monitor_interval", 5))
 
+    def __ensure_running(self) -> None:
+        if not self.__initialized:
+            return
+
+        should_restart = self.__is_shutdown
+        if not should_restart:
+            return
+
+        with self.__lock:
+            if self.__is_shutdown:
+                self.__restart_locked()
+
+    def __restart_locked(self) -> None:
+        logger.info("🔄 Restarting TaskManager after idle shutdown")
+        self.__queue_lock = Lock()
+        self.__tasks_lock = Lock()
+        self.__queue = QueueManager()
+        self.__active_tasks = {}
+        self.__pending_tasks = {}
+        self.__executing_tasks = {}
+        self.__queue_worker_thread = None
+        self.__global_monitor_thread = None
+        self.__monitoring = False
+
+        self.__thread_executor = None
+        self.__process_executor = None
+        self.__asynchronous_executor = None
+        self.__service_manager = None
+        self.__scheduler_service = None
+        self.__last_activity_time = perf_counter()
+        self.__is_shutdown = False
+
+        if self.__task_scheduler:
+            self.__task_scheduler.on_manager_restart()
+
+        if self.__service_definitions:
+            self.__ensure_service_manager(force=True)
+
+    def __ensure_service_manager(
+        self,
+        *,
+        force: bool = False,
+    ) -> Optional[TaskServiceManager]:
+        """Lazily instantiate the task service manager when needed."""
+
+        if self.__service_manager is None:
+            should_create = (
+                force or ServiceRegistry.has_queued() or bool(self.__service_definitions)
+            )
+            if should_create:
+                self.__service_manager = TaskServiceManager(self)
+                for definition in self.__service_definitions.values():
+                    if not self.__service_manager.has_service(definition.name):
+                        self.__service_manager.register(
+                            definition,
+                            start=definition.autostart,
+                        )
+        return self.__service_manager
+
     @classmethod
     def set_resource_percentage(cls, percentage: float) -> None:
         """
@@ -347,6 +434,9 @@ class TaskManager:
         if self.__is_shutdown or not self.__is_idle():
             return False
 
+        if self.__service_manager and self.__service_manager.has_running_services():
+            return False
+
         if self.__idle_timeout == 0:
             return True  # Immediate shutdown when idle
 
@@ -400,6 +490,7 @@ class TaskManager:
             task = manager.background(slow_function, "arg1", kwarg=123)
             result = task.await_result(timeout=30)  # Timeout when awaiting result
         """
+        self.__ensure_running()
         if self.__is_shutdown:
             logger.warning("TaskManager is shutting down, returning empty Task")
             return Task[R](Future[R]())
@@ -448,6 +539,7 @@ class TaskManager:
             ])
             results = batch.await_results()
         """
+        self.__ensure_running()
         if self.__is_shutdown:
             logger.warning("TaskManager is shutting down, returning empty Tasks")
             return Tasks[R]()
@@ -483,6 +575,7 @@ class TaskManager:
         Returns:
             Tasks: Container that manages all tasks together
         """
+        self.__ensure_running()
         return self.multithread(show_progress=show_progress, tasks=tasks)
 
     def race(
@@ -510,6 +603,7 @@ class TaskManager:
             ])
             result = winner.await_result()
         """
+        self.__ensure_running()
         if self.__is_shutdown:
             logger.warning("TaskManager is shutting down, returning empty Task")
             return Task(Future())
@@ -554,6 +648,136 @@ class TaskManager:
         except KeyboardInterrupt:
             self.__handle_keyboard_interrupt()
             raise
+
+    def register_service(
+        self,
+        name: str,
+        target: ServiceCallable,
+        *,
+        autostart: bool = True,
+        daemon: bool = False,
+        keep_alive: bool = True,
+        restart_delay: float = 5.0,
+    ) -> None:
+        """Register a long-running service loop with the task manager."""
+
+        self.__ensure_running()
+
+        definition = ServiceDefinition(
+            name=name,
+            target=target,
+            autostart=autostart,
+            daemon=daemon,
+            keep_alive=keep_alive,
+            restart_delay=restart_delay,
+        )
+
+        self.__service_definitions[name] = definition
+
+        if self.__service_manager is None:
+            try:
+                ServiceRegistry.queue(definition)
+            except ValueError:
+                pass
+            manager = self.__ensure_service_manager(force=True)
+            if definition.autostart and manager is not None:
+                return
+        else:
+            if not self.__service_manager.has_service(name):
+                self.__service_manager.register(definition)
+
+    def service(
+        self,
+        *,
+        name: Optional[str] = None,
+        autostart: bool = True,
+        daemon: bool = False,
+        keep_alive: bool = True,
+        restart_delay: float = 5.0,
+    ) -> Callable[[ServiceCallable], ServiceCallable]:
+        """Decorator for registering service loops."""
+
+        def decorator(func: ServiceCallable) -> ServiceCallable:
+            service_name = name or func.__name__
+            self.register_service(
+                service_name,
+                func,
+                autostart=autostart,
+                daemon=daemon,
+                keep_alive=keep_alive,
+                restart_delay=restart_delay,
+            )
+            return func
+
+        return decorator
+
+    def start_service(self, name: str) -> None:
+        self.__ensure_running()
+        manager = self.__ensure_service_manager()
+        if manager is None:
+            raise KeyError(f"Service '{name}' is not registered")
+        manager.start(name)
+
+    def start_services(self) -> None:
+        self.__ensure_running()
+        manager = self.__ensure_service_manager()
+        if manager is None:
+            return
+        manager.start_all()
+
+    def stop_service(self, name: str, *, timeout: Optional[float] = None) -> None:
+        self.__ensure_running()
+        manager = self.__service_manager
+        if manager is None:
+            return
+        manager.stop(name, timeout=timeout)
+
+    def stop_services(self, *, timeout: Optional[float] = None) -> None:
+        self.__ensure_running()
+        manager = self.__service_manager
+        if manager is None:
+            return
+        manager.stop_all(timeout=timeout)
+
+    def shutdown_services(
+        self,
+        *,
+        wait: bool = True,
+        timeout: Optional[float] = None,
+    ) -> None:
+        self.__ensure_running()
+        manager = self.__service_manager
+        if manager is None:
+            return
+        manager.shutdown(wait=wait, timeout=timeout)
+
+    def has_running_services(self) -> bool:
+        manager = self.__service_manager
+        if manager is None:
+            return False
+        return manager.has_running_services()
+
+    @property
+    def services(self) -> Optional[TaskServiceManager]:
+        """Access the underlying service manager if services are registered."""
+
+        self.__ensure_running()
+        return self.__ensure_service_manager()
+
+    def _get_scheduler_service(self) -> SchedulerService:
+        self.__ensure_running()
+        if self.__scheduler_service is None:
+            self.__scheduler_service = SchedulerService(self)
+        return self.__scheduler_service
+
+    @property
+    def scheduler(self) -> TaskScheduler:
+        """Public scheduling facade built on top of TaskManager services."""
+
+        self.__ensure_running()
+        if self.__task_scheduler is None:
+            self.__task_scheduler = TaskScheduler(self)
+        return self.__task_scheduler
 
     @staticmethod
     def await_async[R](awaitable: Awaitable[R]) -> R:
@@ -690,6 +914,10 @@ class TaskManager:
         self.__is_shutdown = True
         self.__monitoring = False
 
+        self.shutdown_services(wait=wait, timeout=timeout)
+        self.__service_manager = None
+        self.__scheduler_service = None
+
         # Join monitoring thread
         if self.__global_monitor_thread and self.__global_monitor_thread.is_alive():
             if self.__global_monitor_thread is not current_thread():
@@ -775,4 +1003,16 @@ class TaskManager:
                 pass
 
 
-__all__: list[str] = ["TaskManager", "Task", "Tasks"]
+__all__: list[str] = [
+    "TaskManager",
+    "Task",
+    "Tasks",
+    "ServiceContext",
+    "ServiceDefinition",
+    "SchedulerService",
+    "TaskScheduler",
+    "SchedulerJob",
+    "IntervalTrigger",
+    "TimeOfDayTrigger",
+    "SchedulerTrigger",
+]

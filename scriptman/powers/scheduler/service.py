@@ -1,11 +1,4 @@
-"""
-⚡ Internal scheduler backed by the task service infrastructure.
-
-This module provides a minimal scheduler service that allows components to
-schedule jobs to run at specific times or intervals. The scheduler is backed
-by the task service infrastructure, which allows it to integrate seamlessly
-with the task manager's lifecycle management.
-"""
+"""⚙️ Lightweight scheduler service managed by the TaskManager."""
 
 from __future__ import annotations
 
@@ -14,75 +7,26 @@ from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, tzinfo
 from threading import Event, RLock
 from time import monotonic
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import Any, Callable, Optional
 
 from loguru import logger
 
-from scriptman.powers.tasks._service_manager import ServiceContext
+from scriptman.powers.service import ServiceContext
 
-if TYPE_CHECKING:  # pragma: no cover - import for type checking only
-    from scriptman.powers.tasks import TaskManager
-
+from .host import SchedulerHost
+from .triggers import (
+    IntervalTrigger,
+    OneTimeTrigger,
+    SchedulerTrigger,
+    TimeOfDayTrigger,
+)
 
 SchedulerCallable = Callable[..., Any]
 
 
-class SchedulerTrigger:
-    """Interface for scheduler triggers."""
-
-    def next_run(self, previous: Optional[datetime]) -> datetime:
-        raise NotImplementedError  # pragma: no cover - interface method
-
-
-class IntervalTrigger(SchedulerTrigger):
-    """Run jobs on a fixed interval."""
-
-    def __init__(self, interval: timedelta) -> None:
-        if interval.total_seconds() <= 0:
-            raise ValueError("Interval must be greater than zero")
-        self._interval = interval
-
-    def next_run(self, previous: Optional[datetime]) -> datetime:
-        base = previous or datetime.now()
-        return base + self._interval
-
-    @property
-    def interval(self) -> timedelta:
-        return self._interval
-
-
-class TimeOfDayTrigger(SchedulerTrigger):
-    """Run jobs once per day at a specific time of day."""
-
-    def __init__(self, *, at: time, timezone: Optional[tzinfo] = None) -> None:
-        self._time = at
-        self._timezone = timezone
-
-    def next_run(self, previous: Optional[datetime]) -> datetime:
-        now = datetime.now(tz=self._timezone)
-        candidate = now.replace(
-            hour=self._time.hour,
-            minute=self._time.minute,
-            second=self._time.second,
-            microsecond=self._time.microsecond,
-        )
-
-        if candidate <= now:
-            candidate += timedelta(days=1)
-        return candidate
-
-    @property
-    def time_of_day(self) -> time:
-        return self._time
-
-    @property
-    def timezone(self) -> Optional[tzinfo]:
-        return self._timezone
-
-
 @dataclass(slots=True)
 class ScheduledJob:
-    """Internal job representation for the scheduler service."""
+    """🗂 Internal job representation used by the scheduler service."""
 
     id: str
     func: SchedulerCallable
@@ -100,28 +44,20 @@ class ScheduledJob:
 
 
 class SchedulerService:
-    """
-    ⚡ Minimal scheduler driven by ``TaskManager`` services.
-
-    This module provides a minimal scheduler service that allows components to
-    schedule jobs to run at specific times or intervals. The scheduler is backed
-    by the task service infrastructure, which allows it to integrate seamlessly
-    with the task manager's lifecycle management.
-    """
+    """⚙️ Scheduler loop that dispatches jobs through the TaskManager."""
 
     _SERVICE_NAME = "task-scheduler-service"
 
-    def __init__(self, task_manager: "TaskManager") -> None:
-        from scriptman.powers.tasks import TaskManager  # Local import to avoid circular
-
-        if not isinstance(task_manager, TaskManager):  # pragma: no cover - sanity check
-            raise TypeError("SchedulerService requires a TaskManager instance")
-
-        self._task_manager = task_manager
+    def __init__(self, host: SchedulerHost) -> None:
+        self._host = host
         self._jobs: dict[str, ScheduledJob] = {}
         self._lock = RLock()
         self._wake_event = Event()
         self._service_registered = False
+
+    # ------------------------------------------------------------------
+    # Public registration API
+    # ------------------------------------------------------------------
 
     def add_interval_job(
         self,
@@ -134,6 +70,21 @@ class SchedulerService:
         max_instances: int = 1,
         enabled: bool = True,
     ) -> ScheduledJob:
+        """♻️ Add a job that repeats on a fixed interval.
+
+        Args:
+            func: Callable executed on each run.
+            job_id: Unique job identifier.
+            every: Interval between executions.
+            args: Positional arguments passed to ``func``.
+            kwargs: Keyword arguments passed to ``func``.
+            max_instances: Maximum concurrent executions allowed.
+            enabled: Whether the job should be active immediately.
+
+        Returns:
+            The registered :class:`ScheduledJob` snapshot.
+        """
+
         trigger = IntervalTrigger(every)
         job = ScheduledJob(
             id=job_id,
@@ -159,6 +110,22 @@ class SchedulerService:
         max_instances: int = 1,
         enabled: bool = True,
     ) -> ScheduledJob:
+        """🌞 Add a job that runs every day at the given time.
+
+        Args:
+            func: Callable executed when the trigger fires.
+            job_id: Unique job identifier.
+            at: Time-of-day to invoke the job.
+            timezone: Optional timezone for evaluation.
+            args: Positional arguments passed to ``func``.
+            kwargs: Keyword arguments passed to ``func``.
+            max_instances: Maximum concurrent executions allowed.
+            enabled: Whether the job should be active immediately.
+
+        Returns:
+            The registered :class:`ScheduledJob` snapshot.
+        """
+
         trigger = TimeOfDayTrigger(at=at, timezone=timezone)
         job = ScheduledJob(
             id=job_id,
@@ -167,6 +134,43 @@ class SchedulerService:
             args=args or tuple(),
             kwargs=kwargs or {},
             max_instances=max_instances,
+            enabled=enabled,
+            next_run=trigger.next_run(None),
+        )
+        return self._add_job(job)
+
+    def add_one_time_job(
+        self,
+        func: SchedulerCallable,
+        *,
+        job_id: str,
+        run_at: datetime,
+        args: Optional[tuple[Any, ...]] = None,
+        kwargs: Optional[dict[str, Any]] = None,
+        enabled: bool = True,
+    ) -> ScheduledJob:
+        """🎯 Add a job that should run only once at a specific datetime.
+
+        Args:
+            func: Callable executed at ``run_at``.
+            job_id: Unique job identifier.
+            run_at: Exact :class:`datetime` for the single execution.
+            args: Positional arguments passed to ``func``.
+            kwargs: Keyword arguments passed to ``func``.
+            enabled: Whether the job should be active immediately.
+
+        Returns:
+            The registered :class:`ScheduledJob` snapshot.
+        """
+
+        trigger = OneTimeTrigger(run_at=run_at)
+        job = ScheduledJob(
+            id=job_id,
+            func=func,
+            trigger=trigger,
+            args=args or tuple(),
+            kwargs=kwargs or {},
+            max_instances=1,
             enabled=enabled,
             next_run=trigger.next_run(None),
         )
@@ -181,10 +185,22 @@ class SchedulerService:
         return removed
 
     def list_jobs(self) -> list[ScheduledJob]:
+        """📋 Return copies of all scheduled jobs."""
+
         with self._lock:
             return [deepcopy(job) for job in self._jobs.values()]
 
     def set_job_enabled(self, job_id: str, enabled: bool) -> bool:
+        """🔔 Enable or disable a job.
+
+        Args:
+            job_id: Identifier of the job to modify.
+            enabled: Desired enabled state.
+
+        Returns:
+            ``True`` if the job exists and was updated, otherwise ``False``.
+        """
+
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
@@ -197,6 +213,16 @@ class SchedulerService:
             return True
 
     def update_job_trigger(self, job_id: str, trigger: SchedulerTrigger) -> bool:
+        """🔄 Replace a job's trigger.
+
+        Args:
+            job_id: Identifier of the job to modify.
+            trigger: New trigger controlling execution schedule.
+
+        Returns:
+            ``True`` if the job exists and the trigger was replaced.
+        """
+
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
@@ -208,6 +234,8 @@ class SchedulerService:
             return True
 
     def get_job(self, job_id: str) -> Optional[ScheduledJob]:
+        """🔍 Retrieve a copy of the registered job metadata."""
+
         with self._lock:
             job = self._jobs.get(job_id)
             return deepcopy(job) if job else None
@@ -217,6 +245,8 @@ class SchedulerService:
     # ------------------------------------------------------------------
 
     def _add_job(self, job: ScheduledJob) -> ScheduledJob:
+        """🧾 Register the job and ensure the service loop is active."""
+
         with self._lock:
             if job.id in self._jobs:
                 raise ValueError(f"Job '{job.id}' is already registered")
@@ -230,29 +260,34 @@ class SchedulerService:
         return job
 
     def _ensure_service_registered(self) -> None:
+        """🛎️ Ensure the background service loop is ready to dispatch jobs."""
+
         if self._service_registered:
             return
         try:
-            self._task_manager.register_service(
+            self._host.register_service(
                 self._SERVICE_NAME,
                 self._service_loop,
                 autostart=True,
                 daemon=False,
-                keep_alive=True,
+                keepalive=True,
                 restart_delay=1.0,
             )
         except ValueError:
-            # Service may already be registered; swallow duplicate registration
             logger.debug("Scheduler service already registered")
         finally:
             self._service_registered = True
             self._wake_event.set()
 
     def _service_loop(self, context: ServiceContext) -> None:
+        """🔁 Background loop dispatching jobs according to triggers."""
+
         logger.info("Scheduler service loop started")
 
         try:
-            while not context.should_stop:
+            while True:
+                if context.should_stop:
+                    break
                 job_id, wait_time = self._next_job()
 
                 if job_id is None:
@@ -260,25 +295,21 @@ class SchedulerService:
                         break
                     continue
 
-                if wait_time > 0:
-                    if not self._wait(context, wait_time):
-                        break
-
-                if context.should_stop:
-                    break  # type:ignore[unreachable] # pragma: no cover
+                if wait_time > 0 and not self._wait(context, wait_time):
+                    break
 
                 dispatched = self._dispatch(job_id)
-                if not dispatched:
-                    # We reached max instances; wait a little before retrying
-                    if not self._wait(context, 0.5):
-                        break
+                if not dispatched and not self._wait(context, 0.5):
+                    break
 
-        except Exception as exc:  # noqa: BLE001 - service loops must be resilient
+        except Exception as exc:  # noqa: BLE001
             logger.exception(f"Scheduler service encountered an error: {exc}")
         finally:
             logger.info("Scheduler service loop exiting")
 
     def _next_job(self) -> tuple[Optional[str], float]:
+        """⏭ Determine the next job to run plus wait duration."""
+
         with self._lock:
             enabled_jobs = [item for item in self._jobs.items() if item[1].enabled]
             if not enabled_jobs:
@@ -291,22 +322,23 @@ class SchedulerService:
         return job_id, wait
 
     def _dispatch(self, job_id: str) -> bool:
+        """🚀 Submit the job to the TaskManager for execution."""
+
         with self._lock:
             job = self._jobs.get(job_id)
-            if job is None:
-                return False
-
-            if not job.enabled or job.running >= job.max_instances:
+            if job is None or not job.enabled or job.running >= job.max_instances:
                 return False
 
             scheduled_time = job.next_run
             job.running += 1
+            if isinstance(job.trigger, OneTimeTrigger):
+                job.enabled = False
             job.next_run = job.trigger.next_run(scheduled_time)
             args = job.args
             kwargs = job.kwargs
             func = job.func
 
-        task = self._task_manager.background(func, *args, **kwargs)
+        task = self._host.background(func, *args, **kwargs)
 
         def _on_complete(_future: Any, *, _job_id: str = job_id) -> None:
             self._decrement_running(_job_id)
@@ -320,6 +352,8 @@ class SchedulerService:
         return True
 
     def _decrement_running(self, job_id: str) -> None:
+        """🧮 Reduce the running counter once a job completes."""
+
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
@@ -329,6 +363,8 @@ class SchedulerService:
         self._wake_event.set()
 
     def _wait(self, context: ServiceContext, seconds: float) -> bool:
+        """⏳ Sleep cooperatively until the next job needs dispatching."""
+
         if seconds <= 0:
             return not context.should_stop
 
@@ -351,15 +387,15 @@ class SchedulerService:
         return not context.should_stop
 
     def _now_for_job(self, job: ScheduledJob) -> datetime:
+        """🕰 Resolve the current time for the job's timezone."""
+
         tz = job.next_run.tzinfo
         return datetime.now(tz=tz) if tz else datetime.now()
 
 
-__all__: list[str] = [
+__all__ = [
     "SchedulerCallable",
     "SchedulerService",
     "ScheduledJob",
-    "IntervalTrigger",
-    "TimeOfDayTrigger",
-    "SchedulerTrigger",
 ]
+

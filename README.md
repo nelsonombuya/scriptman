@@ -158,23 +158,25 @@ task_timeout = 30
 ### Task Scheduling
 
 ```python
-from scriptman.powers.scheduler import TaskScheduler
+from datetime import time, timedelta
 
-scheduler = TaskScheduler()
+from scriptman.powers.tasks import IntervalTrigger, TaskManager, TimeOfDayTrigger
 
-# Schedule a daily task
-scheduler.add_daily_task(
-    "daily_report",
+manager = TaskManager()
+scheduler = manager.scheduler
+
+# Schedule a daily task at 9:00
+scheduler.schedule_function(
     task_function,
-    hour=9,
-    minute=0
+    job_id="daily_report",
+    trigger=TimeOfDayTrigger(at=time(hour=9, minute=0)),
 )
 
-# Schedule a periodic task
-scheduler.add_periodic_task(
-    "data_sync",
+# Schedule a periodic task every 30 minutes
+scheduler.schedule_function(
     sync_function,
-    interval_minutes=30
+    job_id="data_sync",
+    trigger=IntervalTrigger(timedelta(minutes=30)),
 )
 ```
 

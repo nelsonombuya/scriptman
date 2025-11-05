@@ -21,6 +21,7 @@ dist
 .qodo
 .logs
 .cache
+htmlcov
 .selenium
 .downloads
 __pycache__

@@ -26,6 +26,16 @@ from scriptman.powers.serializer import (
     serialize,
 )
 from scriptman.powers.tasks import Task, TaskManager, Tasks
+from scriptman.powers.scheduler import (
+    IntervalTrigger,
+    OneTimeTrigger,
+    SchedulerService,
+    SchedulerTrigger,
+    TaskScheduler,
+    TimeOfDayTrigger,
+)
+from scriptman.powers.scheduler import Job as SchedulerJob
+from scriptman.powers.service import ServiceDefinition, ServiceManager
 from scriptman.powers.time_calculator import TimeCalculator
 
 # Optional powers that depend on extra packages
@@ -111,19 +121,6 @@ except ImportError as e:
 
 
 """
-Scheduler powers
-"""
-try:
-    from scriptman.powers.scheduler import Scheduler, scheduler
-except ImportError as e:
-    logger.warning(
-        "Scriptman Scheduler Powers are unavailable. "
-        "You may install them with `pip install scriptman[scheduler]`"
-    )
-    logger.debug(f"Scheduler Powers Import Error: {e}")
-
-
-"""
 Selenium powers
 """
 try:
@@ -188,8 +185,16 @@ __all__: list[str] = [
     # ETL
     "ETL",
     # Scheduler
-    "scheduler",
-    "Scheduler",
+    "TaskScheduler",
+    "SchedulerJob",
+    "IntervalTrigger",
+    "TimeOfDayTrigger",
+    "OneTimeTrigger",
+    "SchedulerTrigger",
+    "SchedulerService",
+    # Services
+    "ServiceDefinition",
+    "ServiceManager",
     # Selenium
     "SeleniumInstance",
 ]

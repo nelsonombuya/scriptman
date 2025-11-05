@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from threading import Event, RLock, Thread
 from time import monotonic
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from loguru import logger
 
@@ -72,6 +72,7 @@ class ServiceContext:
         name: str,
     ) -> None:
         """🔍 Initialize the service context."""
+
         self._task_manager = task_manager
         self._stop_event = stop_event
         self.name = name
@@ -79,16 +80,19 @@ class ServiceContext:
     @property
     def task_manager(self) -> "TaskManager":
         """🔍 Reference back to the owning ``TaskManager`` instance."""
+
         return self._task_manager
 
     @property
     def stop_event(self) -> Event:
         """🔔 Event that is signalled when the service should terminate."""
+
         return self._stop_event
 
     @property
     def should_stop(self) -> bool:
         """🔔 Whether the service has been asked to stop."""
+
         return self._stop_event.is_set()
 
     def sleep(self, seconds: float) -> bool:
@@ -96,12 +100,13 @@ class ServiceContext:
         ⏳ Sleep cooperatively until ``seconds`` elapse or a stop is requested.
 
         Args:
-            seconds: The number of seconds to sleep
+            seconds: The number of seconds to sleep.
 
         Returns:
             ``True`` if the service should continue running after the delay,
             or ``False`` if the stop event was triggered while waiting.
         """
+
         return not self._stop_event.wait(timeout=max(0.0, seconds))
 
 
@@ -114,8 +119,8 @@ class ServiceRegistry:
     @classmethod
     def queue(cls, definition: ServiceDefinition) -> None:
         """🔄 Queue a service registration."""
+
         with cls._lock:
-            # Ensure uniqueness by service name within the queued list
             if any(d.name == definition.name for d in cls._queued):
                 raise ValueError(f"Service '{definition.name}' already queued")
             cls._queued.append(definition)
@@ -124,6 +129,7 @@ class ServiceRegistry:
     @classmethod
     def drain(cls) -> list[ServiceDefinition]:
         """🔄 Drain the service registration queue."""
+
         with cls._lock:
             queued = cls._queued[:]
             cls._queued.clear()
@@ -132,6 +138,7 @@ class ServiceRegistry:
     @classmethod
     def has_queued(cls) -> bool:
         """🔔 Whether there are any services queued for registration."""
+
         with cls._lock:
             return bool(cls._queued)
 
@@ -141,6 +148,7 @@ class ServiceManager:
 
     def __init__(self, task_manager: "TaskManager") -> None:
         """🔄 Initialize the service manager."""
+
         self._lock = RLock()
         self._shutdown = False
         self._task_manager = task_manager
@@ -150,18 +158,13 @@ class ServiceManager:
         for definition in queued:
             self._register_internal(definition)
 
-        # Autostart any queued services immediately
         for definition in queued:
             if definition.autostart:
                 self.start(definition.name)
 
     def _register_internal(self, definition: ServiceDefinition) -> ServiceRuntime:
-        """
-        🔄 Register a service internally.
+        """🔄 Register a service internally."""
 
-        Args:
-            definition: The service definition
-        """
         with self._lock:
             if self._shutdown:
                 raise RuntimeError("Cannot register services after shutdown")
@@ -178,33 +181,22 @@ class ServiceManager:
         *,
         start: Optional[bool] = None,
     ) -> None:
-        """
-        🔄 Register a service with the service manager.
+        """🔄 Register a service with the service manager."""
 
-        Args:
-            definition: The service definition
-            start: Whether to start the service immediately
-        """
-        if definition.autostart if start is None else start:
-            self.start(self._register_internal(definition).definition.name)
+        runtime = self._register_internal(definition)
+        autostart = definition.autostart if start is None else start
+        if autostart:
+            self.start(runtime.definition.name)
 
     def has_service(self, name: str) -> bool:
-        """
-        🔔 Whether the service is registered.
+        """🔔 Whether the service is registered."""
 
-        Args:
-            name: The name of the service
-        """
         with self._lock:
             return name in self._services
 
     def start(self, name: str) -> None:
-        """
-        🔄 Start a service.
+        """🔄 Start a service."""
 
-        Args:
-            name: The name of the service
-        """
         runtime = self._services.get(name)
         if runtime is None:
             raise KeyError(f"Service '{name}' is not registered")
@@ -226,13 +218,8 @@ class ServiceManager:
             logger.info(f"🔔 Service '{name}' started")
 
     def stop(self, name: str, *, timeout: Optional[float] = None) -> None:
-        """
-        🔄 Stop a service.
+        """🔄 Stop a service."""
 
-        Args:
-            name: The name of the service
-            timeout: The timeout in seconds to wait for the service to stop
-        """
         runtime = self._services.get(name)
         if runtime is None:
             raise KeyError(f"Service '{name}' is not registered")
@@ -253,9 +240,8 @@ class ServiceManager:
             runtime.thread = None
 
     def start_all(self) -> None:
-        """
-        🔄 Start all registered services.
-        """
+        """🔄 Start all registered services."""
+
         for name in list(self._services.keys()):
             try:
                 self.start(name)
@@ -263,12 +249,8 @@ class ServiceManager:
                 logger.exception(f"Failed to start service '{name}'")
 
     def stop_all(self, *, timeout: Optional[float] = None) -> None:
-        """
-        🔄 Stop all registered services.
+        """🔄 Stop all registered services."""
 
-        Args:
-            timeout: The timeout in seconds to wait for the services to stop
-        """
         for name in list(self._services.keys()):
             try:
                 self.stop(name, timeout=timeout)
@@ -276,13 +258,8 @@ class ServiceManager:
                 logger.exception(f"Failed to stop service '{name}'")
 
     def shutdown(self, *, wait: bool = True, timeout: Optional[float] = None) -> None:
-        """
-        🔄 Shutdown the service manager.
+        """🔄 Shutdown the service manager."""
 
-        Args:
-            wait: Whether to wait for the services to stop
-            timeout: The timeout in seconds to wait for the services to stop
-        """
         with self._lock:
             self._shutdown = True
 
@@ -290,21 +267,16 @@ class ServiceManager:
         logger.debug("Service manager shutdown complete")
 
     def has_running_services(self) -> bool:
-        """
-        🔔 Whether there are any running services.
-        """
+        """🔔 Whether there are any running services."""
+
         return any(
             runtime.thread and runtime.thread.is_alive()
             for runtime in self._services.values()
         )
 
     def _run_service(self, runtime: ServiceRuntime) -> None:
-        """
-        🔄 Run a service.
+        """🔄 Run a service."""
 
-        Args:
-            runtime: The service runtime
-        """
         name = runtime.definition.name
         context = ServiceContext(
             task_manager=self._task_manager,
@@ -338,10 +310,30 @@ class ServiceManager:
             runtime.thread = None
 
 
-__all__: list[str] = [
+class _ServiceManagerProxy:
+    """🧲 Proxy that delegates to ``TaskManager().services``."""
+
+    def _resolve(self) -> ServiceManager | None:
+        return TaskManager().services
+
+    def __getattr__(self, item: str) -> Any:  # pragma: no cover - delegation only
+        manager = self._resolve()
+        if manager is None:
+            raise AttributeError("Service manager has not been initialised yet")
+        return getattr(manager, item)
+
+    def __bool__(self) -> bool:  # pragma: no cover - simple helper
+        return self._resolve() is not None
+
+
+service_manager = _ServiceManagerProxy()
+
+
+__all__ = [
     "ServiceCallable",
     "ServiceContext",
     "ServiceDefinition",
     "ServiceManager",
     "ServiceRegistry",
+    "service_manager",
 ]

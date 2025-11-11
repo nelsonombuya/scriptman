@@ -3,8 +3,6 @@ from argparse import ArgumentParser
 from traceback import format_exc
 from typing import Optional
 
-from loguru import logger
-
 from scriptman.core.cli._api import APISubParser
 from scriptman.core.cli._cleanup import CleanUpSubParser
 from scriptman.core.cli._config import ConfigSubParser
@@ -49,6 +47,7 @@ class CLI:
             description="ScriptMan: Flexible Script Management Tool",
             epilog="Run scripts with advanced configuration options.",
         )
+        parser.set_defaults(action="general")
         subparsers = parser.add_subparsers(
             dest="action",
             help="Action to perform",
@@ -76,11 +75,10 @@ class CLI:
         Returns:
             int: Exit code (0 for success, non-zero for failure)
         """
-        args = self._create_parser().parse_args(argv or sys.argv[1:])
-
         try:
+            args = self._create_parser().parse_args(argv or sys.argv[1:])
             return self.commands.get(args.action, self.commands["general"]).process(args)
         except Exception as e:
-            logger.error(f"❌ CLI execution error: {e.__class__.__name__}: {e}")
-            logger.debug(f"🔍 Stacktrace:\n{format_exc()}")
+            print(f"❌ CLI execution error: {e.__class__.__name__}: {e}")
+            print(f"🔍 Stacktrace:\n{format_exc()}")
             return 1

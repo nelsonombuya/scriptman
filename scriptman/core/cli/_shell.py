@@ -1,6 +1,6 @@
 import platform
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from loguru import logger
 
@@ -78,6 +78,44 @@ Write-Host "Deactivating virtual environment..."
 deactivate
 """
 
+    DIRECT_BATCH_TEMPLATE = """
+@echo off
+set "SCRIPT_DIR=%~dp0"
+set "PYTHON_EXE=%SCRIPT_DIR%\\{venv_name}\\Scripts\\python.exe"
+
+if not exist "%PYTHON_EXE%" (
+    echo Virtual environment python not found at %PYTHON_EXE%
+    exit /b 1
+)
+
+"%PYTHON_EXE%" -m scriptman %*
+"""
+
+    DIRECT_SHELL_TEMPLATE = """
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PYTHON_EXE="$SCRIPT_DIR/{venv_name}/bin/python"
+
+if [ ! -f "$PYTHON_EXE" ]; then
+    echo "Virtual environment python not found at $PYTHON_EXE"
+    exit 1
+fi
+
+"$PYTHON_EXE" -m scriptman "$@"
+"""
+
+    DIRECT_POWERSHELL_TEMPLATE = """
+$ROOT_DIR = $PSScriptRoot
+$PYTHON_EXE = "$ROOT_DIR\\{venv_name}\\Scripts\\python.exe"
+
+if (-Not (Test-Path $PYTHON_EXE)) {{
+    Write-Error "Virtual environment python not found at $PYTHON_EXE"
+    exit 1
+}}
+
+& $PYTHON_EXE -m scriptman @args
+"""
+
     @classmethod
     def get_script_templates(cls) -> dict[str, str]:
         """
@@ -92,6 +130,16 @@ deactivate
             "windows": cls.BATCH_TEMPLATE,
             "darwin": cls.SHELL_TEMPLATE,  # macOS uses the same shell script as Linux
             "linux": cls.SHELL_TEMPLATE,
+        }
+
+    @classmethod
+    def get_direct_templates(cls) -> dict[str, str]:
+        """Return templates that run scriptman directly without activation."""
+        return {
+            "windows_powershell": cls.DIRECT_POWERSHELL_TEMPLATE,
+            "windows": cls.DIRECT_BATCH_TEMPLATE,
+            "darwin": cls.DIRECT_SHELL_TEMPLATE,
+            "linux": cls.DIRECT_SHELL_TEMPLATE,
         }
 
     @staticmethod
@@ -129,6 +177,7 @@ deactivate
         cls,
         relative_venv_path: str = ".venv",
         platform_type: Optional[str] = None,
+        mode: Literal["activate", "direct"] = "activate",
     ) -> str:
         """
         Generates a runner script for the specified platform that activates a virtual
@@ -139,6 +188,11 @@ deactivate
                 project root.
             platform_type (Optional[str]): The platform to generate the script for. If
                 None, uses the current platform.
+            mode (Literal["activate", "direct"]): The mode to generate the script for.
+                If "activate", generates a script that activates a virtual environment
+                and runs scriptman with the provided arguments. If "direct", generates a
+                script that runs scriptman directly without activating a virtual
+                environment.
 
         Returns:
             str: The generated script content
@@ -147,7 +201,9 @@ deactivate
         if platform_type is None:
             platform_type = cls.get_platform_type()
 
-        templates = cls.get_script_templates()
+        templates = (
+            cls.get_direct_templates() if mode == "direct" else cls.get_script_templates()
+        )
 
         if platform_type == "windows" and platform_type in templates:
             return templates[platform_type].format(venv_name=relative_venv_path)
@@ -166,6 +222,7 @@ deactivate
         platform_type: Optional[str] = None,
         relative_venv_path: str = ".venv",
         filename: str = "scriptman",
+        mode: Literal["activate", "direct"] = "activate",
     ) -> None:
         """
         Writes the generated script content to a file.
@@ -174,6 +231,7 @@ deactivate
             script_content = cls.generate_runner_script(
                 relative_venv_path=relative_venv_path,
                 platform_type=platform_type,
+                mode=mode,
             )
 
         if platform_type is None:

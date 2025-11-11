@@ -9,6 +9,8 @@ from tomlkit.items import Table
 from scriptman.core.config._file_handler import FileHandler
 from scriptman.core.config._manager import ConfigManager
 
+# TODO: Test the config changes
+
 
 class TomlHandler(FileHandler):
     """📄 Handler for TOML file format."""
@@ -119,6 +121,19 @@ class TOMLConfigManager(ConfigManager[dict[str, Any]]):
         # Set the final value
         current[parts[-1]] = value
 
+    def _delete_nested_value(self, data: dict[str, Any], key: str) -> None:
+        """
+        Remove a value in a nested dictionary structure based on dot notation.
+        """
+        parts = key.split(".")
+        current = data
+        for part in parts[:-1]:
+            node = current.get(part)
+            if not isinstance(node, dict):
+                return
+            current = node
+        current.pop(parts[-1], None)
+
     def _remove_from_file(self, key: str) -> None:
         """🗑️ Remove configuration from TOML file."""
         try:
@@ -127,12 +142,10 @@ class TOMLConfigManager(ConfigManager[dict[str, Any]]):
 
                 if self.section:
                     section_data = self.get_section_data(data)
-                    if key in section_data:
-                        del section_data[key]
+                    self._delete_nested_value(section_data, key)
                     data = self.update_section_data(data, section_data)
                 else:
-                    if key in data:
-                        del data[key]
+                    self._delete_nested_value(data, key)
 
                 self.file_handler.write(self.file_path, data)
         except Exception as e:

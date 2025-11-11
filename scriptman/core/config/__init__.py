@@ -2,10 +2,10 @@ from os import getcwd
 from pathlib import Path
 from subprocess import run
 from sys import stdout
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Optional
 
 from loguru import logger
-from pydantic import ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from scriptman.core._version import Version
 from scriptman.core.config._defaults import ConfigModel
@@ -42,8 +42,6 @@ class Config:
 
         self.__version = version
         self.__cwd = Path(getcwd())
-        self.__on_failure_callback: Optional[Callable[[Exception], None]] = None
-
         # Initialize config managers
         config_file = self._get_config_file_path()
         secrets_file = self._get_secrets_file_path()
@@ -122,11 +120,14 @@ class Config:
         """
         for field_name, field in ConfigModel.model_fields.items():
             if field_name not in self.__settings:
-                self.__settings[field_name] = field.default
+                default_value = field.get_default()
+                if isinstance(default_value, BaseModel):
+                    default_value = default_value.model_dump()
+                self.__settings[field_name] = default_value
 
     def _initialize_logging(self) -> None:
         """📝 Initialize logging for the CLI handler."""
-        logger.remove()  # FIXME: Logging before the handler is removed
+        logger.remove()
         log_level = str(self.settings.get("log_level", "INFO"))
 
         # Console Handler
@@ -145,7 +146,7 @@ class Config:
             level=log_level,
             rotation="1 day",
             compression="zip",
-            retention="2 weeks",
+            retention="1 week",
             format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
         )
 
@@ -156,14 +157,6 @@ class Config:
     @property
     def secrets(self) -> ConfigManager[dict[str, Any]]:
         return self.__secrets
-
-    @property
-    def on_failure_callback(self) -> Optional[Callable[[Exception], None]]:
-        return self.__on_failure_callback
-
-    def add_on_failure_callback_function(self, func: Callable[[Exception], None]) -> None:
-        self.__on_failure_callback = func
-        logger.debug(f"Added on failure callback function: {func.__name__}")
 
     def validate_and_update_configuration(self, param: str, value: Any) -> bool:
         """
@@ -177,24 +170,25 @@ class Config:
             bool: True if the configuration was updated successfully, False otherwise.
         """
         try:
-            field = ConfigModel.model_fields[param]
-
-            if field.annotation is bool and isinstance(value, str):
-                value = value.lower() == "true"
-            elif field.annotation is Path and isinstance(value, str):
-                value = Path(value)
-            elif field.annotation is not None:
-                if getattr(field.annotation, "__origin__", None) is Literal:
-                    str(value).upper()
-                else:
-                    field.annotation(value)
-
-            self.__settings.set(param.lower(), value, write_to_file=True)
-            logger.info(f"Config updated successfully: {param} = {value}")
+            field_type, _, _ = ConfigModel.get_field_info(param)
+            adapted = self._coerce_value(field_type, value)
+            self.__settings.set(param, adapted, write_to_file=True)
+            logger.info(f"Config updated successfully: {param} = {adapted}")
             return True
         except (KeyError, ValidationError, Exception) as e:
             logger.error(f"Failed to update configuration: {e}")
             return False
+
+    @staticmethod
+    def _coerce_value(annotation: Any, value: Any) -> Any:
+        """
+        🔧 Coerce raw input into the target annotation using Pydantic validation.
+        """
+        adapter = TypeAdapter(annotation)
+        validated = adapter.validate_python(value)
+        if isinstance(validated, BaseModel):
+            return validated.model_dump()
+        return validated
 
     def update_package(self, version: str = "latest") -> None:
         """📦 Update the scriptman package."""

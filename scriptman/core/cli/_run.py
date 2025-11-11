@@ -3,32 +3,25 @@ from pathlib import Path
 
 from loguru import logger
 
-from scriptman.core._scripts import Scripts
+from scriptman.core._scripts import ScriptExecutionOptions, Scripts
 from scriptman.core.cli._parser import BaseParser
 from scriptman.core.config import config
 
 
 class RunSubParser(BaseParser):
-
     def __init__(self, sub_parser: "_SubParsersAction[ArgumentParser]") -> None:
         """
-        🚀 Initializes a RunSubParser instance with an ArgumentParser.
+        🚀 Initialize the run command parser.
 
         Args:
-            sub_parser: ArgumentParser instance to use for parsing CLI arguments.
+            sub_parser: Subparser collection to register the command against.
         """
-
-        self.parser: ArgumentParser = sub_parser.add_parser(
-            "run", help="Run scripts with advanced configuration options."
+        parser = sub_parser.add_parser(
+            "run",
+            help="Run scripts with advanced configuration options.",
         )
 
-        # Allow for script-specific arguments after -- delimiter
-        self.parser.add_argument(
-            "script_args", nargs="*", help="Arguments to pass to the scripts (after '--')"
-        )
-
-        # Initialize sub-commands
-        self.run()
+        super().__init__(parser)
 
     @property
     def command(self) -> str:
@@ -40,9 +33,9 @@ class RunSubParser(BaseParser):
         """
         return "run"
 
-    def run(self) -> None:
+    def configure(self) -> None:
         """
-        ⚙ Add arguments for running scripts with advanced configuration options.
+        ⚙️ Add arguments for running scripts with advanced configuration options.
 
         This function adds the following arguments to the CLI parser:
 
@@ -52,6 +45,12 @@ class RunSubParser(BaseParser):
             case of failure. Default is 0 (no retries).
         - `-f` or `--force`: Force execution of scripts even if they are already running.
         """
+        # Allow for script-specific arguments after -- delimiter
+        self.parser.add_argument(
+            "script_args",
+            nargs="*",
+            help="Arguments to pass to the scripts (after '--')",
+        )
         self.parser.add_argument(
             "-s",
             "--scripts",
@@ -104,11 +103,7 @@ class RunSubParser(BaseParser):
             int: Exit code (0 for success, non-zero for failure)
         """
         print(config.scriptman)  # Just looks cool
-        scripts = (
-            [Path(script) for script in args.scripts]
-            if args.scripts
-            else list(config.cwd.glob("*.py"))
-        )
+        scripts = self._resolve_scripts(args)
 
         if not scripts:
             logger.error("❓ No scripts found in the current directory.")
@@ -118,14 +113,32 @@ class RunSubParser(BaseParser):
             logger.error("❌ Retries must be a non-negative integer.")
             return 1
 
-        config.settings.script_args = getattr(args, "script_args", [])
-        config.settings.retries = args.retries
-        config.settings.verbose = args.verbose
-        config.settings.force = args.force
+        execution_options = ScriptExecutionOptions(
+            force=args.force,
+            retries=args.retries,
+            verbose=args.verbose,
+            script_args=getattr(args, "script_args", []) or [],
+            log_level=str(config.settings.get("log_level", "INFO")),
+        )
 
         try:
-            Scripts().run_scripts(scripts)
+            Scripts().run_scripts(scripts, options=execution_options)
             return 0
         except Exception as e:
             logger.error(f"❌ An error occurred while running the scripts: {e}")
             return 1
+
+    @staticmethod
+    def _resolve_scripts(args: Namespace) -> list[Path]:
+        """
+        🔍 Resolve the scripts to run.
+
+        Args:
+            args: Namespace object containing the parsed CLI arguments.
+
+        Returns:
+            list[Path]: A list of script paths to run.
+        """
+        if args.scripts:
+            return [Path(script) for script in args.scripts]
+        return list(config.cwd.glob("*.py"))

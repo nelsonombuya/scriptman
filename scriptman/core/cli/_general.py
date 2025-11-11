@@ -6,18 +6,14 @@ from scriptman.powers.cleanup import CleanUp
 
 
 class GeneralParser(BaseParser):
-
     def __init__(self, parser: ArgumentParser) -> None:
         """
-        🚀 Initializes a GeneralParser instance with an ArgumentParser.
+        🚀 Initialize a GeneralParser instance with shared CLI arguments.
 
         Args:
-            parser: ArgumentParser instance to use for parsing CLI arguments.
+            parser: Top-level parser that should receive the general options.
         """
-        self.parser: ArgumentParser = parser
-
-        # Initialize sub-commands
-        self.general_arguments()
+        super().__init__(parser)
 
     @property
     def command(self) -> str:
@@ -29,9 +25,9 @@ class GeneralParser(BaseParser):
         """
         return "general"
 
-    def general_arguments(self) -> None:
+    def configure(self) -> None:
         """
-        ⚙ Adds general arguments to the CLI parser.
+        ⚙️ Add general arguments to the CLI parser.
 
         This includes the following arguments:
 

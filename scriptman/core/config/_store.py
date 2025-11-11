@@ -159,6 +159,24 @@ class ConfigStore:
             raise AttributeError("Cannot delete _store attribute")
         self.delete(name)
 
+    def _iter_flat_items(
+        self, mapping: dict[str, Any] | None = None, prefix: str = ""
+    ) -> list[tuple[str, Any]]:
+        """
+        ♻️ Flatten nested dictionaries into dot-notation key/value pairs.
+        """
+        if mapping is None:
+            mapping = self._store
+        mapping = mapping or {}
+        items: list[tuple[str, Any]] = []
+        for key, value in mapping.items():
+            full_key = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict):
+                items.extend(self._iter_flat_items(value, full_key))
+            else:
+                items.append((full_key, value))
+        return items
+
     def reset(self, key: str) -> None:
         """
         🔄 Reset a key-value pair in the configuration store.
@@ -196,7 +214,7 @@ class ConfigStore:
         Returns:
             Any: An iterable of all the keys in the configuration store.
         """
-        return self._store.keys()
+        return [key for key, _ in self._iter_flat_items()]
 
     def items(self) -> Any:
         """
@@ -208,7 +226,7 @@ class ConfigStore:
             Any: An iterable of tuples, each containing a key and its associated value in
             the configuration store.
         """
-        return self._store.items()
+        return self._iter_flat_items()
 
     def values(self) -> Any:
         """
@@ -219,4 +237,4 @@ class ConfigStore:
         Returns:
             Any: An iterable of all the values in the configuration store.
         """
-        return self._store.values()
+        return [value for _, value in self._iter_flat_items()]

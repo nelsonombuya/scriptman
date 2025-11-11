@@ -5,22 +5,21 @@ from scriptman.powers.cleanup import CleanUp
 
 
 class CleanUpSubParser(BaseParser):
-
     def __init__(self, sub_parser: "_SubParsersAction[ArgumentParser]") -> None:
         """
-        🚀 Initializes a CleanUpSubParser instance with an ArgumentParser.
+        🚀 Initialize the cleanup command parser.
 
         Args:
-            sub_parser: ArgumentParser instance to use for parsing CLI arguments.
+            sub_parser: Subparser collection to register the command against.
         """
 
-        self.parser: ArgumentParser = sub_parser.add_parser(
-            "clean", help="Clean up cache, downloaded files, and logs older than 30 days."
+        parser = sub_parser.add_parser(
+            "clean",
+            help="Clean up cache, downloaded files, and logs older than 30 days.",
         )
 
-        # Initialize sub-commands
+        super().__init__(parser)
         self.cleaner = CleanUp()
-        self.clean()
 
     @property
     def command(self) -> str:
@@ -32,14 +31,8 @@ class CleanUpSubParser(BaseParser):
         """
         return "clean"
 
-    def clean(self) -> None:
-        """
-        ⚙ Add arguments for running scripts with advanced configuration options.
-
-        This function adds the following arguments to the CLI parser:
-
-
-        """
+    def configure(self) -> None:
+        """⚙️ Declare cleanup command options."""
         self.parser.add_argument(
             "-c",
             "--cache",
@@ -78,15 +71,23 @@ class CleanUpSubParser(BaseParser):
         Returns:
             int: Exit code (0 for success, non-zero for failure)
         """
+        targeted = False
 
         if args.cache:
+            targeted = True
             self.cleaner.diskcache_cleanup()
 
         if args.selenium:
+            targeted = True
             self.cleaner.selenium_cleanup()
 
         if args.mypy:
+            targeted = True
             self.cleaner.mypy_cleanup()
+
+        if targeted:
+            self.cleaner.run_registered_hooks()
+            return 0
 
         self.cleaner.cleanup()
         return 0

@@ -5,33 +5,41 @@ from argparse import ArgumentParser, Namespace
 class BaseParser(ABC):
     def __init__(self, parser: ArgumentParser) -> None:
         """
-        🚀 Initializes a Parser instance with an ArgumentParser.
+        🚀 Initialize a parser with a shared ArgumentParser instance.
 
         Args:
-            parser: ArgumentParser instance to use for parsing CLI arguments.
+            parser: ArgumentParser instance used to define CLI arguments.
         """
         self.parser: ArgumentParser = parser
+        self.configure()
 
     @property
     @abstractmethod
     def command(self) -> str:
         """
-        ⚙ Get the name of the command being parsed.
+        ⚙️ Retrieve the command name registered by this parser.
 
         Returns:
-            str: The name of the command being parsed.
+            Command keyword handled by this parser.
         """
-        pass
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @abstractmethod
+    def configure(self) -> None:
+        """
+        ⚙️ Declare CLI arguments for this parser instance.
+        """
+        raise NotImplementedError("Subclasses must implement this method")
 
     @abstractmethod
     def process(self, args: Namespace) -> int:
         """
-        ⚙ Process parsed CLI arguments according to the parser's configuration.
+        ⚙️ Process parsed CLI arguments according to the parser's configuration.
 
         Args:
             args: Parsed CLI arguments as a Namespace object.
 
         Returns:
-            int: Exit code (0 for success, non-zero for failure)
+            Exit code (0 for success, non-zero for failure).
         """
-        pass
+        raise NotImplementedError("Subclasses must implement this method")

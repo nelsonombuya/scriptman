@@ -8,18 +8,14 @@ from scriptman.core.config._defaults import ConfigModel
 class ConfigSubParser(BaseParser):
     def __init__(self, sub_parser: "_SubParsersAction[ArgumentParser]") -> None:
         """
-        🚀 Initialize a ConfigSubParser instance with an ArgumentParser.
+        🚀 Initialize the config command parser with shared argument wiring.
 
         Args:
-            sub_parser: ArgumentParser instance to use for parsing CLI arguments.
+            sub_parser: Subparser collection to register the command against.
         """
 
-        self.parser: ArgumentParser = sub_parser.add_parser(
-            "config", help="Manage scriptman settings"
-        )
-
-        # Initialize sub-commands
-        self.config()
+        parser = sub_parser.add_parser("config", help="Manage scriptman settings")
+        super().__init__(parser)
 
     @property
     def command(self) -> str:
@@ -31,22 +27,17 @@ class ConfigSubParser(BaseParser):
         """
         return "config"
 
-    def config(self) -> None:
-        """
-        📝 Set configuration parameter to a specified value.
-
-        Args:
-            config: The configuration parameter to update.
-            value: The value to set for the specified configuration parameter.
-        """
+    def configure(self) -> None:
+        """⚙️ Declare flags for managing Scriptman configuration."""
         self.parser.add_argument(
             "-s",
             "--set",
             nargs=2,
             metavar=("CONFIG", "VALUE"),
-            help="Set configuration parameter to a specified value.\n"
-            "NOTE: For configuration parameters that take lists, "
-            "this will append the value to the list",
+            help=(
+                "Set configuration parameter to a specified value. "
+                "Supports dot notation (e.g. tasks.idle_timeout 5)."
+            ),
         )
 
         self.parser.add_argument(
@@ -54,10 +45,10 @@ class ConfigSubParser(BaseParser):
             "--reset",
             nargs=1,
             metavar="CONFIG",
-            choices=ConfigModel.model_fields,
-            help="Reset configuration parameter to default value.\n"
-            "NOTE: For configuration parameters that take lists, "
-            "this will remove all values from the list",
+            help=(
+                "Reset configuration parameter to its default value. "
+                "Supports dot notation (e.g. tasks.idle_timeout)."
+            ),
         )
 
         self.parser.add_argument(
@@ -88,14 +79,20 @@ class ConfigSubParser(BaseParser):
 
         if hasattr(args, "set") and args.set:
             param, value = args.set
+            param = param.lower()
             result = int(not config.validate_and_update_configuration(param, value))
 
         if hasattr(args, "reset") and args.reset:
-            param = args.reset[0]
-            config.settings.reset(param, True)
+            try:
+                param = args.reset[0].lower()
+                ConfigModel.get_field_info(param)
+                config.settings.reset(param, True)
+            except KeyError:
+                print(f"⚠️ Unknown configuration key: {param}")
+                result = 1
 
         if hasattr(args, "list") and args.list:
-            for param, value in config.settings.items():
-                print(f"\n\t- {param}: {value}")
+            for param, value in sorted(config.settings.items()):
+                print(f"🔍 {param} = {value}")
 
         return result

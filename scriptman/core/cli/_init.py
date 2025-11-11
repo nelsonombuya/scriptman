@@ -14,17 +14,18 @@ class InitSubParser(BaseParser):
 
     def __init__(self, sub_parser: "_SubParsersAction[ArgumentParser]") -> None:
         """
-        🚀 Initializes an InitSubParser instance with an ArgumentParser.
+        🚀 Initialize the init command parser.
 
         Args:
-            sub_parser: ArgumentParser instance to use for parsing CLI arguments.
+            sub_parser: Subparser collection to register the command against.
         """
-        self.parser: ArgumentParser = sub_parser.add_parser(
-            "init", help="Initialize a new scriptman project with customization options."
+
+        parser = sub_parser.add_parser(
+            "init",
+            help="Initialize a new scriptman project with customization options.",
         )
 
-        # Initialize sub-commands
-        self.init_arguments()
+        super().__init__(parser)
 
     @property
     def command(self) -> str:
@@ -36,9 +37,9 @@ class InitSubParser(BaseParser):
         """
         return "init"
 
-    def init_arguments(self) -> None:
+    def configure(self) -> None:
         """
-        ⚙ Add arguments for initializing a new project with customization options.
+        ⚙️ Add arguments for initializing a new project with customization options.
 
         This function adds the following arguments to the CLI parser:
 
@@ -75,6 +76,15 @@ class InitSubParser(BaseParser):
             default=False,
             help="Disable concurrent script execution.",
         )
+        self.parser.add_argument(
+            "--shell",
+            action="store_true",
+            default=False,
+            help=(
+                "Generate runner scripts that call the virtualenv python directly "
+                "without activating the environment."
+            ),
+        )
 
     def process(self, args: Namespace) -> int:
         """
@@ -105,6 +115,14 @@ class InitSubParser(BaseParser):
             platform_type=platform_type,
         )
 
+        if args.shell:
+            ShellScriptGenerator.write_script(
+                relative_venv_path=args.venv,
+                platform_type=platform_type,
+                filename="scriptman-run",
+                mode="direct",
+            )
+
         # Create supporting files
         config.add_secrets_to_gitignore()
         config.create_secrets_file()
@@ -127,12 +145,21 @@ class InitSubParser(BaseParser):
             "💡 You can run the project using the following command (while in venv):\n"
             "--------------------------------------------------------------------\n"
             "scriptman run <script_name> [script_args]\n"
+            "sm sh <script_name> [script_args]\n"
             "--------------------------------------------------------------------\n\n"
             "💡 You can run the project using the shell script (while not in venv):\n"
             "---------------------------------------------------------------------\n"
             f"Linux/MacOS: source scriptman.sh run <script_name> [script_args]\n"
             f"Windows: source scriptman.{ext} run <script_name> [script_args]\n"
-            "--------------------------------------------------------------------\n\n"
         )
+
+        if args.shell:
+            logger.success(
+                "--------------------------------------------------------------------\n"
+                "💡 Direct runner (no activation):\n"
+                f"Linux/MacOS: ./scriptman-run.sh run <script_name> [script_args]\n"
+                f"Windows: scriptman-run{ext} run <script_name> [script_args]\n"
+                "--------------------------------------------------------------------\n\n"
+            )
 
         return 0

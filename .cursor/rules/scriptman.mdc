@@ -1,0 +1,321 @@
+---
+alwaysApply: true
+---
+# Scriptman Library Development Rules
+
+## Project Identity
+Scriptman is a Python utilities library that hides complexity through simple, beginner-friendly APIs while maintaining power-user flexibility. Used in production environments, it prioritizes reliability, performance, and developer experience.
+
+## Core Philosophy: "Simple Things Simple, Complex Things Possible"
+
+### 1. API Design Principles
+
+**Beginner-First, Expert-Capable**
+- Every function/class must work with zero configuration for common use cases
+- Advanced features are optional parameters with sensible defaults
+- Progressive disclosure: simple examples in docstrings, advanced usage in documentation
+- If a user needs to read docs to use basic functionality, the API is too complex
+
+**Emoji-Driven Visual Language**
+- 🚀 Init/Start operations
+- 🔍 Read/Query/Search operations
+- ✍️ Write/Update/Modify operations
+- 🧹 Cleanup/Delete operations
+- ⚙️ Configuration/Settings
+- ⚠️ Warnings/Errors
+- ✅ Success confirmations
+- 📡 Network/External operations
+- ⏱️ Timing/Scheduling operations
+- 🔄 Retry/Update/Refresh operations
+
+**RULE:** Every docstring, log message, and user-facing output should use ONE emoji for instant visual recognition.
+
+### 2. Code Architecture
+
+**Minimal Core, Modular Extensions**
+- Core utilities require ≤5 dependencies
+- Build lightweight implementations for simple functionality (scheduling, caching basics)
+- Keep exceptional libraries (Pydantic, FastAPI) - don't reinvent excellence
+- Use optional extras: `scriptman[db]`, `scriptman[selenium]`, `scriptman[api]`
+- Every dependency must justify its complexity cost
+
+**Unified Sync/Async Experience (Sync-First)**
+- Default to synchronous implementations
+- Async should be opt-in enhancement, not requirement
+- Use decorators/utilities that auto-detect async functions
+- Same API surface for both paradigms where possible
+- Example: `@retry` works on both sync and async functions transparently
+
+**Configuration-Driven Defaults**
+- Every tunable parameter respects configuration hierarchy: function args > scriptman.toml > defaults
+- Defaults work for 80% of use cases out of the box
+- Runtime overrides always possible
+- Use Pydantic for configuration validation
+
+### 3. Quality & Reliability
+
+**Fail Gracefully, Log Comprehensively**
+- Never fail silently - always provide actionable error messages
+- Include recovery suggestions in exceptions
+- Use structured logging with operation context
+- Comprehensive try-except blocks with graceful degradation
+- Resource cleanup in `__del__` and context managers
+
+**Post-Implementation Testing (95%+ Coverage)**
+- Write tests AFTER implementation (not TDD)
+- Achieve 95%+ coverage before marking module complete
+- Focus on edge cases, error conditions, and resource cleanup
+- Integration tests for cross-module functionality
+- Performance benchmarks for critical paths
+
+**Type Safety Without Verbosity**
+- Extensive type hints using modern Python (3.10+) syntax
+- Leverage type inference - don't over-annotate
+- Pydantic models for external data validation
+- Generic types for reusable components
+
+### 4. Breaking Changes Philosophy
+
+**Better > Compatible (Major Versions Only)**
+- Embrace breaking changes if they lead to superior implementations
+- Breaking changes reserved for major version bumps (v2 → v3)
+- Minor/patch versions maintain backwards compatibility
+- Document migration paths clearly in CHANGELOG
+- Deprecation warnings one minor version before removal
+
+### 5. Performance vs Simplicity Trade-offs
+
+**Simplicity Wins, But Offer Choice**
+- Default to simple, readable implementations
+- If speed sacrifice is minimal (<20% difference): choose simplicity
+- If performance matters significantly: provide BOTH implementations
+  - Simple version as default
+  - Optimized version as option (e.g., `use_fast=True`)
+- Document performance characteristics in docstrings
+
+### 6. Code Style Standards
+
+**Consistency & Clarity**
+- Use descriptive names: `retry_with_exponential_backoff` not `retry_exp`
+- One class/function per logical responsibility
+- Maximum function length: ~50 lines (extract helpers if longer)
+- Docstrings follow Google style with emoji prefix
+- Comments explain WHY, not WHAT (code explains what)
+
+**Import Organization**
+```python
+# Standard library
+import os
+from typing import Optional
+
+# Third-party (grouped by purpose)
+from pydantic import BaseModel
+import pandas as pd
+
+# Scriptman internal
+from scriptman.config import settings
+from scriptman.utils import retry
+```
+
+### 7. Documentation Requirements
+
+**Every Public API Must Have:**
+1. Emoji-prefixed docstring with one-line summary
+2. Args/Returns with types
+3. Simple usage example
+4. Raises section for expected exceptions
+5. Advanced usage in separate docs/ file
+
+**Example:**
+```python
+def load_data(source: str, format: str = "csv") -> pd.DataFrame:
+    """🔍 Load data from various sources with automatic format detection.
+
+    Args:
+        source: File path, URL, or database connection string
+        format: Data format - 'csv', 'json', 'parquet' (default: 'csv')
+
+    Returns:
+        DataFrame with loaded data
+
+    Raises:
+        FileNotFoundError: If source file doesn't exist
+        ValueError: If format is unsupported
+
+    Example:
+        >>> df = load_data("data.csv")
+        >>> df = load_data("https://api.example.com/data", format="json")
+    """
+```
+
+### 8. New Feature Checklist
+
+Before marking any feature complete:
+- [ ] Zero-config usage works for common case
+- [ ] Advanced options available but optional
+- [ ] Type hints complete
+- [ ] Docstring with emoji, example, and error docs
+- [ ] Error handling with helpful messages
+- [ ] Resource cleanup (if applicable)
+- [ ] Tests written with 95%+ coverage
+- [ ] Edge cases handled
+- [ ] Performance acceptable for target use case
+- [ ] Dependencies justified (or eliminated)
+
+## Implementation Patterns
+
+**Thread-Safe Singletons:**
+```python
+from threading import Lock
+
+class CacheManager:
+    _instance = None
+    _lock = Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+```
+
+**Optional Import Pattern:**
+```python
+try:
+    from selenium import webdriver
+except ImportError:
+    raise ImportError(
+        "🚫 Selenium not installed. Install with: pip install scriptman[selenium]"
+    )
+```
+
+**Retry Decorator (Sync/Async):**
+```python
+from functools import wraps
+import asyncio
+
+def retry(max_retries: int = 3, backoff: float = 1.0):
+    def decorator(func):
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return await func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        raise
+                    await asyncio.sleep(backoff * (2 ** attempt))
+
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            # Similar pattern for sync
+            pass
+
+        return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+    return decorator
+```
+
+## Reference Implementation Style
+
+Use this template when building new services, runners, CLI commands, or any workflow that performs side effects. It captures the Scriptman “zen”: emoji-first docstrings, explicit options objects, no global state mutations, friendly summaries, and structured error handling.
+
+```python
+class FooOptions(BaseModel):
+    """⚙️ Configure Foo execution parameters.
+
+    Args:
+        name: Identifier for the Foo resource.
+        environment: Optional execution environment override.
+        dry_run: When True, apply no mutations.
+        retries: Number of retry attempts for Foo operations.
+    """
+
+
+class FooRunner:
+    """🚀 Manage Foo resources with explicit options and friendly summaries."""
+
+    def __init__(self, options: FooOptions) -> None:
+        """🚀 Store per-run options and bind contextual logging.
+
+        Args:
+            options: Configuration for this Foo execution.
+        """
+        self.options = options
+        self.logger = logger.bind(component="foo-runner")
+
+    def run(self) -> int:
+        """🚀 Execute the Foo workflow and report success or failure.
+
+        Returns:
+            0 on success, 1 when an exception is encountered.
+        """
+        try:
+            resource = self._configure_resource()
+            self._apply_changes(resource)
+            self._summarize(resource)
+            return 0
+        except Exception as exc:
+            self.logger.error(f"⚠️ Foo run failed: {exc}")
+            return 1
+
+    def _configure_resource(self) -> FooResource:
+        """⚙️ Build the Foo resource from the provided options.
+
+        Returns:
+            A FooResource configured with the current options.
+        """
+        return FooResource(
+            name=self.options.name,
+            dry_run=self.options.dry_run,
+            retries=self.options.retries,
+            environment=self.options.environment or "default",
+        )
+
+    def _apply_changes(self, resource: FooResource) -> None:
+        """✍️ Apply changes to the Foo resource (honouring dry-run mode).
+
+        Args:
+            resource: The resource being manipulated.
+
+        Raises:
+            FooError: When the underlying Foo operation fails.
+        """
+        if resource.dry_run:
+            self.logger.info("✍️ Dry run mode; skipping mutations")
+            return
+        retry(resource.retries)(resource.apply)()
+
+    def _summarize(self, resource: FooResource) -> None:
+        """✅ Emit a friendly summary with next steps.
+
+        Args:
+            resource: The resource that just finished processing.
+        """
+        self.logger.success(
+            "✅ Foo completed\n"
+            "--------------------------------------------------\n"
+            f"💡 Resource: {resource.name}\n"
+            f"💡 Environment: {resource.environment}\n"
+            f"💡 Dry Run: {'Yes' if resource.dry_run else 'No'}\n"
+            "--------------------------------------------------\n"
+            f"💡 Next: foo inspect --name {resource.name}\n"
+        )
+```
+
+### Visual Rhythm (“Cascade”)
+
+Match the stepped layout used across Scriptman: lead with the longest concept, narrow to supporting details, and finish with the tightest lines. This “cascade” makes logs and summaries scannable and keeps diffs clean. Prefer:
+
+```
+Primary statement……………………
+Secondary detail…………………
+Tertiary reminder………………
+```
+
+over dense paragraphs or unordered bullets.
+
+## Remember
+- This library is a learning tool AND production code - balance exploration with reliability
+- Users range from beginners to your production team - design for the beginner, document for the expert
+- Every line of code should answer: "Does this make the developer's life easier?"

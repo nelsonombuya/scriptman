@@ -17,17 +17,17 @@ class ProjectSubParser(BaseParser):
 
     def __init__(self, sub_parser: "_SubParsersAction[ArgumentParser]") -> None:
         """
-        🚀 Initializes a ProjectSubParser instance with an ArgumentParser.
+        🚀 Initialize the project command parser.
 
         Args:
-            sub_parser: ArgumentParser instance to use for parsing CLI arguments.
+            sub_parser: Subparser collection to register the command against.
         """
-        self.parser: ArgumentParser = sub_parser.add_parser(
-            "project", help="Manage the local project where scriptman is installed."
+        parser = sub_parser.add_parser(
+            "project",
+            help="Manage the local project where scriptman is installed.",
         )
 
-        # Initialize sub-commands
-        self.init_arguments()
+        super().__init__(parser)
 
     @property
     def command(self) -> str:
@@ -39,9 +39,9 @@ class ProjectSubParser(BaseParser):
         """
         return "project"
 
-    def init_arguments(self) -> None:
+    def configure(self) -> None:
         """
-        ⚙ Add arguments for project management operations.
+        ⚙️ Add arguments for project management operations.
 
         This function adds the following arguments to the CLI parser:
 
@@ -157,10 +157,10 @@ class ProjectSubParser(BaseParser):
                     cwd=config.cwd,
                 )
                 if result.stdout.strip():
-                    for line in result.stdout.strip().split("\n"):
-                        logger.info(f"  {line}")
+                    for line in result.stdout.strip().splitlines():
+                        logger.info(f"📝 {line}")
                 else:
-                    logger.info("  Clean working directory")
+                    logger.info("✅ Clean working directory")
 
                 # Get current branch
                 result = subprocess.run(
@@ -172,7 +172,7 @@ class ProjectSubParser(BaseParser):
                     cwd=config.cwd,
                 )
                 branch = result.stdout.strip()
-                logger.info(f"  Current branch: {branch}")
+                logger.info(f"🪴 Current branch: {branch}")
             except subprocess.CalledProcessError as e:
                 logger.error(f"❌ Error getting git status: {e}")
                 return 1
@@ -191,7 +191,7 @@ class ProjectSubParser(BaseParser):
                     cwd=config.cwd,
                 )
                 if result.returncode == 0:
-                    logger.debug("  Poetry dependencies installed")
+                    logger.debug("🧪 Poetry dependencies installed")
                 else:
                     logger.warning(
                         "⚠ Poetry dependencies not installed or Poetry not available"
@@ -203,7 +203,7 @@ class ProjectSubParser(BaseParser):
             try:
                 with open(config.cwd / "requirements.txt", "r") as f:
                     deps = len(f.readlines())
-                logger.debug(f"  {deps} packages listed in requirements.txt")
+                logger.debug(f"🧪 {deps} packages listed in requirements.txt")
             except Exception as e:
                 logger.error(f"❌ Error reading requirements.txt: {e}")
         else:
@@ -248,9 +248,11 @@ class ProjectSubParser(BaseParser):
                 if stash_result.returncode != 0:
                     logger.error(f"❌ Failed to stash changes: {stash_result.stderr}")
                     if stash_result.stdout:
-                        logger.debug(f"Stash output: {stash_result.stdout}")
+                        logger.debug(f"🪲 Stash output: {stash_result.stdout}")
                     return False
-                logger.info(stash_result.stdout.strip())
+                if stash_result.stdout:
+                    for line in stash_result.stdout.strip().splitlines():
+                        logger.info(f"📝 {line}")
 
         # Pull latest changes
         try:
@@ -264,7 +266,8 @@ class ProjectSubParser(BaseParser):
                 cwd=config.cwd,
             )
             if pull_result.stdout:
-                logger.info(pull_result.stdout.strip())
+                for line in pull_result.stdout.strip().splitlines():
+                    logger.info(f"📝 {line}")
 
             # Check if there was actually any update
             if "Already up to date" in pull_result.stdout:
@@ -279,7 +282,7 @@ class ProjectSubParser(BaseParser):
         except subprocess.CalledProcessError as e:
             logger.error(f"❌ Git pull failed: {e.stderr}")
             if e.stdout:
-                logger.debug(f"Command output: {e.stdout}")
+                logger.debug(f"🪲 Command output: {e.stdout}")
 
             # If we stashed changes, try to restore them even if pull failed
             if ignore_local_changes and has_local_changes:
@@ -306,13 +309,15 @@ class ProjectSubParser(BaseParser):
             if pop_result.returncode != 0:
                 logger.error(f"❌ Failed to restore stashed changes: {pop_result.stderr}")
                 if pop_result.stdout:
-                    logger.debug(f"Command output: {pop_result.stdout}")
+                    logger.debug(f"🪲 Command output: {pop_result.stdout}")
                 logger.warning(
                     "⚠️ Your changes are stored in the git stash. "
                     "Use 'git stash apply' to recover them."
                 )
                 return False
-            logger.info(pop_result.stdout.strip())
+            if pop_result.stdout:
+                for line in pop_result.stdout.strip().splitlines():
+                    logger.info(f"📝 {line}")
 
         logger.success("✅ Project code updated successfully")
         return True
@@ -339,7 +344,8 @@ class ProjectSubParser(BaseParser):
                     cwd=config.cwd,
                 )
                 if lock_result.stdout:
-                    logger.info(lock_result.stdout.strip())
+                    for line in lock_result.stdout.strip().splitlines():
+                        logger.info(f"📝 {line}")
 
                 # Install dependencies
                 logger.info("📚 Installing dependencies...")
@@ -352,7 +358,8 @@ class ProjectSubParser(BaseParser):
                     cwd=config.cwd,
                 )
                 if install_result.stdout:
-                    logger.info(install_result.stdout.strip())
+                    for line in install_result.stdout.strip().splitlines():
+                        logger.info(f"📝 {line}")
 
                 # Update dependencies to latest versions
                 logger.info("🔄 Updating dependencies to latest versions...")
@@ -365,7 +372,8 @@ class ProjectSubParser(BaseParser):
                     cwd=config.cwd,
                 )
                 if update_result.stdout:
-                    logger.info(update_result.stdout.strip())
+                    for line in update_result.stdout.strip().splitlines():
+                        logger.info(f"📝 {line}")
 
                 # Check for non-error output in stderr (warnings)
                 for result in [lock_result, install_result, update_result]:
@@ -377,7 +385,7 @@ class ProjectSubParser(BaseParser):
             except subprocess.CalledProcessError as e:
                 logger.error(f"❌ Poetry update failed: {e.stderr}")
                 if e.stdout:
-                    logger.debug(f"Command output: {e.stdout}")
+                    logger.debug(f"🪲 Command output: {e.stdout}")
                 return False
             except FileNotFoundError:
                 logger.error(
@@ -413,11 +421,13 @@ class ProjectSubParser(BaseParser):
                     check=True,
                     cwd=config.cwd,
                 )
-                logger.info("Updated pip:")
-                logger.info(pip_update_result.stdout.strip())
+                logger.info("♻️ Updated pip:")
+                if pip_update_result.stdout:
+                    for line in pip_update_result.stdout.strip().splitlines():
+                        logger.info(f"📝 {line}")
 
                 # Update packages from requirements.txt
-                logger.info("Updating packages from requirements.txt...")
+                logger.info("📦 Updating packages from requirements.txt...")
                 update_result = subprocess.run(
                     [
                         python_exe,
@@ -437,7 +447,8 @@ class ProjectSubParser(BaseParser):
 
                 # Log the output to show what happened
                 if update_result.stdout:
-                    logger.info(update_result.stdout.strip())
+                    for line in update_result.stdout.strip().splitlines():
+                        logger.info(f"📝 {line}")
 
                 # Check for warnings in stderr but don't fail
                 if update_result.stderr:
@@ -455,7 +466,7 @@ class ProjectSubParser(BaseParser):
             except subprocess.CalledProcessError as e:
                 logger.error(f"❌ pip update failed: {e.stderr}")
                 if e.stdout:
-                    logger.debug(f"Command output: {e.stdout}")
+                    logger.debug(f"🪲 Command output: {e.stdout}")
                 return False
         else:
             logger.warning(

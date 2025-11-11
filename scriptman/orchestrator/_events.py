@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from threading import RLock
-from typing import Callable, DefaultDict, Iterable, Protocol
+from typing import Callable, DefaultDict, Iterable, Mapping, Protocol
+
+from .workloads import WorkloadEventPayload
 
 
 class RuntimeEventTopic(str, Enum):
@@ -34,7 +36,7 @@ class RuntimeEvent:
     """🔍 Event payload carrying structured information to observers."""
 
     topic: RuntimeEventTopic | str
-    payload: dict[str, object]
+    payload: Mapping[str, object]
     timestamp: datetime
 
 
@@ -141,19 +143,27 @@ def make_event(
     topic: RuntimeEventTopic | str,
     *,
     timestamp_factory: Callable[[], datetime],
-    **payload: object,
+    payload: WorkloadEventPayload | Mapping[str, object] | None = None,
+    **extras: object,
 ) -> RuntimeEvent:
     """🪄 Helper to construct runtime events with consistent timestamps.
 
     Args:
         topic: The topic of the event.
         timestamp_factory: The factory to produce the timestamp.
-        **payload: The payload of the event.
+        payload: Optional structured payload (TypedDict or mapping).
+        **extras: Additional key-value fields merged into the payload.
 
     Returns:
         RuntimeEvent: The constructed event.
     """
-    return RuntimeEvent(topic=topic, payload=dict(payload), timestamp=timestamp_factory())
+    base_payload: dict[str, object] = dict(payload or {})
+    base_payload.update(extras)
+    return RuntimeEvent(
+        topic=topic,
+        payload=base_payload,
+        timestamp=timestamp_factory(),
+    )
 
 
 __all__ = [

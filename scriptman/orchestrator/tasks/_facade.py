@@ -1,113 +1,61 @@
 from __future__ import annotations
 
 from abc import ABC
-from dataclasses import dataclass
-from typing import Callable, Mapping, Protocol
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Callable, Mapping, cast
 
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
+from scriptman.orchestrator.workloads import (
+    WorkloadEventPayload,
+    WorkloadExecutor,
+    WorkloadKind,
+    WorkloadOutcome,
+    WorkloadQueue,
+    WorkloadRegistry,
+    WorkloadSummaryReporter,
+)
 
 TaskCallable = Callable[..., object]
 
 
-@dataclass(slots=True)
+@dataclass
 class TaskDescriptor:
     """🧾 Immutable description of a registered task."""
 
     name: str
     target: TaskCallable
-    metadata: Mapping[str, object]
+    metadata: Mapping[str, object] = field(default_factory=dict)
+
+    @property
+    def kind(self) -> WorkloadKind:
+        """🔍 Workload kind identifier for Command Deck events."""
+        return "task"
 
 
-@dataclass(slots=True)
+@dataclass
 class TaskExecutionResult:
     """✅ Summary bundle returned after executing a task."""
 
     task_id: str
     descriptor: TaskDescriptor
-    outcome: str
-    duration_seconds: float
+    outcome: WorkloadOutcome
+    started_at: datetime
+    finished_at: datetime
+    detail: Mapping[str, Any] = field(default_factory=dict)
     result: object | None = None
     error: BaseException | None = None
 
-
-class TaskQueueAdapter(Protocol):
-    """📦 Interface for queueing work prior to execution."""
-
-    def enqueue(self, descriptor: TaskDescriptor, *, context: RuntimeContext) -> str:
-        """🚀 Enqueue a task for background execution.
-
-        Args:
-            descriptor: The task descriptor.
-            context: The runtime context.
-
-        Returns:
-            str: The task ID.
-        """
-        ...
-
-    def dequeue(self, *, context: RuntimeContext) -> tuple[str, TaskDescriptor] | None:
-        """🔄 Dequeue a task for immediate execution.
-
-        Args:
-            context: The runtime context.
-
-        Returns:
-            tuple[str, TaskDescriptor] | None: The task ID and descriptor.
-        """
-        ...
-
-    def complete(self, task_id: str, *, context: RuntimeContext) -> None:
-        """🏁 Complete a task after execution.
-
-        Args:
-            task_id: The task ID.
-            context: The runtime context.
-
-        Raises:
-            RuntimeError: If the task is not found.
-        """
-        ...
+    @property
+    def duration(self) -> float:
+        """⏱️ Duration in seconds between start and finish."""
+        return (self.finished_at - self.started_at).total_seconds()
 
 
-class TaskExecutor(Protocol):
-    """⚙️ Strategy object responsible for executing task callables."""
-
-    def execute(
-        self,
-        descriptor: TaskDescriptor,
-        *,
-        context: RuntimeContext,
-    ) -> TaskExecutionResult:
-        """🚀 Execute a task.
-
-        Args:
-            descriptor: The task descriptor.
-            context: The runtime context.
-
-        Returns:
-            TaskExecutionResult: The task execution result.
-        """
-        ...
-
-
-class TaskSummaryReporter(Protocol):
-    """📊 Collect and emit summaries after execution concludes."""
-
-    def report(self, result: TaskExecutionResult, *, context: RuntimeContext) -> None:
-        """📊 Report the result of a task execution.
-
-        Args:
-            result: The task execution result.
-            context: The runtime context.
-
-        Returns:
-            None: The task execution result is reported.
-
-        Raises:
-            RuntimeError: If the task execution result is not found.
-        """
-        ...
+TaskQueueAdapter = WorkloadQueue[TaskDescriptor]
+TaskExecutor = WorkloadExecutor[TaskDescriptor, TaskExecutionResult]
+TaskSummaryReporter = WorkloadSummaryReporter[TaskExecutionResult]
 
 
 class TasksFacade(ABC):
@@ -139,7 +87,12 @@ class TasksFacade(ABC):
         """
 
         self.registry.add(descriptor)
-        self._emit(RuntimeEventTopic.TASK_REGISTERED, name=descriptor.name)
+        payload: WorkloadEventPayload = {
+            "workload_kind": "task",
+            "workload_name": descriptor.name,
+            "metadata": descriptor.metadata,
+        }
+        self._emit(RuntimeEventTopic.TASK_REGISTERED, payload=payload)
 
     def enqueue(self, name: str) -> str:
         """
@@ -156,7 +109,13 @@ class TasksFacade(ABC):
         """
         descriptor = self.registry.get(name)
         task_id = self.queue.enqueue(descriptor, context=self.context)
-        self._emit(RuntimeEventTopic.TASK_ENQUEUED, task_id=task_id, name=name)
+        payload: WorkloadEventPayload = {
+            "task_id": task_id,
+            "workload_kind": "task",
+            "metadata": descriptor.metadata,
+            "workload_name": descriptor.name,
+        }
+        self._emit(RuntimeEventTopic.TASK_ENQUEUED, payload=payload)
         return task_id
 
     def execute(
@@ -176,12 +135,29 @@ class TasksFacade(ABC):
             RuntimeError: If the task descriptor is not found.
         """
         descriptor = self._resolve_descriptor(task_id=task_id, name=name)
-        self._emit(RuntimeEventTopic.TASK_STARTED, name=descriptor.name)
+        started_payload: WorkloadEventPayload = {
+            "workload_kind": "task",
+            "workload_name": descriptor.name,
+            "metadata": descriptor.metadata,
+            "status": "started",
+        }
+        self._emit(RuntimeEventTopic.TASK_STARTED, payload=started_payload)
+
         result = self.executor.execute(descriptor, context=self.context)
+
+        completion_payload: WorkloadEventPayload = {
+            "workload_kind": "task",
+            "workload_name": descriptor.name,
+            "metadata": descriptor.metadata,
+            "detail": result.detail,
+            "status": cast(str, result.outcome),
+        }
         if result.error:
-            self._emit(RuntimeEventTopic.TASK_FAILED, name=descriptor.name)
+            completion_payload["error"] = str(result.error)
+            self._emit(RuntimeEventTopic.TASK_FAILED, payload=completion_payload)
         else:
-            self._emit(RuntimeEventTopic.TASK_COMPLETED, name=descriptor.name)
+            self._emit(RuntimeEventTopic.TASK_COMPLETED, payload=completion_payload)
+
         self.reporter.report(result, context=self.context)
         return result
 
@@ -200,27 +176,39 @@ class TasksFacade(ABC):
         """
         return self.registry.get(name)
 
-    def _emit(self, topic: RuntimeEventTopic, **payload: object) -> None:
-        """🔍 Emit an event.
+    def _emit(
+        self,
+        topic: RuntimeEventTopic,
+        *,
+        payload: WorkloadEventPayload | Mapping[str, object] | None = None,
+        **extras: object,
+    ) -> None:
+        """
+        📡 Emit an orchestrator event with merged payload data.
 
         Args:
             topic: The topic of the event.
-            **payload: The payload of the event.
+            payload: The payload of the event.
+            **extras: Additional key-value fields merged into the payload.
 
         Raises:
             RuntimeError: If the event is not found.
         """
         event = make_event(
             topic,
+            payload=payload,
             timestamp_factory=self.context.timestamp,
-            **payload,
+            **extras,
         )
         self.context.event_publisher.emit(event)
 
     def _resolve_descriptor(
-        self, *, task_id: str | None, name: str | None
+        self,
+        *,
+        task_id: str | None,
+        name: str | None,
     ) -> TaskDescriptor:
-        """🔍 Resolve a task descriptor.
+        """🔍 Resolve a task descriptor using either name or task identifier.
 
         Args:
             task_id: The task ID.
@@ -242,38 +230,17 @@ class TasksFacade(ABC):
         raise ValueError("⚠️ Either task_id or name must be provided")
 
 
-class TaskRegistry(Protocol):
+class TaskRegistry(WorkloadRegistry[TaskDescriptor]):
     """🗂️ Contract for storing task descriptors."""
 
-    def add(self, descriptor: TaskDescriptor) -> None:
-        """🗂️ Add a task descriptor to the registry.
-
-        Args:
-            descriptor: The task descriptor.
-
-        Raises:
-            RuntimeError: If the task descriptor is not found.
-        """
-
-    def get(self, name: str) -> TaskDescriptor:
-        """🔍 Get a task descriptor by name.
-
-        Args:
-            name: The name of the task.
-
-        Raises:
-            RuntimeError: If the task descriptor is not found.
-        """
-        ...
-
     def get_by_task_id(self, task_id: str) -> TaskDescriptor | None:
-        """🔍 Get a task descriptor by task ID.
+        """🔍 Retrieve a descriptor previously associated with a queue task ID.
 
         Args:
             task_id: The task ID.
 
         Returns:
-            TaskDescriptor | None: The task descriptor.
+            TaskDescriptor: The task descriptor.
 
         Raises:
             RuntimeError: If the task descriptor is not found.

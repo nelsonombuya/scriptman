@@ -137,22 +137,27 @@ class RuntimeOrchestrator:
                 f"⚠️ Cannot {action} while in phase {self._phase.name.lower()}"
             )
 
-    def _emit(self, topic: RuntimeEventTopic | str, **payload: object) -> None:
+    def _emit(
+        self,
+        topic: RuntimeEventTopic | str,
+        *,
+        payload: Mapping[str, object] | None = None,
+        **extras: object,
+    ) -> None:
         """🔍 Emit an event.
 
         Args:
             topic: The topic of the event.
-            **payload: The payload of the event.
-
-        Raises:
-            RuntimeError: If the orchestrator is not in the RUNTIME phase.
+            payload: Optional structured payload.
+            **extras: Additional key-value fields merged into the payload.
         """
         if self._context is None:
             return
         event = make_event(
             topic,
             timestamp_factory=self._context.timestamp,
-            **payload,
+            payload=payload,
+            **extras,
         )
         self._context.event_publisher.emit(event)
 

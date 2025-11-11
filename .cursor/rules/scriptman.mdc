@@ -6,6 +6,12 @@ alwaysApply: true
 ## Project Identity
 Scriptman is a Python utilities library that hides complexity through simple, beginner-friendly APIs while maintaining power-user flexibility. Used in production environments, it prioritizes reliability, performance, and developer experience.
 
+## Mythos & Narrative Identity
+- Scriptman is our Python-powered superhero who keeps automation alive through endless renewal. Every feature should feel like a guided mission where the hero quietly hands newcomers the right tool.
+- The orchestrator lives in the Command Deck: the central bridge that coordinates tasks, services, schedules, and observability. Anything that needs runtime context, executors, or shared state reports to the Command Deck.
+- Scriptman retreats to the Ouroboros Observatory when planning new loops. Ouroboros, the serpent that feeds on its tail, symbolizes the continuous cycles of execution, recovery, and reinvention that Scriptman manages.
+- Storytelling elements (names, messages, docs) should reinforce this heroic loop: approachable guidance on the surface, disciplined coordination beneath, always ready for the next renewal arc.
+
 ## Core Philosophy: "Simple Things Simple, Complex Things Possible"
 
 ### 1. API Design Principles

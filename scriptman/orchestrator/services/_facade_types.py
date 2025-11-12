@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Mapping
+from typing import Any, Mapping, TypeVar
 
+from scriptman.orchestrator._generics import ContextFunc
 from scriptman.orchestrator._logging import WorkloadLoggingOptions
 from scriptman.orchestrator.workloads import WorkloadKind, WorkloadOutcome
 
+from ._context import ServiceContext
 from ._policies import RestartPolicy
 
-if TYPE_CHECKING:
-    from ._context import ServiceContext
-
-ServiceCallable = Callable[["ServiceContext"], Awaitable[Any] | Any]
+ServiceReturn = TypeVar("ServiceReturn")
+ServiceCallable = ContextFunc[ServiceContext, ServiceReturn]
 
 
 @dataclass
@@ -39,7 +39,7 @@ class ServiceDescriptor:
     """🧾 Immutable description of a registered service."""
 
     name: str
-    target: ServiceCallable
+    target: ServiceCallable[Any]
     metadata: Mapping[str, Any] = field(default_factory=dict)
     logging: WorkloadLoggingOptions = field(default_factory=default_service_logging)
 

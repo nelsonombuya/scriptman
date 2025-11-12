@@ -1,74 +1,24 @@
 from __future__ import annotations
 
 from abc import ABC
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Callable, Mapping, cast
+from typing import Any, Mapping, cast
 from uuid import uuid4
 
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
-from scriptman.orchestrator._logging import (
-    WorkloadLoggingOptions,
-    extract_logging_options,
-    workload_log_sink,
-)
+from scriptman.orchestrator._logging import extract_logging_options, workload_log_sink
 from scriptman.orchestrator.workloads import (
     WorkloadEventPayload,
     WorkloadExecutor,
-    WorkloadKind,
-    WorkloadOutcome,
     WorkloadQueue,
     WorkloadRegistry,
     WorkloadSummaryReporter,
 )
 
-TaskCallable = Callable[..., object]
+from ._model import TaskEntry, TaskExecutionResult, TaskSubmission, default_task_logging
 
-
-def _default_task_logging() -> WorkloadLoggingOptions:
-    """🔍 Default logging options for tasks."""
-    return WorkloadLoggingOptions(
-        path_template="logs/tasks/{workload}/{date}/{run_id}.log"
-    )
-
-
-@dataclass
-class TaskDescriptor:
-    """🧾 Immutable description of a registered task."""
-
-    name: str
-    target: TaskCallable
-    metadata: Mapping[str, object] = field(default_factory=dict)
-    logging: WorkloadLoggingOptions = field(default_factory=_default_task_logging)
-
-    @property
-    def kind(self) -> WorkloadKind:
-        """🔍 Workload kind identifier for Command Deck events."""
-        return "task"
-
-
-@dataclass
-class TaskExecutionResult:
-    """✅ Summary bundle returned after executing a task."""
-
-    task_id: str
-    descriptor: TaskDescriptor
-    outcome: WorkloadOutcome
-    started_at: datetime
-    finished_at: datetime
-    detail: Mapping[str, Any] = field(default_factory=dict)
-    result: object | None = None
-    error: BaseException | None = None
-
-    @property
-    def duration(self) -> float:
-        """⏱️ Duration in seconds between start and finish."""
-        return (self.finished_at - self.started_at).total_seconds()
-
-
-TaskQueueAdapter = WorkloadQueue[TaskDescriptor]
-TaskExecutor = WorkloadExecutor[TaskDescriptor, TaskExecutionResult]
+TaskQueueAdapter = WorkloadQueue[TaskSubmission]
+TaskExecutor = WorkloadExecutor[TaskSubmission, TaskExecutionResult]
 TaskSummaryReporter = WorkloadSummaryReporter[TaskExecutionResult]
 
 
@@ -84,35 +34,52 @@ class TasksFacade(ABC):
         executor: TaskExecutor,
         reporter: TaskSummaryReporter,
     ) -> None:
+        """🔄 Initialize the tasks facade.
+
+        Args:
+            context: The runtime context.
+            registry: The task registry.
+            queue: The task queue.
+            executor: The task executor.
+            reporter: The task reporter.
+        """
+        self.queue = queue
         self.context = context
         self.registry = registry
-        self.queue = queue
         self.executor = executor
         self.reporter = reporter
 
-    def register(self, descriptor: TaskDescriptor) -> None:
+    def register(self, entry: TaskEntry) -> None:
         """✍️ Register a new task with the underlying registry.
 
         Args:
-            descriptor: The task descriptor.
+            entry: The task entry.
 
         Raises:
-            RuntimeError: If the task descriptor is not found.
+            RuntimeError: If the task entry is not found.
         """
 
-        default_logging = _default_task_logging()
-        decorator_logging = extract_logging_options(descriptor.target)
-        if descriptor.logging == default_logging and decorator_logging != default_logging:
-            descriptor.logging = decorator_logging
-        self.registry.add(descriptor)
+        default_logging = default_task_logging()
+        decorator_logging = extract_logging_options(entry.target)
+        if entry.logging == default_logging and decorator_logging != default_logging:
+            entry.logging = decorator_logging
+        self.registry.add(entry)
         payload: WorkloadEventPayload = {
             "workload_kind": "task",
-            "workload_name": descriptor.name,
-            "metadata": descriptor.metadata,
+            "metadata": entry.metadata,
+            "workload_name": entry.name,
         }
         self._emit(RuntimeEventTopic.TASK_REGISTERED, payload=payload)
 
-    def enqueue(self, name: str) -> str:
+    def enqueue(
+        self,
+        name: str,
+        /,
+        *args: Any,
+        metadata: Mapping[str, object] | None = None,
+        correlation_id: str | None = None,
+        **kwargs: Any,
+    ) -> str:
         """
         🚀 Enqueue a registered task for background execution.
 
@@ -123,60 +90,94 @@ class TasksFacade(ABC):
             str: The task ID.
 
         Raises:
-            RuntimeError: If the task descriptor is not found.
+            RuntimeError: If the task entry is not found.
         """
-        descriptor = self.registry.get(name)
-        task_id = self.queue.enqueue(descriptor, context=self.context)
+
+        entry = self.registry.get(name)
+        submission = TaskSubmission(
+            args=args,
+            entry=entry,
+            kwargs=dict(kwargs),
+            extra_metadata=metadata or {},
+            correlation_id=correlation_id,
+        )
+        task_id = self.queue.enqueue(submission, context=self.context)
+        submission.task_id = task_id
+        self.registry.remember_task_id(task_id, submission)
         payload: WorkloadEventPayload = {
             "task_id": task_id,
             "workload_kind": "task",
-            "metadata": descriptor.metadata,
-            "workload_name": descriptor.name,
+            "workload_name": entry.name,
+            "metadata": submission.metadata,
         }
+        if correlation_id:
+            payload["detail"] = {"correlation_id": correlation_id}
         self._emit(RuntimeEventTopic.TASK_ENQUEUED, payload=payload)
         return task_id
 
     def execute(
-        self, *, task_id: str | None = None, name: str | None = None
+        self,
+        *,
+        name: str | None = None,
+        task_id: str | None = None,
+        args: tuple[Any, ...] | None = None,
+        kwargs: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, object] | None = None,
     ) -> TaskExecutionResult:
         """
         🚀 Execute a task immediately, bypassing the queue when desired.
 
         Args:
-            task_id: The task ID.
             name: The name of the task.
+            task_id: The task ID.
+            args: Positional arguments passed to the task when executing by name.
+            kwargs: Keyword arguments passed to the task when executing by name.
+            metadata: Additional metadata merged into the event payload.
 
         Returns:
             TaskExecutionResult: The task execution result.
 
         Raises:
-            RuntimeError: If the task descriptor is not found.
+            RuntimeError: If the task entry is not found.
         """
-        descriptor = self._resolve_descriptor(task_id=task_id, name=name)
+        submission = self._resolve_submission(
+            name=name,
+            task_id=task_id,
+            args=args or (),
+            kwargs=kwargs or {},
+            metadata=metadata or {},
+        )
+        resolved_task_id = (
+            task_id or submission.task_id or f"manual-{submission.entry.name}-{uuid4()}"
+        )
+        submission.task_id = resolved_task_id
+        self.registry.remember_task_id(resolved_task_id, submission)
+
         started_payload: WorkloadEventPayload = {
-            "workload_kind": "task",
-            "workload_name": descriptor.name,
-            "metadata": descriptor.metadata,
             "status": "started",
+            "workload_kind": "task",
+            "task_id": resolved_task_id,
+            "metadata": submission.metadata,
+            "workload_name": submission.entry.name,
         }
         self._emit(RuntimeEventTopic.TASK_STARTED, payload=started_payload)
 
-        resolved_task_id = task_id or f"manual-{descriptor.name}-{uuid4()}"
         with workload_log_sink(
-            workload=descriptor.name,
             run_id=resolved_task_id,
-            options=descriptor.logging,
+            workload=submission.entry.name,
+            options=submission.entry.logging,
         ):
-            result = self.executor.execute(descriptor, context=self.context)
+            result = self.executor.execute(submission, context=self.context)
         if not getattr(result, "task_id", None):
             result.task_id = resolved_task_id
 
         completion_payload: WorkloadEventPayload = {
             "workload_kind": "task",
-            "workload_name": descriptor.name,
-            "metadata": descriptor.metadata,
             "detail": result.detail,
+            "task_id": resolved_task_id,
+            "metadata": submission.metadata,
             "status": cast(str, result.outcome),
+            "workload_name": submission.entry.name,
         }
         if result.error:
             completion_payload["error"] = str(result.error)
@@ -185,9 +186,11 @@ class TasksFacade(ABC):
             self._emit(RuntimeEventTopic.TASK_COMPLETED, payload=completion_payload)
 
         self.reporter.report(result, context=self.context)
+        if result.error is not None:
+            raise result.error
         return result
 
-    def inspect(self, name: str) -> TaskDescriptor:
+    def inspect(self, name: str) -> TaskEntry:
         """
         🔍 Inspect the configuration for a registered task.
 
@@ -195,10 +198,10 @@ class TasksFacade(ABC):
             name: The name of the task.
 
         Returns:
-            TaskDescriptor: The task descriptor.
+            TaskEntry: The task entry.
 
         Raises:
-            RuntimeError: If the task descriptor is not found.
+            RuntimeError: If the task entry is not found.
         """
         return self.registry.get(name)
 
@@ -232,47 +235,54 @@ class TasksFacade(ABC):
         )
         self.context.event_publisher.emit(event)
 
-    def _resolve_descriptor(
+    def _resolve_submission(
         self,
         *,
         task_id: str | None,
         name: str | None,
-    ) -> TaskDescriptor:
-        """🔍 Resolve a task descriptor using either name or task identifier.
+        args: tuple[Any, ...],
+        kwargs: Mapping[str, Any],
+        metadata: Mapping[str, object],
+    ) -> TaskSubmission:
+        """🔍 Resolve a task submission using either name or task identifier.
 
         Args:
             task_id: The task ID.
             name: The name of the task.
+            args: Positional arguments for on-demand execution.
+            kwargs: Keyword arguments for on-demand execution.
+            metadata: Additional metadata for on-demand execution.
 
         Returns:
-            TaskDescriptor: The task descriptor.
+            TaskSubmission: The resolved task submission.
 
         Raises:
-            RuntimeError: If the task descriptor is not found.
+            RuntimeError: If the task entry is not found.
         """
-        if name is not None:
-            return self.registry.get(name)
-        if task_id is not None:
-            descriptor = self.registry.get_by_task_id(task_id)
-            if descriptor is None:
-                raise KeyError(f"⚠️ No task descriptor found for task_id {task_id!r}")
-            return descriptor
-        raise ValueError("⚠️ Either task_id or name must be provided")
+        if name is None:
+            if task_id is None:
+                raise ValueError("⚠️ Either task_id or name must be provided")
+            submission = self.registry.get_by_task_id(task_id)
+            if submission is None:
+                raise KeyError(f"⚠️ No task submission found for task_id {task_id!r}")
+            return submission
+        else:
+            entry = self.registry.get(name)
+            return TaskSubmission(
+                entry=entry,
+                args=args,
+                kwargs=dict(kwargs),
+                extra_metadata=metadata,
+            )
 
 
-class TaskRegistry(WorkloadRegistry[TaskDescriptor]):
-    """🗂️ Contract for storing task descriptors."""
+class TaskRegistry(WorkloadRegistry[TaskEntry]):
+    """🗂️ Contract for storing task entries and submissions."""
 
-    def get_by_task_id(self, task_id: str) -> TaskDescriptor | None:
-        """🔍 Retrieve a descriptor previously associated with a queue task ID.
+    def remember_task_id(self, task_id: str, submission: TaskSubmission) -> None:
+        """🔄 Associate a queue-provided task ID with a submission."""
+        ...
 
-        Args:
-            task_id: The task ID.
-
-        Returns:
-            TaskDescriptor: The task descriptor.
-
-        Raises:
-            RuntimeError: If the task descriptor is not found.
-        """
+    def get_by_task_id(self, task_id: str) -> TaskSubmission | None:
+        """🔍 Retrieve a submission previously associated with a queue task ID."""
         ...

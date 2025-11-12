@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Mapping
+from typing import Any, Mapping
 
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
@@ -34,7 +34,7 @@ class ServicesFacade:
     def register(
         self,
         name: str,
-        target: ServiceCallable,
+        target: ServiceCallable[Any],
         *,
         options: ServiceOptions | None = None,
         metadata: Mapping[str, object] | None = None,

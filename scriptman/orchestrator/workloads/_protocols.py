@@ -1,4 +1,4 @@
-"""⚙️ Shared workload contracts for Command Deck collaborators."""
+"""⚙️ Shared workload contracts for Orchestrator collaborators."""
 
 from __future__ import annotations
 
@@ -21,7 +21,13 @@ from typing_extensions import NotRequired
 if TYPE_CHECKING:
     from scriptman.orchestrator._context import RuntimeContext
 
-WorkloadKind = Literal["task", "service", "schedule"]
+
+# ⚙️ Workload type variables and constants
+WorkloadKind = Literal[
+    "task",
+    "service",
+    "schedule",
+]
 WorkloadOutcome = Literal[
     "success",
     "retry",
@@ -31,16 +37,26 @@ WorkloadOutcome = Literal[
     "restarting",
 ]
 
-DescriptorT = TypeVar("DescriptorT", bound="WorkloadDescriptor")
-DescriptorT_co = TypeVar("DescriptorT_co", bound="WorkloadDescriptor", covariant=True)
-DescriptorT_contra = TypeVar(
-    "DescriptorT_contra", bound="WorkloadDescriptor", contravariant=True
+# ⚙️ Workload entry type variables and constants
+EntryType = TypeVar(
+    "EntryType",
+    bound="WorkloadEntry",
+)
+EntryTypeInput = TypeVar(
+    "EntryTypeInput",
+    bound="WorkloadEntry",
+    contravariant=True,
+)
+EntryTypeOutput = TypeVar(
+    "EntryTypeOutput",
+    bound="WorkloadEntry",
+    covariant=True,
 )
 
 
 @runtime_checkable
-class WorkloadDescriptor(Protocol):
-    """🧾 Describes a unit of work managed by the Command Deck."""
+class WorkloadEntry(Protocol):
+    """🧾 Unit of work managed by the Orchestrator."""
 
     @property
     def name(self) -> str:
@@ -58,11 +74,24 @@ class WorkloadDescriptor(Protocol):
         ...
 
 
-class WorkloadResult(Protocol[DescriptorT_co]):
+# ⚙️ Workload result type variables and constants
+ResultTypeOutput = TypeVar(
+    "ResultTypeOutput",
+    bound="WorkloadResult[Any]",
+    covariant=True,
+)
+ResultTypeInput = TypeVar(
+    "ResultTypeInput",
+    bound="WorkloadResult[Any]",
+    contravariant=True,
+)
+
+
+class WorkloadResult(Protocol[EntryTypeOutput]):
     """✅ Standard result contract emitted by workload executors."""
 
     @property
-    def descriptor(self) -> DescriptorT_co:
+    def entry(self) -> EntryTypeOutput:
         """🔍 Descriptor that originated this execution."""
         ...
 
@@ -92,63 +121,57 @@ class WorkloadResult(Protocol[DescriptorT_co]):
         ...
 
 
-ResultT_co = TypeVar("ResultT_co", bound="WorkloadResult[Any]", covariant=True)
-ResultT_contra = TypeVar(
-    "ResultT_contra", bound="WorkloadResult[Any]", contravariant=True
-)
-
-
-class WorkloadExecutor(Protocol[DescriptorT_contra, ResultT_co]):
-    """⚙️ Executes a descriptor and returns a result."""
+class WorkloadExecutor(Protocol[EntryTypeInput, ResultTypeOutput]):
+    """⚙️ Executes a workload entry and returns a result."""
 
     def execute(
         self,
-        descriptor: DescriptorT_contra,
+        entry: EntryTypeInput,
         *,
         context: RuntimeContext,
-    ) -> ResultT_co:
+    ) -> ResultTypeOutput:
         """🚀 Perform the workload and return a typed result."""
         ...
 
 
-class WorkloadSummaryReporter(Protocol[ResultT_contra]):
+class WorkloadSummaryReporter(Protocol[ResultTypeInput]):
     """📊 Emits summaries after workload execution."""
 
-    def report(self, result: ResultT_contra, *, context: RuntimeContext) -> None:
+    def report(self, result: ResultTypeInput, *, context: RuntimeContext) -> None:
         """🗒️ Publish a summary for operators."""
         ...
 
 
-class WorkloadRegistry(Protocol[DescriptorT]):
-    """🗂️ Persistent store for workload descriptors."""
+class WorkloadRegistry(Protocol[EntryType]):
+    """🗂️ Persistent store for workload entries."""
 
-    def add(self, descriptor: DescriptorT) -> None:
-        """✍️ Register a descriptor for future lookups."""
+    def add(self, entry: EntryType) -> None:
+        """✍️ Register an entry for future lookups."""
         ...
 
-    def get(self, name: str) -> DescriptorT:
-        """🔍 Retrieve a descriptor by name."""
+    def get(self, name: str) -> EntryType:
+        """🔍 Retrieve an entry by name."""
         ...
 
 
-class WorkloadQueue(Protocol[DescriptorT]):
+class WorkloadQueue(Protocol[EntryType]):
     """🧱 Queue abstraction used prior to execution."""
 
     def enqueue(
         self,
-        descriptor: DescriptorT,
+        entry: EntryType,
         *,
         context: RuntimeContext,
     ) -> str:
-        """🚀 Enqueue a descriptor and return a task identifier."""
+        """🚀 Enqueue a workload entry and return a task identifier."""
         ...
 
     def dequeue(
         self,
         *,
         context: RuntimeContext,
-    ) -> tuple[str, DescriptorT] | None:
-        """🔄 Retrieve the next descriptor to process, if available."""
+    ) -> tuple[str, EntryType] | None:
+        """🔄 Retrieve the next entry to process, if available."""
         ...
 
     def complete(self, task_id: str, *, context: RuntimeContext) -> None:
@@ -170,8 +193,8 @@ class WorkloadEventPayload(TypedDict, total=False):
 
 
 @dataclass(slots=True)
-class BaseWorkloadDescriptor(WorkloadDescriptor):
-    """🧾 Minimal descriptor implementation."""
+class BaseWorkloadEntry(WorkloadEntry):
+    """🧾 Minimal workload entry implementation."""
 
     name: str
     kind: WorkloadKind
@@ -179,10 +202,10 @@ class BaseWorkloadDescriptor(WorkloadDescriptor):
 
 
 @dataclass(slots=True)
-class BaseWorkloadResult(Generic[DescriptorT], WorkloadResult[DescriptorT]):
+class BaseWorkloadResult(Generic[EntryType], WorkloadResult[EntryType]):
     """✅ Minimal result implementation with convenience helpers."""
 
-    descriptor: DescriptorT
+    entry: EntryType
     outcome: WorkloadOutcome
     started_at: datetime
     finished_at: datetime
@@ -196,9 +219,9 @@ class BaseWorkloadResult(Generic[DescriptorT], WorkloadResult[DescriptorT]):
 
 
 __all__ = [
-    "BaseWorkloadDescriptor",
+    "BaseWorkloadEntry",
     "BaseWorkloadResult",
-    "WorkloadDescriptor",
+    "WorkloadEntry",
     "WorkloadEventPayload",
     "WorkloadExecutor",
     "WorkloadKind",

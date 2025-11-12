@@ -5,9 +5,7 @@ description = "A powerful Python package for automation, script management, and 
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
 license = { file = "LICENSE" }
-classifiers = [
-    "License :: OSI Approved :: MIT License",
-]
+classifiers = ["License :: OSI Approved :: MIT License"]
 authors = [
     { name = "Nelson Ombuya", email = "developer@incognitouser.anonaddy.me" },
 ]
@@ -16,6 +14,7 @@ dependencies = [
     "loguru>=0.7.3",
     "tomlkit>=0.13.2",
     "filelock>=3.16.1",
+    "croniter>=1.3.16",
     "psutil (>=7.0.0,<8.0.0)",
     "types-tqdm>=4.67.0.20241221",
     "types-psutil (>=7.0.0.20250601,<8.0.0.0)",
@@ -43,6 +42,7 @@ sqlalchemy = ["sqlalchemy>=2.0.37", "pyodbc>=5.2.0"]
 
 [project.scripts]
 scriptman = "scriptman.core.cli:CLI.start_cli_instance"
+sm = "scriptman.sm:main"
 
 # Development dependency groups (used only during development)
 [tool.poetry.group.dev.dependencies]
@@ -118,7 +118,7 @@ disallow_incomplete_defs = true
 disallow_untyped_decorators = true
 
 [[tool.mypy.overrides]]
-module = ["diskcache.*", "dill.*", "pyodbc.*"]
+module = ["diskcache.*", "dill.*", "pyodbc.*", "croniter.*"]
 ignore_missing_imports = true
 
 [tool.scriptman]

@@ -3,14 +3,13 @@ from __future__ import annotations
 import asyncio
 import inspect
 from functools import wraps
-from typing import Any, Callable, Mapping
+from typing import Any, Awaitable, Callable, Mapping
 from uuid import uuid4
 
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
 from scriptman.orchestrator._logging import workload_log_sink
 from scriptman.orchestrator.services._context import ServiceContext
-from scriptman.powers.tasks import TaskManager  # placeholder for future injection
 
 from ._queue import QueueEntry, ScheduleQueue
 from ._registry import ScheduleRegistry
@@ -26,12 +25,10 @@ class SchedulerRunner:
         runtime_context: RuntimeContext,
         registry: ScheduleRegistry,
         queue: ScheduleQueue,
-        task_executor: TaskManager,  # TODO: replace with TasksFacade when integrated
     ) -> None:
         self._ctx = runtime_context
         self._registry = registry
         self._queue = queue
-        self._tasks = task_executor
 
     def service(self, service_context: ServiceContext) -> None:
         """🔁 Background loop for the scheduler runner service.
@@ -76,8 +73,9 @@ class SchedulerRunner:
         )
 
         invocation = self._wrap_target(descriptor)
-        # TODO: integrate with TasksFacade when available.
-        self._tasks.background(invocation)
+        result = invocation()
+        if inspect.isawaitable(result):
+            asyncio.run(self._await_result(result))
 
         next_fire = descriptor.trigger.next_fire(entry.fire_time)
         self._queue.reschedule(descriptor, next_fire)
@@ -146,6 +144,15 @@ class SchedulerRunner:
             payload=payload,
         )
         self._ctx.event_publisher.emit(event)
+
+    @staticmethod
+    async def _await_result(awaitable: Awaitable[Any]) -> Any:
+        """🔄 Await the result of an awaitable.
+
+        Args:
+            awaitable: The awaitable to await.
+        """
+        return await awaitable
 
 
 __all__ = ["SchedulerRunner"]

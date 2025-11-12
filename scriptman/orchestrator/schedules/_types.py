@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Mapping, TypeVar
 
+from scriptman.orchestrator._generics import ContextFunc
 from scriptman.orchestrator._logging import WorkloadLoggingOptions
 from scriptman.orchestrator.workloads import WorkloadKind, WorkloadOutcome
 
@@ -11,7 +12,8 @@ if TYPE_CHECKING:
     from ._context import ScheduleContext
     from ._triggers import ScheduleTrigger
 
-SchedulableCallable = Callable[["ScheduleContext"], Awaitable[Any] | Any]
+ScheduleReturn = TypeVar("ScheduleReturn")
+SchedulableCallable = ContextFunc[ScheduleContext, ScheduleReturn]
 
 
 @dataclass
@@ -35,7 +37,7 @@ class ScheduleDescriptor:
     """🧾 Immutable description of a scheduled job."""
 
     name: str
-    target: SchedulableCallable
+    target: SchedulableCallable[Any]
     trigger: "ScheduleTrigger"
     metadata: Mapping[str, Any] = field(default_factory=dict)
     logging: WorkloadLoggingOptions = field(default_factory=_default_schedule_logging)

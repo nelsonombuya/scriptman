@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Mapping
+from typing import Any, Mapping
 
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
@@ -10,7 +10,6 @@ from scriptman.orchestrator._logging import (
 )
 from scriptman.orchestrator.schedules import ScheduleTrigger
 from scriptman.orchestrator.services import ServiceOptions, ServicesFacade
-from scriptman.powers.tasks import TaskManager
 
 from ._queue import ScheduleQueue
 from ._registry import ScheduleRegistry
@@ -28,7 +27,6 @@ class SchedulesFacade:
         registry: ScheduleRegistry | None = None,
         queue: ScheduleQueue | None = None,
         services: ServicesFacade | None = None,
-        task_manager: TaskManager | None = None,  # TODO: replace with TasksFacade
     ) -> None:
         """🔄 Initialize the schedules facade.
 
@@ -37,25 +35,22 @@ class SchedulesFacade:
             registry: The schedule registry.
             queue: The schedule queue.
             services: The services facade.
-            task_manager: The task manager.
         """
         self._ctx = context
         self._registry = registry or ScheduleRegistry()
         self._queue = queue or ScheduleQueue()
         self._services = services
-        self._task_manager = task_manager or TaskManager()
         self._runner = SchedulerRunner(
             runtime_context=context,
             registry=self._registry,
             queue=self._queue,
-            task_executor=self._task_manager,
         )
         self._service_registered = False
 
     def register(
         self,
         name: str,
-        callable: SchedulableCallable,
+        callable: SchedulableCallable[Any],
         *,
         trigger: ScheduleTrigger,
         options: ScheduleOptions | None = None,

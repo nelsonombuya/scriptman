@@ -1,9 +1,9 @@
 """🚀 Workload contracts shared by tasks, services, and schedules."""
 
 from ._protocols import (
-    BaseWorkloadDescriptor,
+    BaseWorkloadEntry,
     BaseWorkloadResult,
-    WorkloadDescriptor,
+    WorkloadEntry,
     WorkloadEventPayload,
     WorkloadExecutor,
     WorkloadKind,
@@ -15,9 +15,9 @@ from ._protocols import (
 )
 
 __all__ = [
-    "BaseWorkloadDescriptor",
+    "BaseWorkloadEntry",
     "BaseWorkloadResult",
-    "WorkloadDescriptor",
+    "WorkloadEntry",
     "WorkloadEventPayload",
     "WorkloadExecutor",
     "WorkloadKind",

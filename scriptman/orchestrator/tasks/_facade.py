@@ -4,9 +4,15 @@ from abc import ABC
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Mapping, cast
+from uuid import uuid4
 
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
+from scriptman.orchestrator._logging import (
+    WorkloadLoggingOptions,
+    extract_logging_options,
+    workload_log_sink,
+)
 from scriptman.orchestrator.workloads import (
     WorkloadEventPayload,
     WorkloadExecutor,
@@ -20,6 +26,13 @@ from scriptman.orchestrator.workloads import (
 TaskCallable = Callable[..., object]
 
 
+def _default_task_logging() -> WorkloadLoggingOptions:
+    """🔍 Default logging options for tasks."""
+    return WorkloadLoggingOptions(
+        path_template="logs/tasks/{workload}/{date}/{run_id}.log"
+    )
+
+
 @dataclass
 class TaskDescriptor:
     """🧾 Immutable description of a registered task."""
@@ -27,6 +40,7 @@ class TaskDescriptor:
     name: str
     target: TaskCallable
     metadata: Mapping[str, object] = field(default_factory=dict)
+    logging: WorkloadLoggingOptions = field(default_factory=_default_task_logging)
 
     @property
     def kind(self) -> WorkloadKind:
@@ -86,6 +100,10 @@ class TasksFacade(ABC):
             RuntimeError: If the task descriptor is not found.
         """
 
+        default_logging = _default_task_logging()
+        decorator_logging = extract_logging_options(descriptor.target)
+        if descriptor.logging == default_logging and decorator_logging != default_logging:
+            descriptor.logging = decorator_logging
         self.registry.add(descriptor)
         payload: WorkloadEventPayload = {
             "workload_kind": "task",
@@ -143,7 +161,15 @@ class TasksFacade(ABC):
         }
         self._emit(RuntimeEventTopic.TASK_STARTED, payload=started_payload)
 
-        result = self.executor.execute(descriptor, context=self.context)
+        resolved_task_id = task_id or f"manual-{descriptor.name}-{uuid4()}"
+        with workload_log_sink(
+            workload=descriptor.name,
+            run_id=resolved_task_id,
+            options=descriptor.logging,
+        ):
+            result = self.executor.execute(descriptor, context=self.context)
+        if not getattr(result, "task_id", None):
+            result.task_id = resolved_task_id
 
         completion_payload: WorkloadEventPayload = {
             "workload_kind": "task",
@@ -194,11 +220,15 @@ class TasksFacade(ABC):
         Raises:
             RuntimeError: If the event is not found.
         """
+        payload_data: dict[str, object] = {}
+        if payload is not None:
+            payload_data.update(dict(payload))
+        if extras:
+            payload_data.update(extras)
         event = make_event(
             topic,
-            payload=payload,
+            payload=payload_data,
             timestamp_factory=self.context.timestamp,
-            **extras,
         )
         self.context.event_publisher.emit(event)
 

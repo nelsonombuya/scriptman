@@ -22,7 +22,14 @@ if TYPE_CHECKING:
     from scriptman.orchestrator._context import RuntimeContext
 
 WorkloadKind = Literal["task", "service", "schedule"]
-WorkloadOutcome = Literal["success", "retry", "failure", "stopped"]
+WorkloadOutcome = Literal[
+    "success",
+    "retry",
+    "failure",
+    "stopped",
+    "running",
+    "restarting",
+]
 
 DescriptorT = TypeVar("DescriptorT", bound="WorkloadDescriptor")
 DescriptorT_co = TypeVar("DescriptorT_co", bound="WorkloadDescriptor", covariant=True)
@@ -154,6 +161,7 @@ class WorkloadEventPayload(TypedDict, total=False):
 
     workload_kind: WorkloadKind
     workload_name: str
+    run_id: NotRequired[str]
     task_id: NotRequired[str]
     status: NotRequired[str]
     metadata: NotRequired[Mapping[str, Any]]

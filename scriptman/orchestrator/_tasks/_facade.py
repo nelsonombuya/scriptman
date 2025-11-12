@@ -7,7 +7,7 @@ from uuid import uuid4
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
 from scriptman.orchestrator._logging import extract_logging_options, workload_log_sink
-from scriptman.orchestrator.workloads import (
+from scriptman.orchestrator._workloads import (
     WorkloadEventPayload,
     WorkloadExecutor,
     WorkloadQueue,

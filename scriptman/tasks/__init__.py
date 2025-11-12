@@ -23,7 +23,7 @@ from scriptman.orchestrator import (
 from scriptman.orchestrator._context import ExecutorRegistry, ExecutorStrategy
 from scriptman.orchestrator._events import SynchronousEventBus
 from scriptman.orchestrator._generics import Func
-from scriptman.orchestrator.tasks import (
+from scriptman.orchestrator._tasks import (
     InMemoryTaskQueue,
     InMemoryTaskRegistryStore,
     SynchronousTaskExecutor,
@@ -31,8 +31,8 @@ from scriptman.orchestrator.tasks import (
     TaskEntry,
     TaskExecutionResult,
 )
-from scriptman.orchestrator.tasks import TaskRegistry as TaskRegistryProtocol
-from scriptman.orchestrator.tasks import (
+from scriptman.orchestrator._tasks import TaskRegistry as TaskRegistryProtocol
+from scriptman.orchestrator._tasks import (
     TaskResourceSpec,
     TaskRetryPolicy,
     TasksFacade,
@@ -40,9 +40,9 @@ from scriptman.orchestrator.tasks import (
     TaskSubmission,
     default_task_logging,
 )
-from scriptman.orchestrator.tasks._registry import TaskRegistry as TaskRegistryImpl
-from scriptman.orchestrator.tasks._reporter import TaskReporter
-from scriptman.orchestrator.workloads import WorkloadQueue
+from scriptman.orchestrator._tasks._registry import TaskRegistry as TaskRegistryImpl
+from scriptman.orchestrator._tasks._reporter import TaskReporter
+from scriptman.orchestrator._workloads import WorkloadQueue
 
 TaskParams = ParamSpec("TaskParams")
 TaskReturn = TypeVar("TaskReturn")

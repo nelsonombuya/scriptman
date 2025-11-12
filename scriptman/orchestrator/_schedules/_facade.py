@@ -8,8 +8,8 @@ from scriptman.orchestrator._logging import (
     WorkloadLoggingOptions,
     extract_logging_options,
 )
-from scriptman.orchestrator.schedules import ScheduleTrigger
-from scriptman.orchestrator.services import ServiceOptions, ServicesFacade
+from scriptman.orchestrator._schedules import ScheduleTrigger
+from scriptman.orchestrator._services import ServiceOptions, ServicesFacade
 
 from ._queue import ScheduleQueue
 from ._registry import ScheduleRegistry

@@ -6,7 +6,7 @@ from typing import Any, Mapping, TypeVar
 
 from scriptman.orchestrator._generics import ContextFunc
 from scriptman.orchestrator._logging import WorkloadLoggingOptions
-from scriptman.orchestrator.workloads import WorkloadKind, WorkloadOutcome
+from scriptman.orchestrator._workloads import WorkloadKind, WorkloadOutcome
 
 from ._context import ServiceContext
 from ._policies import RestartPolicy

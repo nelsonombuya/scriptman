@@ -4,8 +4,8 @@ from typing import Any
 from uuid import uuid4
 
 from scriptman.orchestrator._context import RuntimeContext
-from scriptman.orchestrator.tasks._model import TaskExecutionResult, TaskSubmission
-from scriptman.orchestrator.workloads import WorkloadExecutor, WorkloadOutcome
+from scriptman.orchestrator._tasks._model import TaskExecutionResult, TaskSubmission
+from scriptman.orchestrator._workloads import WorkloadExecutor, WorkloadOutcome
 
 
 class SynchronousTaskExecutor(WorkloadExecutor[TaskSubmission, TaskExecutionResult]):

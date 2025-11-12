@@ -12,7 +12,7 @@ from loguru import logger
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
 from scriptman.orchestrator._logging import workload_log_sink
-from scriptman.orchestrator.workloads import WorkloadOutcome
+from scriptman.orchestrator._workloads import WorkloadOutcome
 
 from ._context import ServiceContext
 from ._facade_types import ServiceDescriptor, ServiceOptions

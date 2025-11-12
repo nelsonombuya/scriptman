@@ -5,8 +5,8 @@ from typing import Any, Mapping
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
 from scriptman.orchestrator._logging import extract_logging_options
-from scriptman.orchestrator.services._registry import ServiceRegistry
-from scriptman.orchestrator.services._status import ServiceOverview, ServiceStatus
+from scriptman.orchestrator._services._registry import ServiceRegistry
+from scriptman.orchestrator._services._status import ServiceOverview, ServiceStatus
 
 from ._facade_types import (
     ServiceCallable,

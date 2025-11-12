@@ -38,9 +38,9 @@ class ScheduleQueue:
         """
         entry = QueueEntry(
             fire_time=fire_time,
-            sequence=next(self._counter),
             name=descriptor.name,
             descriptor=descriptor,
+            sequence=next(self._counter),
         )
         heapq.heappush(self._heap, entry)
         self._index[descriptor.name] = entry

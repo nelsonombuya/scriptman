@@ -9,7 +9,7 @@ from uuid import uuid4
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
 from scriptman.orchestrator._logging import workload_log_sink
-from scriptman.orchestrator.services._context import ServiceContext
+from scriptman.orchestrator._services._context import ServiceContext
 
 from ._queue import QueueEntry, ScheduleQueue
 from ._registry import ScheduleRegistry

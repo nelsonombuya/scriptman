@@ -5,7 +5,7 @@ from typing import Callable
 
 from typing_extensions import Literal
 
-from scriptman.orchestrator.workloads import WorkloadEventPayload
+from scriptman.orchestrator._workloads import WorkloadEventPayload
 
 
 @dataclass(slots=True)

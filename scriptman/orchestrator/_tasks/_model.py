@@ -6,7 +6,7 @@ from typing import Any, Literal, Mapping, MutableMapping, Sequence
 
 from scriptman.orchestrator._generics import AnyCallable
 from scriptman.orchestrator._logging import WorkloadLoggingOptions
-from scriptman.orchestrator.workloads import WorkloadKind, WorkloadOutcome
+from scriptman.orchestrator._workloads import WorkloadKind, WorkloadOutcome
 
 TaskCallable = AnyCallable
 ResourceClass = Literal["light", "standard", "heavy"]

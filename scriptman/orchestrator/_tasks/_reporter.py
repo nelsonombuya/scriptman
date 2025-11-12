@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Protocol
 
 from scriptman.orchestrator._context import RuntimeContext
-from scriptman.orchestrator.tasks._model import TaskExecutionResult
-from scriptman.orchestrator.workloads import WorkloadSummaryReporter
+from scriptman.orchestrator._tasks._model import TaskExecutionResult
+from scriptman.orchestrator._workloads import WorkloadSummaryReporter
 
 
 class TaskReporter(WorkloadSummaryReporter[TaskExecutionResult], Protocol):

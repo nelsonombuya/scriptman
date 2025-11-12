@@ -6,7 +6,7 @@ from typing import Deque, Dict, Tuple
 from uuid import uuid4
 
 from scriptman.orchestrator._context import RuntimeContext
-from scriptman.orchestrator.workloads import WorkloadQueue
+from scriptman.orchestrator._workloads import WorkloadQueue
 
 from ._model import TaskSubmission
 

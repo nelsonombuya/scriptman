@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Mapping
 
-from scriptman.orchestrator.workloads import WorkloadOutcome
+from scriptman.orchestrator._workloads import WorkloadOutcome
 
 
 @dataclass(slots=True)

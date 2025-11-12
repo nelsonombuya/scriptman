@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Mapping, TypeVar
 
 from scriptman.orchestrator._generics import ContextFunc
 from scriptman.orchestrator._logging import WorkloadLoggingOptions
-from scriptman.orchestrator.workloads import WorkloadKind, WorkloadOutcome
+from scriptman.orchestrator._workloads import WorkloadKind, WorkloadOutcome
 
 if TYPE_CHECKING:
     from ._context import ScheduleContext

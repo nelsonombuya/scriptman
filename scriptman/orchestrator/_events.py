@@ -7,7 +7,7 @@ from enum import Enum
 from threading import RLock
 from typing import Callable, DefaultDict, Iterable, Mapping, Protocol
 
-from .workloads import WorkloadEventPayload
+from ._workloads import WorkloadEventPayload
 
 
 class RuntimeEventTopic(str, Enum):

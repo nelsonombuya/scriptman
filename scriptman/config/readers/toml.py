@@ -42,7 +42,7 @@ class TomlReader(ConfigReader):
         return "toml"
 
     @property
-    def file_path(self) -> Path:
+    def file_path(self) -> Path | None:
         return self._path
 
     def read(self) -> dict[str, Any]:

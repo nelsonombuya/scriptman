@@ -19,8 +19,7 @@ __debug__.py
 # Folders
 dist
 .qodo
-.logs
-.cache
+.data
 htmlcov
 .selenium
 .downloads

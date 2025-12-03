@@ -6,7 +6,7 @@ structure. Each nested config section is defined in its own module for clarity.
 Usage:
     >>> from scriptman.config.schema import ConfigSchema
     >>> ConfigSchema.get_all_keys()
-    ['logging.level', 'logging.dir', 'execution.concurrent']
+    ['data.dir', 'data.logs', 'logging.level', 'execution.concurrent']
 
     >>> ConfigSchema.get_default("logging.level")
     'INFO'
@@ -20,11 +20,13 @@ from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 
 # Import nested config models
+from .data import DataConfig
 from .execution import ExecutionConfig
 from .logging import LoggingConfig
 
 __all__ = [
     "ConfigSchema",
+    "DataConfig",
     "ExecutionConfig",
     "LoggingConfig",
 ]
@@ -37,17 +39,21 @@ class ConfigSchema(BaseModel):
     what they want to change.
 
     Sections:
-        logging: Logging configuration (level, directory)
+        data: Data storage configuration (base dir, subdirectories)
+        logging: Logging configuration (level)
         execution: Script execution configuration (concurrency)
 
     Example:
         >>> schema = ConfigSchema()
+        >>> schema.data.dir
+        PosixPath('.data')
         >>> schema.logging.level
         'INFO'
         >>> schema.execution.concurrent
         True
     """
 
+    data: DataConfig = Field(default_factory=DataConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
 
@@ -130,7 +136,7 @@ class ConfigSchema(BaseModel):
 
         Example:
             >>> ConfigSchema.get_all_keys()
-            ['logging.level', 'logging.dir', 'execution.concurrent']
+            ['data.dir', 'data.logs', 'data.db', 'logging.level', 'execution.concurrent']
         """
         keys: list[str] = []
         for name, field in cls.model_fields.items():

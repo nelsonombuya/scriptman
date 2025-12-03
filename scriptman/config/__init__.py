@@ -13,6 +13,12 @@ Usage:
     >>> with config.temporary(execution={"concurrent": False}):
     ...     # Runs with concurrent=False
     ...     pass
+
+    # Path resolution for data directories
+    >>> config.resolve_path("logs")
+    PosixPath('.data/logs')
+    >>> config.ensure_path("db")  # Creates directory if needed
+    PosixPath('.data/db')
 """
 
 from __future__ import annotations
@@ -31,6 +37,7 @@ from .readers import (
     auto_discover_secrets_reader,
 )
 from .schema import ConfigSchema
+from .schema.data import DataCategory, DataConfig
 
 __all__ = ["config", "Config", "ConfigSchema"]
 
@@ -157,6 +164,65 @@ class Config:
     def items(self) -> list[tuple[str, Any]]:
         """🔍 Get all config key-value pairs."""
         return [(key, self.get(key)) for key in self.keys()]
+
+    # ─────────────────────────────────────────────────────────────
+    # Path Resolution
+    # ─────────────────────────────────────────────────────────────
+
+    def resolve_path(self, category: DataCategory) -> Path:
+        """📁 Resolve path for a data category.
+
+        Returns the full path for a data category based on config.
+        Uses data.dir as the base directory.
+
+        Args:
+            category: One of 'logs', 'db', 'cache', 'artifacts'
+
+        Returns:
+            Full resolved path for the category
+
+        Example:
+            >>> config.resolve_path("logs")
+            PosixPath('.data/logs')
+            >>> config.resolve_path("db")
+            PosixPath('.data/db')
+        """
+        # Build DataConfig from current config values
+        data_config = DataConfig(
+            dir=self.get("data.dir"),
+            logs=self.get("data.logs"),
+            db=self.get("data.db"),
+            cache=self.get("data.cache"),
+            artifacts=self.get("data.artifacts"),
+        )
+        return data_config.get_path(category)
+
+    def ensure_path(self, category: DataCategory) -> Path:
+        """📁 Resolve path for a data category, creating directory if needed.
+
+        Same as resolve_path but also creates the directory.
+
+        Args:
+            category: One of 'logs', 'db', 'cache', 'artifacts'
+
+        Returns:
+            Full resolved path (directory created if needed)
+
+        Example:
+            >>> config.ensure_path("logs")
+            PosixPath('.data/logs')
+            >>> Path('.data/logs').exists()
+            True
+        """
+        # Build DataConfig from current config values
+        data_config = DataConfig(
+            dir=self.get("data.dir"),
+            logs=self.get("data.logs"),
+            db=self.get("data.db"),
+            cache=self.get("data.cache"),
+            artifacts=self.get("data.artifacts"),
+        )
+        return data_config.ensure_path(category)
 
     # ─────────────────────────────────────────────────────────────
     # Writing
@@ -413,15 +479,24 @@ class Config:
 config = Config()
 
 # Expose methods at module level for scriptman.config.get() style
+
+# Reading & writing
 get = config.get
 set = config.set
 reset = config.reset
 reset_all = config.reset_all
 
+# Overrides
 override = config.override
 temporary = config.temporary
 clear_overrides = config.clear_overrides
 
+# Reader management
 use_reader = config.use_reader
 migrate_to = config.migrate_to
 generate_example = config.generate_example
+
+# Path resolution helpers
+resolve_path = config.resolve_path
+ensure_path = config.ensure_path
+ensure_path = config.ensure_path

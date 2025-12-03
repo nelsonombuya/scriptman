@@ -6,14 +6,22 @@ different backends (SQLite, PostgreSQL, MySQL, etc.).
 Quick Start:
     >>> from scriptman.database import SQLiteClient
     >>>
-    >>> db = SQLiteClient("app.db")
+    >>> # Default location: .data/db/default.db
+    >>> db = SQLiteClient()
+    >>>
+    >>> # Custom name in default location: .data/db/myapp.db
+    >>> db = SQLiteClient(name="myapp.db")
+    >>>
+    >>> # Explicit path (ignores config)
+    >>> db = SQLiteClient("path/to/custom.db")
+    >>>
     >>> db.execute("CREATE TABLE users (id INTEGER, name TEXT)")
     >>> db.execute("INSERT INTO users VALUES (:id, :name)", {"id": 1, "name": "Alice"})
     >>> users = db.query("SELECT * FROM users")
     >>> db.close()
 
 Context Manager:
-    >>> with SQLiteClient("app.db") as db:
+    >>> with SQLiteClient(name="app.db") as db:
     ...     users = db.query("SELECT * FROM users")
 
 Query Portability:

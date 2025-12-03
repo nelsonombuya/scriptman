@@ -26,11 +26,24 @@ class SQLiteClient(DatabaseClient):
 
     Args:
         path: Path to SQLite database file (created if doesn't exist)
-            Use ":memory:" for in-memory database
+            - Use ":memory:" for in-memory database
+            - Use None for default location (config's data.db directory)
+        name: Database name (used with default path). Default: "default.db"
         timeout: Connection timeout in seconds (default: 30)
 
     Example:
-        >>> db = SQLiteClient("app.db")
+        >>> # Default location: .data/db/default.db
+        >>> db = SQLiteClient()
+
+        >>> # Custom name in default location: .data/db/myapp.db
+        >>> db = SQLiteClient(name="myapp.db")
+
+        >>> # Explicit path (ignores config)
+        >>> db = SQLiteClient("path/to/custom.db")
+
+        >>> # In-memory database
+        >>> db = SQLiteClient(":memory:")
+
         >>> db.execute("CREATE TABLE IF NOT EXISTS events (id TEXT, message TEXT)")
         >>> db.execute(
         ...     "INSERT INTO events VALUES (:id, :msg)",
@@ -55,28 +68,55 @@ class SQLiteClient(DatabaseClient):
 
     def __init__(
         self,
-        path: str | Path = ":memory:",
+        path: str | Path | None = None,
+        *,
+        name: str = "default.db",
         timeout: float = 30.0,
     ) -> None:
         """🚀 Initialize SQLite client.
 
         Args:
-            path: Database file path, or ":memory:" for in-memory
+            path: Database file path, ":memory:" for in-memory, or None for default
+            name: Database filename when using default path (default: "default.db")
             timeout: Connection timeout in seconds
         """
         super().__init__()
 
-        self._path: str | Path
-        if path == ":memory:":
-            self._path = path
-        else:
-            self._path = Path(path)
-            # Create parent directory if needed
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-
+        self._path: str | Path = self._resolve_path(path, name)
         self._timeout = timeout
         self._conn: sqlite3.Connection | None = None
         self._lock = Lock()
+
+    def _resolve_path(self, path: str | Path | None, name: str) -> str | Path:
+        """📁 Resolve database path based on input.
+
+        Resolution order:
+            1. ":memory:" → in-memory database
+            2. Explicit path → use as-is (create parent dirs)
+            3. None → use config's data.db directory + name
+
+        Args:
+            path: User-provided path (or None)
+            name: Database filename for default location
+
+        Returns:
+            Resolved path string or Path object
+        """
+        # In-memory database
+        if path == ":memory:":
+            return path
+
+        # Explicit path provided
+        if path is not None:
+            resolved = Path(path)
+            resolved.parent.mkdir(parents=True, exist_ok=True)
+            return resolved
+
+        # Default: use config's db directory
+        from scriptman import config
+
+        db_dir = config.ensure_path("db")
+        return db_dir / name
 
     # ─────────────────────────────────────────────────────────────
     # Properties
@@ -141,9 +181,14 @@ class SQLiteClient(DatabaseClient):
             try:
                 yield
                 self._conn.commit()
-            except Exception as e:
+            except sqlite3.Error as e:
+                # Wrap database errors in DatabaseError
                 self._conn.rollback()
                 raise DatabaseError("Transaction failed", e)
+            except Exception:
+                # Re-raise user exceptions unchanged (don't hide their type)
+                self._conn.rollback()
+                raise
 
     # ─────────────────────────────────────────────────────────────
     # Query Execution
@@ -293,7 +338,7 @@ class SQLiteClient(DatabaseClient):
             ...     primary_key=["id"]
             ... )
         """
-        exists_clause = "IF NOT EXISTS" if if_not_exists else ""
+        exists_clause = "IF NOT EXISTS " if if_not_exists else ""
 
         col_defs = ", ".join(f'"{name}" {dtype}' for name, dtype in columns.items())
 
@@ -301,7 +346,7 @@ class SQLiteClient(DatabaseClient):
             pk_cols = ", ".join(f'"{col}"' for col in primary_key)
             col_defs += f", PRIMARY KEY ({pk_cols})"
 
-        sql = f'CREATE TABLE {exists_clause} "{table_name}" ({col_defs})'
+        sql = f'CREATE TABLE {exists_clause}"{table_name}" ({col_defs})'
         self.execute(sql)
         self._log.debug(f"🏗️ Created table: {table_name}")
 
@@ -313,7 +358,7 @@ class SQLiteClient(DatabaseClient):
             if_exists: Add IF EXISTS clause
         """
         exists_clause = "IF EXISTS " if if_exists else ""
-        self.execute(f'DROP TABLE {exists_clause} "{table_name}"')
+        self.execute(f'DROP TABLE {exists_clause}"{table_name}"')
         self._log.debug(f"🗑️ Dropped table: {table_name}")
 
     def create_index(
@@ -340,12 +385,12 @@ class SQLiteClient(DatabaseClient):
             ...     ["timestamp"]
             ... )
         """
-        unique_clause = "UNIQUE" if unique else ""
-        exists_clause = "IF NOT EXISTS" if if_not_exists else ""
+        unique_clause = "UNIQUE " if unique else ""
+        exists_clause = "IF NOT EXISTS " if if_not_exists else ""
         cols = ", ".join(f'"{col}"' for col in columns)
 
         sql = (
-            f'CREATE {unique_clause} INDEX {exists_clause} "{index_name}" '
+            f'CREATE {unique_clause}INDEX {exists_clause}"{index_name}" '
             f'ON "{table_name}" ({cols})'
         )
         self.execute(sql)
@@ -390,8 +435,8 @@ class SQLiteClient(DatabaseClient):
         self._log.info("🔒 Disabled WAL mode")
 
     def is_wal_mode(self) -> bool:
-        """🔍 Get the current WAL mode."""
-        return str(self.get_pragma("journal_mode")) == "WAL"
+        """🔍 Check if WAL mode is currently enabled."""
+        return str(self.get_pragma("journal_mode")).lower() == "wal"
 
     def get_pragma(self, pragma: str) -> Any:
         """⚙️ Get a SQLite pragma value.

@@ -23,12 +23,14 @@ from pydantic.fields import FieldInfo
 from .data import DataConfig
 from .execution import ExecutionConfig
 from .logging import LoggingConfig
+from .observe import ObserveConfig
 
 __all__ = [
     "ConfigSchema",
     "DataConfig",
     "ExecutionConfig",
     "LoggingConfig",
+    "ObserveConfig",
 ]
 
 
@@ -42,6 +44,7 @@ class ConfigSchema(BaseModel):
         data: Data storage configuration (base dir, subdirectories)
         logging: Logging configuration (level)
         execution: Script execution configuration (concurrency)
+        observe: Observer/telemetry configuration
 
     Example:
         >>> schema = ConfigSchema()
@@ -51,10 +54,13 @@ class ConfigSchema(BaseModel):
         'INFO'
         >>> schema.execution.concurrent
         True
+        >>> schema.observe.enabled
+        True
     """
 
     data: DataConfig = Field(default_factory=DataConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    observe: ObserveConfig = Field(default_factory=ObserveConfig)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
 
     @classmethod

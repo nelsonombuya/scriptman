@@ -244,6 +244,9 @@ class Config:
             >>> config.set("logging.level", "DEBUG")
             >>> config.set("execution.concurrent", False)
         """
+        # Capture old value for event
+        old_value = self.get(key)
+
         # Validate against schema
         self._validate(key, value)
 
@@ -254,6 +257,16 @@ class Config:
         if persist and self._reader.supports_write():
             self._reader.write(self._store)
             logger.debug(f"✍️ Config updated: {key} = {value}")
+
+        # Emit config change event
+        self._emit_event(
+            f"Config changed: {key}",
+            event_type="config.changed",
+            key=key,
+            old_value=self._safe_serialize(old_value),
+            new_value=self._safe_serialize(value),
+            persisted=persist,
+        )
 
     def __setitem__(self, key: str, value: Any) -> None:
         """✍️ Bracket notation assignment: config["logging.level"] = "DEBUG" """
@@ -297,11 +310,33 @@ class Config:
             if isinstance(value, dict):
                 # Flatten nested dict
                 for flat_key, flat_value in self._flatten_dict(value, prefix=key):
+                    old_value = self._overrides.get(flat_key)
                     self._validate(flat_key, flat_value)
                     self._overrides[flat_key] = flat_value
+
+                    # Emit config change event
+                    self._emit_event(
+                        f"Config override: {flat_key}",
+                        event_type="config.changed",
+                        key=flat_key,
+                        old_value=self._safe_serialize(old_value),
+                        new_value=self._safe_serialize(flat_value),
+                        is_override=True,
+                    )
             else:
+                old_value = self._overrides.get(key)
                 self._validate(key, value)
                 self._overrides[key] = value
+
+                # Emit config change event
+                self._emit_event(
+                    f"Config override: {key}",
+                    event_type="config.changed",
+                    key=key,
+                    old_value=self._safe_serialize(old_value),
+                    new_value=self._safe_serialize(value),
+                    is_override=True,
+                )
 
     def clear_overrides(self) -> None:
         """🧹 Clear all runtime overrides."""
@@ -327,11 +362,25 @@ class Config:
             >>> # Original config restored
         """
         previous = self._overrides.copy()
+
+        # Emit start event
+        self._emit_event(
+            "Config temporary override started",
+            event_type="config.override.start",
+            overrides={k: self._safe_serialize(v) for k, v in kwargs.items()},
+        )
+
         self.override(**kwargs)
         try:
             yield
         finally:
             self._overrides = previous
+            # Emit end event
+            self._emit_event(
+                "Config temporary override ended",
+                event_type="config.override.end",
+                restored_keys=list(kwargs.keys()),
+            )
 
     # ─────────────────────────────────────────────────────────────
     # Reader Management
@@ -470,6 +519,40 @@ class Config:
                 items.append((full_key, value))
 
         return items
+
+    def _emit_event(
+        self,
+        message: str,
+        event_type: str,
+        **data: Any,
+    ) -> None:
+        """📝 Emit config change event (safe, won't fail if observe unavailable)."""
+        try:
+            from scriptman.observe import observe
+            from scriptman.observe.event import EventType
+
+            # Use the event type constants if available
+            if event_type == "config.changed":
+                event_type = EventType.CONFIG_CHANGED
+            elif event_type == "config.override.start":
+                event_type = EventType.CONFIG_OVERRIDE_START
+            elif event_type == "config.override.end":
+                event_type = EventType.CONFIG_OVERRIDE_END
+
+            observe.event(message, event_type=event_type, **data)
+        except Exception:
+            # Don't fail config operations if observe isn't ready
+            pass
+
+    @staticmethod
+    def _safe_serialize(value: Any) -> Any:
+        """🔒 Safely serialize value for event data."""
+        try:
+            from scriptman.serialization import serialize
+
+            return serialize(value)
+        except Exception:
+            return str(value)
 
 
 # ─────────────────────────────────────────────────────────────────

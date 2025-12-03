@@ -14,7 +14,7 @@ from scriptman.orchestrator._services import ServiceOptions, ServicesFacade
 from ._queue import ScheduleQueue
 from ._registry import ScheduleRegistry
 from ._runner import SchedulerRunner
-from ._types import SchedulableCallable, ScheduleDescriptor, ScheduleOptions
+from ._types import SchedulableCallable, ScheduleEntry, ScheduleOptions
 
 
 class SchedulesFacade:
@@ -50,7 +50,7 @@ class SchedulesFacade:
     def register(
         self,
         name: str,
-        callable: SchedulableCallable[Any],
+        callable: SchedulableCallable,
         *,
         trigger: ScheduleTrigger,
         options: ScheduleOptions | None = None,
@@ -65,7 +65,7 @@ class SchedulesFacade:
             options: The options for the schedule.
             metadata: The metadata for the schedule.
         """
-        descriptor = ScheduleDescriptor(
+        entry = ScheduleEntry(
             name=name,
             target=callable,
             trigger=trigger,
@@ -76,14 +76,14 @@ class SchedulesFacade:
             path_template="logs/schedules/{workload}/{date}/{run_id}.log"
         )
         decorator_logging = extract_logging_options(callable)
-        if descriptor.logging == default_logging and decorator_logging != default_logging:
-            descriptor.logging = decorator_logging
-        self._registry.add(descriptor, opts)
-        self._emit(RuntimeEventTopic.SCHEDULED_JOB_REGISTERED, descriptor, {})
+        if entry.logging == default_logging and decorator_logging != default_logging:
+            entry.logging = decorator_logging
+        self._registry.add(entry, opts)
+        self._emit(RuntimeEventTopic.SCHEDULED_JOB_REGISTERED, entry, {})
 
         next_fire = trigger.next_fire(self._ctx.timestamp())
         if next_fire is not None:
-            self._queue.enqueue(descriptor, next_fire)
+            self._queue.enqueue(entry, next_fire)
 
         self._ensure_service()
 
@@ -93,11 +93,11 @@ class SchedulesFacade:
         Args:
             name: The name of the schedule.
         """
-        descriptor = self._registry.get(name)
+        entry = self._registry.get(name)
         self._queue.remove(name)
         self._emit(
             RuntimeEventTopic.SCHEDULED_JOB_REGISTERED,
-            descriptor,
+            entry,
             {"status": "paused"},
         )
 
@@ -107,13 +107,13 @@ class SchedulesFacade:
         Args:
             name: The name of the schedule.
         """
-        descriptor = self._registry.get(name)
-        next_fire = descriptor.trigger.next_fire(self._ctx.timestamp())
+        entry = self._registry.get(name)
+        next_fire = entry.trigger.next_fire(self._ctx.timestamp())
         if next_fire is not None:
-            self._queue.enqueue(descriptor, next_fire)
+            self._queue.enqueue(entry, next_fire)
         self._emit(
             RuntimeEventTopic.SCHEDULED_JOB_REGISTERED,
-            descriptor,
+            entry,
             {"status": "resumed"},
         )
         self._ensure_service()
@@ -124,30 +124,21 @@ class SchedulesFacade:
         Args:
             name: The name of the schedule.
         """
-        descriptor = self._registry.get(name)
-        self._queue.enqueue(descriptor, self._ctx.timestamp())
+        entry = self._registry.get(name)
+        self._queue.enqueue(entry, self._ctx.timestamp())
         self._ensure_service()
 
     def _emit(
         self,
         topic: RuntimeEventTopic,
-        descriptor: ScheduleDescriptor,
+        entry: ScheduleEntry,
         extra: Mapping[str, object] | None = None,
     ) -> None:
-        """🔔 Emit an event for a schedule.
-
-        Args:
-            topic: The topic of the event.
-            descriptor: The schedule descriptor.
-            extra: The extra of the event.
-
-        Raises:
-            RuntimeError: If the event is not found.
-        """
+        """🔔 Emit an event for a schedule entry."""
         payload_data: dict[str, object] = {
             "workload_kind": "schedule",
-            "workload_name": descriptor.name,
-            "metadata": descriptor.metadata,
+            "workload_name": entry.name,
+            "metadata": entry.metadata,
         }
         if extra:
             for key, value in extra.items():

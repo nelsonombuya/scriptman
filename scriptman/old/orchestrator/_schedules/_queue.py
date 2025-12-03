@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import MutableMapping
 
-from ._types import ScheduleDescriptor
+from ._types import ScheduleEntry
 
 
 @dataclass(order=True)
@@ -14,7 +14,7 @@ class QueueEntry:
     fire_time: datetime
     sequence: int
     name: str
-    descriptor: ScheduleDescriptor
+    entry: ScheduleEntry
 
 
 class ScheduleQueue:
@@ -27,24 +27,24 @@ class ScheduleQueue:
 
     def enqueue(
         self,
-        descriptor: ScheduleDescriptor,
+        entry: ScheduleEntry,
         fire_time: datetime,
     ) -> str:
         """🔄 Enqueue a schedule.
 
         Args:
-            descriptor: The schedule descriptor.
+            entry: The schedule entry.
             fire_time: The fire time of the schedule.
         """
-        entry = QueueEntry(
+        queue_entry = QueueEntry(
             fire_time=fire_time,
-            name=descriptor.name,
-            descriptor=descriptor,
+            name=entry.name,
+            entry=entry,
             sequence=next(self._counter),
         )
-        heapq.heappush(self._heap, entry)
-        self._index[descriptor.name] = entry
-        return descriptor.name
+        heapq.heappush(self._heap, queue_entry)
+        self._index[entry.name] = queue_entry
+        return entry.name
 
     def dequeue_due(self, now: datetime) -> QueueEntry | None:
         """🔄 Dequeue a schedule due.
@@ -53,12 +53,12 @@ class ScheduleQueue:
             now: The current time.
         """
         while self._heap:
-            entry = self._heap[0]
-            if entry.fire_time > now:
+            queue_entry = self._heap[0]
+            if queue_entry.fire_time > now:
                 return None
             heapq.heappop(self._heap)
-            if self._index.pop(entry.name, None) is entry:
-                return entry
+            if self._index.pop(queue_entry.name, None) is queue_entry:
+                return queue_entry
         return None
 
     def peek_due(self, now: datetime) -> QueueEntry | None:
@@ -69,30 +69,28 @@ class ScheduleQueue:
         """
         if not self._heap:
             return None
-        entry = self._heap[0]
-        return entry if entry.fire_time <= now else None
+        queue_entry = self._heap[0]
+        return queue_entry if queue_entry.fire_time <= now else None
 
     def next_entry(self) -> QueueEntry | None:
         """🔍 Get the next schedule entry."""
         while self._heap:
-            entry = self._heap[0]
-            if self._index.get(entry.name) is entry:
-                return entry
+            queue_entry = self._heap[0]
+            if self._index.get(queue_entry.name) is queue_entry:
+                return queue_entry
             heapq.heappop(self._heap)
         return None
 
-    def reschedule(
-        self, descriptor: ScheduleDescriptor, fire_time: datetime | None
-    ) -> None:
+    def reschedule(self, entry: ScheduleEntry, fire_time: datetime | None) -> None:
         """🔄 Reschedule a schedule.
 
         Args:
-            descriptor: The schedule descriptor.
+            entry: The schedule entry.
             fire_time: The fire time of the schedule.
         """
-        self._index.pop(descriptor.name, None)
+        self._index.pop(entry.name, None)
         if fire_time is not None:
-            self.enqueue(descriptor, fire_time)
+            self.enqueue(entry, fire_time)
 
     def remove(self, name: str) -> None:
         """🔄 Remove a schedule.

@@ -15,14 +15,14 @@ from scriptman.orchestrator._logging import workload_log_sink
 from scriptman.orchestrator._workloads import WorkloadOutcome
 
 from ._context import ServiceContext
-from ._facade_types import ServiceDescriptor, ServiceOptions
+from ._facade_types import ServiceEntry, ServiceOptions
 from ._policies import RestartPolicy
 from ._status import ServiceStatus
 
 
 @dataclass
 class ServiceProcess:
-    descriptor: ServiceDescriptor
+    entry: ServiceEntry
     options: ServiceOptions
     context: ServiceContext
     thread: Thread
@@ -41,21 +41,19 @@ class ServiceSupervisor:
         self._services: MutableMapping[str, ServiceProcess] = {}
         self._lock = Lock()
 
-    def ensure_running(
-        self, descriptor: ServiceDescriptor, options: ServiceOptions
-    ) -> ServiceStatus:
+    def ensure_running(self, entry: ServiceEntry, options: ServiceOptions) -> ServiceStatus:
         """🔄 Ensure a service is running.
 
         Args:
-            descriptor: The service descriptor.
+            entry: The service entry.
             options: The service options.
 
         Returns:
             ServiceStatus: The status of the service.
         """
         with self._lock:
-            if descriptor.name in self._services:
-                process = self._services[descriptor.name]
+            if entry.name in self._services:
+                process = self._services[entry.name]
                 if process.thread.is_alive():
                     return self._status_for(process)
                 # restart stale thread
@@ -64,22 +62,22 @@ class ServiceSupervisor:
                 return self._status_for(process)
 
             context = ServiceContext(
-                name=descriptor.name,
+                name=entry.name,
                 metadata=options.metadata,
                 runtime_context=self._ctx,
                 start_time=self._ctx.timestamp(),
                 restart_count=0,
                 heartbeat_callback=lambda detail: self._record_heartbeat(
-                    descriptor.name, detail
+                    entry.name, detail
                 ),
             )
             process = ServiceProcess(
-                descriptor=descriptor,
+                entry=entry,
                 options=options,
                 context=context,
-                thread=self._build_thread(descriptor, context, options),
+                thread=self._build_thread(entry, context, options),
             )
-            self._services[descriptor.name] = process
+            self._services[entry.name] = process
             self._emit(RuntimeEventTopic.SERVICE_STARTED, process, {"status": "starting"})
             process.thread.start()
             return self._status_for(process)
@@ -164,14 +162,14 @@ class ServiceSupervisor:
     # internal helpers
     def _build_thread(
         self,
-        descriptor: ServiceDescriptor,
+        entry: ServiceEntry,
         context: ServiceContext,
         options: ServiceOptions,
     ) -> Thread:
         """🔄 Build a thread for a service.
 
         Args:
-            descriptor: The service descriptor.
+            entry: The service entry.
             context: The service context.
             options: The service options.
 
@@ -180,8 +178,8 @@ class ServiceSupervisor:
         """
         return Thread(
             target=self._run_service,
-            name=f"service:{descriptor.name}",
-            args=(descriptor, context, options),
+            name=f"service:{entry.name}",
+            args=(entry, context, options),
             daemon=options.daemon,
         )
 
@@ -193,17 +191,17 @@ class ServiceSupervisor:
         """
         process.stop_event.clear()
         process.context = ServiceContext(
-            name=process.descriptor.name,
+            name=process.entry.name,
             metadata=process.options.metadata,
             runtime_context=self._ctx,
             start_time=self._ctx.timestamp(),
             restart_count=process.restart_count,
             heartbeat_callback=lambda detail: self._record_heartbeat(
-                process.descriptor.name, detail
+                process.entry.name, detail
             ),
         )
         process.thread = self._build_thread(
-            process.descriptor,
+            process.entry,
             process.context,
             process.options,
         )
@@ -216,34 +214,34 @@ class ServiceSupervisor:
 
     def _run_service(
         self,
-        descriptor: ServiceDescriptor,
+        entry: ServiceEntry,
         context: ServiceContext,
         options: ServiceOptions,
     ) -> None:
         """🔄 Run a service.
 
         Args:
-            descriptor: The service descriptor.
+            entry: The service entry.
             context: The service context.
             options: The service options.
         """
-        run_id = f"{descriptor.name}-{context.restart_count}-{uuid4()}"
+        run_id = f"{entry.name}-{context.restart_count}-{uuid4()}"
         with workload_log_sink(
-            workload=descriptor.name,
+            workload=entry.name,
             run_id=run_id,
-            options=descriptor.logging,
+            options=entry.logging,
         ):
             try:
-                result = descriptor.target(context)
+                result = entry.target(context)
                 if asyncio.iscoroutine(result):
                     asyncio.run(result)
                 self._emit(
                     RuntimeEventTopic.SERVICE_STOPPED,
-                    self._services[descriptor.name],
+                    self._services[entry.name],
                     {"status": "exited", "run_id": run_id},
                 )
             except Exception as exc:  # pragma: no cover - runtime path
-                logger.exception("Service %s crashed: %s", descriptor.name, exc)
+                logger.exception("Service %s crashed: %s", entry.name, exc)
                 payload = {
                     "status": "failed",
                     "error": str(exc),
@@ -251,10 +249,10 @@ class ServiceSupervisor:
                 }
                 self._emit(
                     RuntimeEventTopic.SERVICE_FAILED,
-                    self._services[descriptor.name],
+                    self._services[entry.name],
                     payload,
                 )
-                self._schedule_restart(descriptor.name, exc)
+                self._schedule_restart(entry.name, exc)
 
     def _status_for(self, process: ServiceProcess) -> ServiceStatus:
         """🔍 Get the status of a service.
@@ -268,7 +266,7 @@ class ServiceSupervisor:
         uptime = (self._ctx.timestamp() - process.context.start_time).total_seconds()
         state: WorkloadOutcome = "running" if process.thread.is_alive() else "stopped"
         return ServiceStatus(
-            name=process.descriptor.name,
+            name=process.entry.name,
             state=state,
             uptime_seconds=uptime,
             restart_count=process.restart_count,
@@ -291,7 +289,7 @@ class ServiceSupervisor:
         """
         payload: dict[str, object] = {
             "workload_kind": "service",
-            "workload_name": process.descriptor.name,
+            "workload_name": process.entry.name,
             "metadata": process.options.metadata,
         }
         if extra:

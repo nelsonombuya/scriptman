@@ -13,7 +13,7 @@ from scriptman.orchestrator._services._context import ServiceContext
 
 from ._queue import QueueEntry, ScheduleQueue
 from ._registry import ScheduleRegistry
-from ._types import ScheduleDescriptor
+from ._types import ScheduleEntry
 
 
 class SchedulerRunner:
@@ -61,33 +61,33 @@ class SchedulerRunner:
             entry: The schedule entry.
             service_context: The service context.
         """
-        descriptor = entry.descriptor
+        schedule_entry = entry.entry
 
         self._emit(
             RuntimeEventTopic.SCHEDULED_JOB_TRIGGERED,
-            descriptor,
+            schedule_entry,
             {
                 "planned_time": entry.fire_time.isoformat(),
                 "actual_time": self._ctx.timestamp().isoformat(),
             },
         )
 
-        invocation = self._wrap_target(descriptor)
+        invocation = self._wrap_target(schedule_entry)
         result = invocation()
         if inspect.isawaitable(result):
             asyncio.run(self._await_result(result))
 
-        next_fire = descriptor.trigger.next_fire(entry.fire_time)
-        self._queue.reschedule(descriptor, next_fire)
+        next_fire = schedule_entry.trigger.next_fire(entry.fire_time)
+        self._queue.reschedule(schedule_entry, next_fire)
 
-    def _wrap_target(self, descriptor: ScheduleDescriptor) -> Callable[..., Any]:
+    def _wrap_target(self, entry: ScheduleEntry) -> Callable[..., Any]:
         """🔄 Wrap the target function with logging.
 
         Args:
-            descriptor: The schedule descriptor.
+            entry: The schedule entry.
         """
-        target = descriptor.target
-        options = descriptor.logging
+        target = entry.target
+        options = entry.logging
         if not options.enabled:
             return target
 
@@ -95,9 +95,9 @@ class SchedulerRunner:
 
             @wraps(target)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                run_id = f"{descriptor.name}-{uuid4()}"
+                run_id = f"{entry.name}-{uuid4()}"
                 with workload_log_sink(
-                    workload=descriptor.name,
+                    workload=entry.name,
                     run_id=run_id,
                     options=options,
                     args=args if options.include_args else None,
@@ -109,9 +109,9 @@ class SchedulerRunner:
 
         @wraps(target)
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            run_id = f"{descriptor.name}-{uuid4()}"
+            run_id = f"{entry.name}-{uuid4()}"
             with workload_log_sink(
-                workload=descriptor.name,
+                workload=entry.name,
                 run_id=run_id,
                 options=options,
                 args=args if options.include_args else None,
@@ -127,13 +127,13 @@ class SchedulerRunner:
     def _emit(
         self,
         topic: RuntimeEventTopic,
-        descriptor: ScheduleDescriptor,
+        entry: ScheduleEntry,
         extra: Mapping[str, object] | None = None,
     ) -> None:
         payload: dict[str, object] = {
             "workload_kind": "schedule",
-            "workload_name": descriptor.name,
-            "metadata": descriptor.metadata,
+            "workload_name": entry.name,
+            "metadata": entry.metadata,
         }
         if extra:
             for key, value in extra.items():

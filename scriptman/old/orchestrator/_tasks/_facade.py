@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any, Mapping, cast
+from typing import Any, Generic, Mapping, cast
 from uuid import uuid4
 
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
+from scriptman.orchestrator._generics import P, R
 from scriptman.orchestrator._logging import extract_logging_options, workload_log_sink
 from scriptman.orchestrator._workloads import (
     WorkloadEventPayload,
@@ -17,22 +18,34 @@ from scriptman.orchestrator._workloads import (
 
 from ._model import TaskEntry, TaskExecutionResult, TaskSubmission, default_task_logging
 
-TaskQueueAdapter = WorkloadQueue[TaskSubmission]
-TaskExecutor = WorkloadExecutor[TaskSubmission, TaskExecutionResult]
-TaskSummaryReporter = WorkloadSummaryReporter[TaskExecutionResult]
+TaskQueueAdapter = WorkloadQueue[TaskSubmission[P, R]]
+TaskExecutor = WorkloadExecutor[TaskSubmission[P, R], TaskExecutionResult[P, R]]
+TaskSummaryReporter = WorkloadSummaryReporter[TaskExecutionResult[P, R]]
 
 
-class TasksFacade(ABC):
+class TaskRegistry(Generic[P, R], WorkloadRegistry[TaskEntry[P, R]]):
+    """🗂️ Contract for storing task entries and submissions."""
+
+    def remember_task_id(self, task_id: str, submission: TaskSubmission[P, R]) -> None:
+        """🔄 Associate a queue-provided task ID with a submission."""
+        ...
+
+    def get_by_task_id(self, task_id: str) -> TaskSubmission[P, R] | None:
+        """🔍 Retrieve a submission previously associated with a queue task ID."""
+        ...
+
+
+class TasksFacade(ABC, Generic[P, R]):
     """🚀 High-level API exposed to users via `TaskManager`."""
 
     def __init__(
         self,
         *,
         context: RuntimeContext,
-        registry: "TaskRegistry",
-        queue: TaskQueueAdapter,
-        executor: TaskExecutor,
-        reporter: TaskSummaryReporter,
+        registry: TaskRegistry[P, R],
+        queue: TaskQueueAdapter[P, R],
+        executor: TaskExecutor[P, R],
+        reporter: TaskSummaryReporter[P, R],
     ) -> None:
         """🔄 Initialize the tasks facade.
 
@@ -49,7 +62,7 @@ class TasksFacade(ABC):
         self.executor = executor
         self.reporter = reporter
 
-    def register(self, entry: TaskEntry) -> None:
+    def register(self, entry: TaskEntry[P, R]) -> None:
         """✍️ Register a new task with the underlying registry.
 
         Args:
@@ -123,7 +136,7 @@ class TasksFacade(ABC):
         args: tuple[Any, ...] | None = None,
         kwargs: Mapping[str, Any] | None = None,
         metadata: Mapping[str, object] | None = None,
-    ) -> TaskExecutionResult:
+    ) -> TaskExecutionResult[P, R]:
         """
         🚀 Execute a task immediately, bypassing the queue when desired.
 
@@ -190,7 +203,7 @@ class TasksFacade(ABC):
             raise result.error
         return result
 
-    def inspect(self, name: str) -> TaskEntry:
+    def inspect(self, name: str) -> TaskEntry[P, R]:
         """
         🔍 Inspect the configuration for a registered task.
 
@@ -243,7 +256,7 @@ class TasksFacade(ABC):
         args: tuple[Any, ...],
         kwargs: Mapping[str, Any],
         metadata: Mapping[str, object],
-    ) -> TaskSubmission:
+    ) -> TaskSubmission[P, R]:
         """🔍 Resolve a task submission using either name or task identifier.
 
         Args:
@@ -274,15 +287,3 @@ class TasksFacade(ABC):
                 kwargs=dict(kwargs),
                 extra_metadata=metadata,
             )
-
-
-class TaskRegistry(WorkloadRegistry[TaskEntry]):
-    """🗂️ Contract for storing task entries and submissions."""
-
-    def remember_task_id(self, task_id: str, submission: TaskSubmission) -> None:
-        """🔄 Associate a queue-provided task ID with a submission."""
-        ...
-
-    def get_by_task_id(self, task_id: str) -> TaskSubmission | None:
-        """🔍 Retrieve a submission previously associated with a queue task ID."""
-        ...

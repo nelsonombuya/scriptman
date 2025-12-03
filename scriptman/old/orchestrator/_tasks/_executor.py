@@ -1,22 +1,25 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Generic, cast
 from uuid import uuid4
 
 from scriptman.orchestrator._context import RuntimeContext
+from scriptman.orchestrator._generics import P, R
 from scriptman.orchestrator._tasks._model import TaskExecutionResult, TaskSubmission
 from scriptman.orchestrator._workloads import WorkloadExecutor, WorkloadOutcome
 
 
-class SynchronousTaskExecutor(WorkloadExecutor[TaskSubmission, TaskExecutionResult]):
+class SynchronousTaskExecutor(
+    WorkloadExecutor[TaskSubmission[P, R], TaskExecutionResult[P, R]], Generic[P, R]
+):
     """⚙️ Default executor that runs task callables in-process."""
 
     def execute(
         self,
-        entry: TaskSubmission,
+        entry: TaskSubmission[P, R],
         *,
         context: RuntimeContext,
-    ) -> TaskExecutionResult:
+    ) -> TaskExecutionResult[P, R]:
         """🔄 Execute a task submission and return the execution result.
 
         Args:
@@ -49,7 +52,7 @@ class SynchronousTaskExecutor(WorkloadExecutor[TaskSubmission, TaskExecutionResu
             config_generation=self._resolve_generation(context),
         )
 
-    def _invoke(self, submission: TaskSubmission) -> Any:
+    def _invoke(self, submission: TaskSubmission[P, R]) -> R:
         """🔄 Invoke the task submission and return the result.
 
         Args:
@@ -60,8 +63,8 @@ class SynchronousTaskExecutor(WorkloadExecutor[TaskSubmission, TaskExecutionResu
 
         target = submission.entry.target
         if iscoroutinefunction(target):
-            return run(target(*submission.args, **submission.kwargs))
-        return target(*submission.args, **submission.kwargs)
+            return cast(R, run(target(*submission.args, **submission.kwargs)))
+        return cast(R, target(*submission.args, **submission.kwargs))
 
     @staticmethod
     def _resolve_generation(context: RuntimeContext) -> str | None:

@@ -1,17 +1,8 @@
 from __future__ import annotations
 
-from threading import Event, RLock, Thread
+from threading import Event, RLock
 from types import TracebackType
-from typing import (
-    Any,
-    Awaitable,
-    Callable,
-    Mapping,
-    MutableMapping,
-    ParamSpec,
-    TypeVar,
-    cast,
-)
+from typing import Any, Awaitable, Callable, Mapping, MutableMapping, cast
 
 from loguru import logger
 
@@ -20,9 +11,7 @@ from scriptman.orchestrator import (
     RuntimeContextBuilder,
     RuntimeOrchestrator,
 )
-from scriptman.orchestrator._context import ExecutorRegistry, ExecutorStrategy
 from scriptman.orchestrator._events import SynchronousEventBus
-from scriptman.orchestrator._generics import Func
 from scriptman.orchestrator._tasks import (
     InMemoryTaskQueue,
     InMemoryTaskRegistryStore,
@@ -43,87 +32,6 @@ from scriptman.orchestrator._tasks import (
 from scriptman.orchestrator._tasks._registry import TaskRegistry as TaskRegistryImpl
 from scriptman.orchestrator._tasks._reporter import TaskReporter
 from scriptman.orchestrator._workloads import WorkloadQueue
-
-TaskParams = ParamSpec("TaskParams")
-TaskReturn = TypeVar("TaskReturn")
-TaskFunc = Func[TaskParams, TaskReturn]
-
-
-class _InlineExecutorStrategy(ExecutorStrategy):
-    name = "inline"
-
-    def acquire(self) -> ExecutorStrategy:
-        return self
-
-    def release(self) -> None:  # pragma: no cover - no-op
-        return
-
-
-class _InlineExecutorRegistry(ExecutorRegistry):
-    def __init__(self) -> None:
-        self._strategies: MutableMapping[str, ExecutorStrategy] = {
-            "inline": _InlineExecutorStrategy()
-        }
-
-    def get(self, name: str) -> ExecutorStrategy:
-        try:
-            return self._strategies[name]
-        except KeyError as exc:  # pragma: no cover - defensive
-            raise RuntimeError(f"⚠️ Unknown executor strategy '{name}'") from exc
-
-    def register(self, strategy: ExecutorStrategy) -> None:
-        self._strategies[strategy.name] = strategy
-
-
-class _QueueWorker(Thread):
-    """Background worker that drains the task queue."""
-
-    def __init__(
-        self,
-        *,
-        facade: TasksFacade,
-        queue: WorkloadQueue[TaskSubmission],
-        context: RuntimeContext,
-        reporter: TaskReporter,
-        on_complete: Callable[[str, TaskExecutionResult], None],
-    ) -> None:
-        super().__init__(daemon=True, name="scriptman-task-worker")
-        self._facade = facade
-        self._queue = queue
-        self._context = context
-        self._reporter = reporter
-        self._on_complete = on_complete
-        self._wake = Event()
-        self._stopped = Event()
-
-    def run(self) -> None:  # pragma: no cover - thin wrapper around facade
-        while not self._stopped.is_set():
-            item = self._queue.dequeue(context=self._context)
-            if item is None:
-                self._wake.wait(0.1)
-                self._wake.clear()
-                continue
-
-            task_id, _submission = item
-            try:
-                result = self._facade.execute(task_id=task_id)
-            except Exception as exc:  # pragma: no cover - defensive logging
-                self._context.logger.error(
-                    "⚠️ Task execution crashed", task_id=task_id, error=str(exc)
-                )
-                self._queue.complete(task_id, context=self._context)
-                continue
-
-            self._queue.complete(task_id, context=self._context)
-            self._reporter.report(result, context=self._context)
-            self._on_complete(task_id, result)
-
-    def wake(self) -> None:
-        self._wake.set()
-
-    def stop(self) -> None:
-        self._stopped.set()
-        self._wake.set()
 
 
 class TaskManager:
@@ -222,25 +130,39 @@ class TaskManager:
         sla: TaskSlaPolicy | None = None,
         config: TaskConfigBinding | None = None,
     ) -> Callable[
-        [TaskFunc[TaskParams, TaskReturn]],
-        TaskFunc[TaskParams, TaskReturn],
+        [
+            Callable[
+                TaskDecoratorParams,
+                Awaitable[TaskDecoratorReturn] | TaskDecoratorReturn,
+            ]
+        ],
+        Callable[
+            TaskDecoratorParams,
+            Awaitable[TaskDecoratorReturn] | TaskDecoratorReturn,
+        ],
     ]:
         """Decorator for registering a callable as a task."""
 
         def decorator(
-            func: TaskFunc[TaskParams, TaskReturn],
-        ) -> TaskFunc[TaskParams, TaskReturn]:
-            descriptor = TaskEntry(
-                name=name or func.__name__,
+            func: Callable[
+                TaskDecoratorParams,
+                Awaitable[TaskDecoratorReturn] | TaskDecoratorReturn,
+            ],
+        ) -> Callable[
+            TaskDecoratorParams,
+            Awaitable[TaskDecoratorReturn] | TaskDecoratorReturn,
+        ]:
+            entry = TaskEntry(
                 target=func,
                 metadata=metadata or {},
-                logging=logging or default_task_logging(),
-                retry=retry or TaskRetryPolicy(),
-                resources=resources or TaskResourceSpec(),
+                name=name or func.__name__,
                 sla=sla or TaskSlaPolicy(),
+                retry=retry or TaskRetryPolicy(),
                 config=config or TaskConfigBinding(),
+                logging=logging or default_task_logging(),
+                resources=resources or TaskResourceSpec(),
             )
-            self.register(descriptor)
+            self.register(entry)
             return func
 
         return decorator

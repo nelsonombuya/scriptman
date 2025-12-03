@@ -2,8 +2,7 @@
 
 from ._facade import ServicesFacade
 from ._facade_types import (
-    ServiceCallable,
-    ServiceDescriptor,
+    ServiceEntry,
     ServiceExecutionResult,
     ServiceOptions,
 )
@@ -20,8 +19,7 @@ __all__ = [
     "InMemoryServiceRegistryStore",
     "RestartPolicy",
     "RestartStrategy",
-    "ServiceCallable",
-    "ServiceDescriptor",
+    "ServiceEntry",
     "ServiceExecutionResult",
     "ServiceOptions",
     "ServiceOverview",

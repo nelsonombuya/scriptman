@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Awaitable, Callable, Mapping
 
 from scriptman.orchestrator._context import RuntimeContext
 from scriptman.orchestrator._events import RuntimeEventTopic, make_event
 from scriptman.orchestrator._logging import extract_logging_options
 from scriptman.orchestrator._services._registry import ServiceRegistry
 from scriptman.orchestrator._services._status import ServiceOverview, ServiceStatus
+from ._context import ServiceContext
 
-from ._facade_types import (
-    ServiceCallable,
-    ServiceDescriptor,
-    ServiceOptions,
-    default_service_logging,
-)
+from ._facade_types import ServiceEntry, ServiceOptions, default_service_logging
 from ._supervisor import ServiceSupervisor
 
 
@@ -34,7 +30,7 @@ class ServicesFacade:
     def register(
         self,
         name: str,
-        target: ServiceCallable[Any],
+        target: Callable[[ServiceContext], Awaitable[Any] | Any],
         *,
         options: ServiceOptions | None = None,
         metadata: Mapping[str, object] | None = None,
@@ -50,7 +46,7 @@ class ServicesFacade:
         Raises:
             RuntimeError: If the service is already registered.
         """
-        descriptor = ServiceDescriptor(
+        entry = ServiceEntry(
             name=name,
             target=target,
             metadata=metadata or {},
@@ -58,21 +54,21 @@ class ServicesFacade:
         opts = options or ServiceOptions()
         default_logging = default_service_logging()
         decorator_logging = extract_logging_options(target)
-        if descriptor.logging == default_logging and decorator_logging != default_logging:
-            descriptor.logging = decorator_logging
-        self._registry.add(descriptor, opts)
+        if entry.logging == default_logging and decorator_logging != default_logging:
+            entry.logging = decorator_logging
+        self._registry.add(entry, opts)
         register_event = make_event(
             RuntimeEventTopic.SERVICE_REGISTERED,
             timestamp_factory=self._ctx.timestamp,
             payload={
                 "workload_kind": "service",
                 "workload_name": name,
-                "metadata": descriptor.metadata,
+                "metadata": entry.metadata,
             },
         )
         self._ctx.event_publisher.emit(register_event)
         if opts.autostart:
-            self._supervisor.ensure_running(descriptor, opts)
+            self._supervisor.ensure_running(entry, opts)
 
     def start(self, name: str) -> ServiceStatus | None:
         """🚀 Start a registered service.
@@ -86,9 +82,9 @@ class ServicesFacade:
         Raises:
             RuntimeError: If the service is not registered.
         """
-        descriptor = self._registry.get(name)
+        entry = self._registry.get(name)
         options = self._registry.get_options(name)
-        return self._supervisor.ensure_running(descriptor, options)
+        return self._supervisor.ensure_running(entry, options)
 
     def stop(
         self,
@@ -152,16 +148,16 @@ class ServicesFacade:
             RuntimeError: If the service is not registered.
         """
         overview: list[ServiceOverview] = []
-        for descriptor, options in self._registry.list():
-            current = self._supervisor.status(descriptor.name)
+        for entry, options in self._registry.list():
+            current = self._supervisor.status(entry.name)
             state = current.state if current else "stopped"
             overview.append(
                 ServiceOverview(
-                    name=descriptor.name,
+                    name=entry.name,
                     state=state,
                     autostart=options.autostart,
                     restart_policy=options.restart_policy.strategy,
-                    metadata=descriptor.metadata,
+                    metadata=entry.metadata,
                 )
             )
         return overview

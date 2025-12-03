@@ -2,13 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal, Mapping, MutableMapping, Sequence
+from typing import Any, Generic, Literal, Mapping, MutableMapping, Sequence
 
-from scriptman.orchestrator._generics import AnyCallable
+from scriptman.orchestrator._generics import P, R, TypedAnyFunc
 from scriptman.orchestrator._logging import WorkloadLoggingOptions
-from scriptman.orchestrator._workloads import WorkloadKind, WorkloadOutcome
+from scriptman.orchestrator._workloads import (
+    WorkloadEntry,
+    WorkloadKind,
+    WorkloadOutcome,
+    WorkloadResult,
+)
 
-TaskCallable = AnyCallable
 ResourceClass = Literal["light", "standard", "heavy"]
 RetryStrategy = Literal["none", "fixed", "linear", "exponential"]
 
@@ -25,10 +29,10 @@ class TaskRetryPolicy:
     """🔁 Retry configuration for task executions."""
 
     max_attempts: int = 0
-    strategy: RetryStrategy = "none"
     interval_seconds: float = 0.0
-    max_interval_seconds: float | None = None
+    strategy: RetryStrategy = "none"
     jitter_seconds: float | None = None
+    max_interval_seconds: float | None = None
 
 
 @dataclass(slots=True)
@@ -61,18 +65,28 @@ class TaskConfigBinding:
 
 
 @dataclass(slots=True)
-class TaskEntry:
-    """🧾 Immutable description of a registered task."""
+class TaskEntry(Generic[P, R], WorkloadEntry):
+    """🧾 Immutable description of a registered task.
+
+    Captures the task definition with all its metadata, policies, and the callable
+    target. Uses generics to preserve type information through the orchestration
+    stack, enabling full type inference for power users while remaining simple
+    for beginners.
+
+    The target uses UntypedCallable (loosely typed) for maximum flexibility,
+    allowing any callable type (sync, async, generators) to be registered
+    without type constraints. This trades type information for flexibility.
+    """
 
     name: str
-    target: TaskCallable
-    metadata: Mapping[str, object] = field(default_factory=dict)
-    logging: WorkloadLoggingOptions = field(default_factory=default_task_logging)
-    retry: TaskRetryPolicy = field(default_factory=TaskRetryPolicy)
-    sla: TaskSlaPolicy = field(default_factory=TaskSlaPolicy)
-    resources: TaskResourceSpec = field(default_factory=TaskResourceSpec)
-    config: TaskConfigBinding = field(default_factory=TaskConfigBinding)
+    target: TypedAnyFunc[P, R]
     labels: Sequence[str] = field(default_factory=tuple)
+    sla: TaskSlaPolicy = field(default_factory=TaskSlaPolicy)
+    metadata: Mapping[str, object] = field(default_factory=dict)
+    retry: TaskRetryPolicy = field(default_factory=TaskRetryPolicy)
+    config: TaskConfigBinding = field(default_factory=TaskConfigBinding)
+    resources: TaskResourceSpec = field(default_factory=TaskResourceSpec)
+    logging: WorkloadLoggingOptions = field(default_factory=default_task_logging)
 
     @property
     def kind(self) -> WorkloadKind:
@@ -81,16 +95,24 @@ class TaskEntry:
 
 
 @dataclass(slots=True)
-class TaskSubmission:
-    """📦 Concrete invocation of a task entry."""
+class TaskSubmission(Generic[P, R], WorkloadEntry):
+    """📦 Concrete invocation of a task entry.
 
-    entry: TaskEntry
+    Represents a specific execution request with arguments, metadata, and
+    correlation tracking. Carries the entry definition alongside runtime-specific
+    data like task IDs and retry attempts.
+
+    Uses generics to maintain type relationships with the entry and execution
+    results, enabling end-to-end type safety through the orchestration pipeline.
+    """
+
+    entry: TaskEntry[P, R]
+    task_id: str | None = None
     args: tuple[Any, ...] = ()
     kwargs: Mapping[str, Any] = field(default_factory=dict)
     extra_metadata: Mapping[str, object] = field(default_factory=dict)
     correlation_id: str | None = None
     attempt: int = 1
-    task_id: str | None = None
 
     @property
     def name(self) -> str:
@@ -110,11 +132,19 @@ class TaskSubmission:
 
 
 @dataclass(slots=True)
-class TaskExecutionResult:
-    """✅ Summary bundle returned after executing a task."""
+class TaskExecutionResult(Generic[P, R], WorkloadResult[TaskEntry[P, R]]):
+    """✅ Summary bundle returned after executing a task.
+
+    Contains the complete execution report including timing, outcome, errors,
+    and configuration lineage. Links back to the submission and entry through
+    generics to maintain type relationships across the orchestration pipeline.
+
+    Provides convenience properties like duration and run_id for easy access
+    to common execution metrics.
+    """
 
     task_id: str
-    submission: TaskSubmission
+    submission: TaskSubmission[P, R]
     outcome: WorkloadOutcome
     started_at: datetime
     finished_at: datetime
@@ -134,13 +164,17 @@ class TaskExecutionResult:
         return self.task_id
 
     @property
-    def entry(self) -> TaskEntry:
-        """🔍 Entry that produced this execution."""
+    def entry(self) -> TaskEntry[P, R]:
+        """🔍 Entry that produced this execution.
+
+        Returns:
+            The task entry that was executed, maintaining generic type
+            information for type-safe access to entry properties.
+        """
         return self.submission.entry
 
 
 __all__ = [
-    "TaskCallable",
     "TaskConfigBinding",
     "TaskEntry",
     "TaskExecutionResult",

@@ -2,17 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Mapping, TypeVar
-
-from scriptman.orchestrator._generics import ContextFunc
+from typing import Any, Awaitable, Callable, Mapping, TypeAlias
 from scriptman.orchestrator._logging import WorkloadLoggingOptions
 from scriptman.orchestrator._workloads import WorkloadKind, WorkloadOutcome
 
 from ._context import ServiceContext
 from ._policies import RestartPolicy
 
-ServiceReturn = TypeVar("ServiceReturn")
-ServiceCallable = ContextFunc[ServiceContext, ServiceReturn]
+ServiceCallable: TypeAlias = Callable[[ServiceContext], Awaitable[Any] | Any]
 
 
 @dataclass
@@ -35,11 +32,11 @@ def default_service_logging() -> WorkloadLoggingOptions:
 
 
 @dataclass
-class ServiceDescriptor:
-    """🧾 Immutable description of a registered service."""
+class ServiceEntry:
+    """🧾 Immutable entry describing a registered service."""
 
     name: str
-    target: ServiceCallable[Any]
+    target: Callable[[ServiceContext], Awaitable[Any] | Any]
     metadata: Mapping[str, Any] = field(default_factory=dict)
     logging: WorkloadLoggingOptions = field(default_factory=default_service_logging)
 
@@ -52,7 +49,7 @@ class ServiceDescriptor:
 class ServiceExecutionResult:
     """✅ Execution report emitted by the supervisor."""
 
-    descriptor: ServiceDescriptor
+    entry: ServiceEntry
     outcome: WorkloadOutcome
     started_at: datetime
     finished_at: datetime
@@ -66,7 +63,7 @@ class ServiceExecutionResult:
 
 __all__ = [
     "ServiceCallable",
-    "ServiceDescriptor",
+    "ServiceEntry",
     "ServiceExecutionResult",
     "ServiceOptions",
 ]

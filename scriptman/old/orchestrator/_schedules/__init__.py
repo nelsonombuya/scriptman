@@ -10,7 +10,7 @@ from ._triggers import (
 )
 from ._types import (
     SchedulableCallable,
-    ScheduleDescriptor,
+    ScheduleEntry,
     ScheduleExecutionResult,
     ScheduleOptions,
 )
@@ -20,7 +20,7 @@ __all__ = [
     "EventTrigger",
     "IntervalTrigger",
     "OneTimeTrigger",
-    "ScheduleDescriptor",
+    "ScheduleEntry",
     "ScheduleExecutionResult",
     "ScheduleOptions",
     "ScheduleTrigger",

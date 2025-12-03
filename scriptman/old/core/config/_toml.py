@@ -10,6 +10,7 @@ from scriptman.core.config._file_handler import FileHandler
 from scriptman.core.config._manager import ConfigManager
 
 # TODO: Test the config changes
+# TODO: When implementing the api power, implement a way to take in a list of BaseModels
 
 
 class TomlHandler(FileHandler):

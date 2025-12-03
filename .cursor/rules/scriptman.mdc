@@ -33,10 +33,86 @@ Scriptman is a Python utilities library that hides complexity through simple, be
 - 📡 Network/External operations
 - ⏱️ Timing/Scheduling operations
 - 🔄 Retry/Update/Refresh operations
+- 🔐 Secrets/Security operations
+- 📁 File/Directory operations
+- 🏷️ Naming/Labeling operations
 
 **RULE:** Every docstring, log message, and user-facing output should use ONE emoji for instant visual recognition.
 
+**Explicit Access Over Magic**
+- Prefer explicit method calls over magic attribute access
+- Use `config.get("key")` or `config["key"]` over `config.key`
+- Magic attributes (`__getattr__`) cause confusion with actual class methods
+- Dot notation belongs in string keys, not attribute chains: `config.get("retry.max_delay")`
+
 ### 2. Code Architecture
+
+**ABCs Over Protocols**
+- **Always prefer Abstract Base Classes (ABCs) over Protocols** for internal abstractions
+- ABCs provide:
+  - Enforced implementation via `@abstractmethod`
+  - Clear inheritance hierarchy showing intent
+  - IDE support displaying required methods to implement
+  - Ability to share implementation in base class
+- Protocols are ONLY appropriate for:
+  - Interoperability with third-party code you cannot modify
+  - Very simple duck-typing scenarios (e.g., `Callable`, `Iterable`)
+- When in doubt, use ABC
+
+```python
+# ✅ CORRECT - Use ABC
+from abc import ABC, abstractmethod
+
+class ConfigReader(ABC):
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """🏷️ Reader identifier."""
+        ...
+
+    @abstractmethod
+    def read(self) -> dict[str, Any]:
+        """🔍 Load configuration."""
+        ...
+
+# ❌ WRONG - Don't use Protocol for internal abstractions
+from typing import Protocol
+
+class ConfigReader(Protocol):  # NO!
+    def read(self) -> dict[str, Any]: ...
+```
+
+**Variable Visibility Conventions**
+When designing classes, explicitly consider visibility for every attribute and method:
+
+| Prefix | Visibility | Use Case | Example |
+|--------|------------|----------|---------|
+| (none) | Public | Part of the API, documented, stable | `config.get()`, `self.options` |
+| `_` | Protected | Internal implementation, may be used by subclasses | `self._store`, `_validate()` |
+| `__` | Private | Strictly internal, name-mangled, never override | `self.__initialized`, `__parse()` |
+
+**Visibility Decision Questions:**
+1. Is this part of the public API users should call? → **Public**
+2. Is this implementation detail that subclasses might need? → **Protected** (`_`)
+3. Is this strictly internal, should never be accessed externally, and must not be overridden? → **Private** (`__`)
+
+```python
+class Config:
+    # Public: Part of the API
+    def get(self, key: str) -> Any: ...
+    def set(self, key: str, value: Any) -> None: ...
+
+    # Protected: Internal but accessible to subclasses
+    _store: dict[str, Any]
+    _reader: ConfigReader
+
+    def _validate(self, key: str, value: Any) -> None: ...
+    def _get_nested(self, data: dict, key: str) -> Any: ...
+
+    # Private: Strictly internal, prevents accidental override
+    __initialized: bool
+    __instance: Optional["Config"]
+```
 
 **Minimal Core, Modular Extensions**
 - Core utilities require ≤5 dependencies
@@ -44,6 +120,17 @@ Scriptman is a Python utilities library that hides complexity through simple, be
 - Keep exceptional libraries (Pydantic, FastAPI) - don't reinvent excellence
 - Use optional extras: `scriptman[db]`, `scriptman[selenium]`, `scriptman[api]`
 - Every dependency must justify its complexity cost
+
+**Top-Level Module Organization**
+Scriptman v3 uses a flat, discoverable structure:
+```
+scriptman/
+├── __init__.py      # Lazy imports, exposes config, etc.
+├── config/          # Configuration management (top-level, not in core/)
+├── cli/             # Command-line interface (top-level, not in core/)
+├── orchestrator/    # Command Deck - runtime coordination
+└── (other modules)  # Each feature as a top-level module
+```
 
 **Unified Sync/Async Experience (Sync-First)**
 - Default to synchronous implementations
@@ -53,9 +140,12 @@ Scriptman is a Python utilities library that hides complexity through simple, be
 - Example: `@retry` works on both sync and async functions transparently
 
 **Configuration-Driven Defaults**
-- Every tunable parameter respects configuration hierarchy: function args > scriptman.toml > defaults
+- Every tunable parameter respects configuration hierarchy:
+  1. Runtime overrides (`config.override()`) - highest priority
+  2. Environment variables (`SCRIPTMAN_*`)
+  3. Config file (`scriptman.toml` / `pyproject.toml`)
+  4. Schema defaults - lowest priority
 - Defaults work for 80% of use cases out of the box
-- Runtime overrides always possible
 - Use Pydantic for configuration validation
 
 ### 3. Quality & Reliability
@@ -75,10 +165,19 @@ Scriptman is a Python utilities library that hides complexity through simple, be
 - Performance benchmarks for critical paths
 
 **Type Safety Without Verbosity**
-- Extensive type hints using modern Python (3.10+) syntax
+- Extensive type hints using modern Python (3.12+) syntax
 - Leverage type inference - don't over-annotate
 - Pydantic models for external data validation
 - Generic types for reusable components
+
+```python
+# Modern Python 3.12+ type hints
+def process(items: list[str], count: int | None = None) -> dict[str, Any]:
+    ...
+
+# Avoid older syntax
+from typing import Optional, List, Dict  # Don't need these anymore
+```
 
 ### 4. Breaking Changes Philosophy
 
@@ -111,16 +210,32 @@ Scriptman is a Python utilities library that hides complexity through simple, be
 **Import Organization**
 ```python
 # Standard library
+from __future__ import annotations
+
 import os
-from typing import Optional
+from pathlib import Path
+from typing import Any
 
 # Third-party (grouped by purpose)
+from loguru import logger
 from pydantic import BaseModel
-import pandas as pd
 
 # Scriptman internal
-from scriptman.config import settings
-from scriptman.utils import retry
+from scriptman.config import config
+from scriptman.config.schema import ConfigSchema
+```
+
+**Lazy Imports for Optional Dependencies**
+```python
+# At module level for optional heavy dependencies
+def get_selenium():
+    try:
+        from selenium import webdriver
+        return webdriver
+    except ImportError:
+        raise ImportError(
+            "🚫 Selenium not installed. Install with: pip install scriptman[selenium]"
+        )
 ```
 
 ### 7. Documentation Requirements
@@ -159,7 +274,7 @@ def load_data(source: str, format: str = "csv") -> pd.DataFrame:
 Before marking any feature complete:
 - [ ] Zero-config usage works for common case
 - [ ] Advanced options available but optional
-- [ ] Type hints complete
+- [ ] Type hints complete (modern 3.12+ syntax)
 - [ ] Docstring with emoji, example, and error docs
 - [ ] Error handling with helpful messages
 - [ ] Resource cleanup (if applicable)
@@ -167,6 +282,8 @@ Before marking any feature complete:
 - [ ] Edge cases handled
 - [ ] Performance acceptable for target use case
 - [ ] Dependencies justified (or eliminated)
+- [ ] Variable visibility reviewed (public/protected/private)
+- [ ] No magic attribute access (use explicit methods)
 
 ## Implementation Patterns
 
@@ -175,25 +292,69 @@ Before marking any feature complete:
 from threading import Lock
 
 class CacheManager:
-    _instance = None
-    _lock = Lock()
+    _instance: "CacheManager | None" = None
+    _lock: Lock = Lock()
+    __initialized: bool = False
 
-    def __new__(cls):
+    def __new__(cls) -> "CacheManager":
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
         return cls._instance
+
+    def __init__(self) -> None:
+        if self.__initialized:
+            return
+        # ... initialization ...
+        self.__initialized = True
 ```
 
-**Optional Import Pattern:**
+**Context Manager for Temporary State:**
 ```python
-try:
-    from selenium import webdriver
-except ImportError:
-    raise ImportError(
-        "🚫 Selenium not installed. Install with: pip install scriptman[selenium]"
-    )
+from contextlib import contextmanager
+from typing import Iterator
+
+@contextmanager
+def temporary(self, **kwargs: Any) -> Iterator[None]:
+    """🔄 Context manager for temporary overrides."""
+    previous = self._overrides.copy()
+    self.override(**kwargs)
+    try:
+        yield
+    finally:
+        self._overrides = previous
+```
+
+**ABC-Based Extensibility:**
+```python
+from abc import ABC, abstractmethod
+
+class ConfigReader(ABC):
+    """📖 Base class for configuration readers."""
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """🏷️ Reader identifier (e.g., 'toml', 'yaml')."""
+        ...
+
+    @abstractmethod
+    def read(self) -> dict[str, Any]:
+        """🔍 Load configuration as dictionary."""
+        ...
+
+    @abstractmethod
+    def write(self, data: dict[str, Any]) -> None:
+        """✍️ Persist configuration."""
+        ...
+
+    # Shared implementation available to all subclasses
+    def exists(self) -> bool:
+        """🔍 Check if config source exists."""
+        if self.file_path is None:
+            return True
+        return self.file_path.exists()
 ```
 
 **Retry Decorator (Sync/Async):**
@@ -224,9 +385,13 @@ def retry(max_retries: int = 3, backoff: float = 1.0):
 
 ## Reference Implementation Style
 
-Use this template when building new services, runners, CLI commands, or any workflow that performs side effects. It captures the Scriptman “zen”: emoji-first docstrings, explicit options objects, no global state mutations, friendly summaries, and structured error handling.
+Use this template when building new services, runners, CLI commands, or any workflow that performs side effects. It captures the Scriptman "zen": emoji-first docstrings, explicit options objects, no global state mutations, friendly summaries, and structured error handling.
 
 ```python
+from pydantic import BaseModel
+from loguru import logger
+
+
 class FooOptions(BaseModel):
     """⚙️ Configure Foo execution parameters.
 
@@ -236,6 +401,11 @@ class FooOptions(BaseModel):
         dry_run: When True, apply no mutations.
         retries: Number of retry attempts for Foo operations.
     """
+
+    name: str
+    environment: str | None = None
+    dry_run: bool = False
+    retries: int = 3
 
 
 class FooRunner:
@@ -247,8 +417,11 @@ class FooRunner:
         Args:
             options: Configuration for this Foo execution.
         """
+        # Public: Part of the API
         self.options = options
-        self.logger = logger.bind(component="foo-runner")
+
+        # Protected: Internal but may be useful to subclasses
+        self._logger = logger.bind(component="foo-runner")
 
     def run(self) -> int:
         """🚀 Execute the Foo workflow and report success or failure.
@@ -262,7 +435,7 @@ class FooRunner:
             self._summarize(resource)
             return 0
         except Exception as exc:
-            self.logger.error(f"⚠️ Foo run failed: {exc}")
+            self._logger.error(f"⚠️ Foo run failed: {exc}")
             return 1
 
     def _configure_resource(self) -> FooResource:
@@ -288,7 +461,7 @@ class FooRunner:
             FooError: When the underlying Foo operation fails.
         """
         if resource.dry_run:
-            self.logger.info("✍️ Dry run mode; skipping mutations")
+            self._logger.info("✍️ Dry run mode; skipping mutations")
             return
         retry(resource.retries)(resource.apply)()
 
@@ -298,7 +471,7 @@ class FooRunner:
         Args:
             resource: The resource that just finished processing.
         """
-        self.logger.success(
+        self._logger.success(
             "✅ Foo completed\n"
             "--------------------------------------------------\n"
             f"💡 Resource: {resource.name}\n"
@@ -309,9 +482,9 @@ class FooRunner:
         )
 ```
 
-### Visual Rhythm (“Cascade”)
+### Visual Rhythm ("Cascade")
 
-Match the stepped layout used across Scriptman: lead with the longest concept, narrow to supporting details, and finish with the tightest lines. This “cascade” makes logs and summaries scannable and keeps diffs clean. Prefer:
+Match the stepped layout used across Scriptman: lead with the longest concept, narrow to supporting details, and finish with the tightest lines. This "cascade" makes logs and summaries scannable and keeps diffs clean. Prefer:
 
 ```
 Primary statement……………………
@@ -321,7 +494,45 @@ Tertiary reminder………………
 
 over dense paragraphs or unordered bullets.
 
+## Config System Conventions
+
+**Import Patterns:**
+```python
+# For repeated use - import the singleton
+from scriptman import config
+config.get("log_level")
+config.set("log_level", "DEBUG")
+
+# For module-level access
+import scriptman
+scriptman.config.get("log_level")
+```
+
+**Access Patterns:**
+```python
+# ✅ Explicit access (preferred)
+config.get("retry.max_delay")
+config["retry.max_delay"]
+config.set("log_level", "DEBUG")
+
+# ❌ Magic attribute access (avoid)
+config.retry.max_delay  # Don't do this
+```
+
+**Override Patterns:**
+```python
+# Runtime override (not persisted)
+config.override(log_level="DEBUG")
+
+# Temporary override (scoped)
+with config.temporary(concurrent=False):
+    # Runs with concurrent=False
+    pass
+# Original restored
+```
+
 ## Remember
 - This library is a learning tool AND production code - balance exploration with reliability
 - Users range from beginners to your production team - design for the beginner, document for the expert
 - Every line of code should answer: "Does this make the developer's life easier?"
+- ABCs for contracts, explicit methods for access, clear visibility for every attribute

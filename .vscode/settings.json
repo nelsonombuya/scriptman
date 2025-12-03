@@ -1,21 +1,9 @@
 {
   "cSpell.words": [
-    "deques",
-    "docstrings",
-    "drivedownload",
-    "driveupload",
-    "firefox",
-    "fromlist",
-    "htmlcov",
-    "linux",
-    "mypy",
-    "Ombuya",
-    "ospath",
-    "popleft",
-    "pycache",
-    "pytest",
-    "qodo",
-    "Schedulable",
-    "scriptman"
+    "abstractmethod",
+    "scriptman",
+    "Scriptman",
+    "SCRIPTMAN",
+    "unflatten"
   ]
 }

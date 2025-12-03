@@ -1,6 +1,6 @@
 [project]
 name = "scriptman"
-version = "2.9.584"
+version = "3.0.0.0alpha1"
 description = "A powerful Python package for automation, script management, and workflow orchestration."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
@@ -9,45 +9,14 @@ classifiers = ["License :: OSI Approved :: MIT License"]
 authors = [
     { name = "Nelson Ombuya", email = "developer@incognitouser.anonaddy.me" },
 ]
-dependencies = [
-    "tqdm>=4.67.1",
-    "loguru>=0.7.3",
-    "tomlkit>=0.13.2",
-    "filelock>=3.16.1",
-    "croniter>=1.3.16",
-    "psutil (>=7.0.0,<8.0.0)",
-    "types-tqdm>=4.67.0.20241221",
-    "types-psutil (>=7.0.0.20250601,<8.0.0.0)",
-]
-
-[project.optional-dependencies]
-api = [
-    "uvicorn>=0.34.0",
-    "requests>=2.32.3",
-    "fastapi>=0.115.12",
-    "pydantic[email]>=2.10.6",
-    "types-requests>=2.32.0.20241016",
-]
-cache = ["dill>=0.3.9", "diskcache>=5.6.3"]
-etl = ["pandas>=2.2.3", "pandas-stubs>=2.2.3.241126"]
-pyodbc = ["pyodbc>=5.2.0"]
-selenium = [
-    "selenium>=4.28.1",
-    "requests>=2.32.3",
-    "types-selenium>=3.141.9",
-    "webdriver-manager>=4.0.2",
-    "types-requests>=2.32.0.20241016",
-]
-sqlalchemy = ["sqlalchemy>=2.0.37", "pyodbc>=5.2.0"]
+dependencies = ["loguru>=0.7.3", "tomlkit>=0.13.2"]
 
 [project.scripts]
-scriptman = "scriptman.core.cli:CLI.start_cli_instance"
-sm = "scriptman.sm:main"
+scriptman = "scriptman.cli:main"
 
 # Development dependency groups (used only during development)
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"
-icecream = "^2.1.4"
 isort = "^5.13.2"
 mypy = "^1.13.0"
 poetry = "^2.2.0"
@@ -56,41 +25,13 @@ pytest-asyncio = "^0.25.0"
 pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
 
-[tool.poetry.group.api.dependencies]
-fastapi = "^0.115.8"
-pydantic = { extras = ["email"], version = "^2.10.6" }
-uvicorn = "^0.34.0"
-
-[tool.poetry.group.cache.dependencies]
-diskcache = "^5.6.3"
-dill = "^0.3.9"
-
-[tool.poetry.group.sqlalchemy.dependencies]
-sqlalchemy = "^2.0.38"
-pyodbc = "^5.2.0"
-
-[tool.poetry.group.pyodbc.dependencies]
-pyodbc = "^5.2.0"
-
-[tool.poetry.group.etl.dependencies]
-pandas = "^2.2.3"
-pandas-stubs = "^2.2.3.241126"
-
 [tool.poetry.group.lint.dependencies]
 black = "^24.10.0"
 isort = "^5.13.2"
 mypy = "^1.13.0"
 
-[tool.poetry.group.selenium.dependencies]
-selenium = "^4.28.1"
-requests = "^2.32.3"
-types-selenium = "^3.141.9"
-types-requests = "^2.32.0.20241016"
-webdriver-manager = "^4.0.2"
-
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.4"
-icecream = "^2.1.4"
 pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
 pytest-asyncio = "^0.25.0"
@@ -116,18 +57,6 @@ warn_redundant_casts = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_decorators = true
-
-[[tool.mypy.overrides]]
-module = ["diskcache.*", "dill.*", "pyodbc.*", "croniter.*"]
-ignore_missing_imports = true
-
-[tool.scriptman]
-root_dir = "."
-logs_dir = ".logs"
-log_level = "DEBUG"
-
-[tool.scriptman.cache]
-dir = ".cache"
 
 [build-system]
 requires = ["poetry-core"]

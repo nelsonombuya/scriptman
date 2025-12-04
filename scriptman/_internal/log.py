@@ -98,7 +98,20 @@ def _log(level: str, message: str, **data: Any) -> None:
 
 
 def _loguru_fallback(level: str, message: str, **data: Any) -> None:
-    """📝 Direct loguru output when observe isn't available."""
+    """📝 Direct loguru output when observe isn't available.
+
+    This function is the last-resort fallback during early initialization
+    or when observe fails. It must never raise exceptions.
+
+    Args:
+        level: Log level name (trace, debug, info, warning, error, critical)
+        message: Log message
+        **data: Additional data to format as key=value pairs
+
+    Note:
+        Unknown log levels default to INFO. Data formatting uses serialize()
+        when available, falling back to str() during very early initialization.
+    """
     log_method = getattr(logger, level.lower(), logger.info)
 
     # Format data for console (serialize for consistency with observe)
@@ -212,6 +225,10 @@ def event(message: str, event_type: str, **data: Any) -> None:
         message: Event message
         event_type: Event type string (e.g., "config.changed", "cache.hit")
         **data: Additional event data
+
+    Returns:
+        None. Events are fire-and-forget; failures are silently ignored
+        to prevent logging from disrupting application flow.
 
     Example:
         >>> log.event("Config changed", "config.changed", key="logging.level")

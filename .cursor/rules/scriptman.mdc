@@ -141,12 +141,15 @@ Provides reusable utilities for generic programming and sync/async handling:
 ```python
 from scriptman.types import (
     T, P, R, C,              # Type variables (C for context managers)
+    BaseModelT,              # TypeVar bound to Pydantic BaseModel
     SyncFunc,                # Callable[P, R]
     AsyncFunc,               # Callable[P, Awaitable[R]]
     Func,                    # Union of both
     is_async,                # Detect if function is async
     wrap_function,           # Wrap with before/after hooks
     wrap_function_in_context,  # Wrap inside context manager (for spans, etc.)
+    make_sync_async_decorator, # Higher-order decorator builder
+    AsyncLock,               # Dual sync/async lock
     StampedeLock,            # Per-key locks for stampede prevention
 )
 
@@ -191,6 +194,7 @@ R = TypeVar("R")    # Already exists in scriptman.types!
 
 ```python
 # ✅ CORRECT - Decorator works with both
+from functools import wraps
 from scriptman.types import is_async, StampedeLock
 
 def my_decorator(func):
@@ -807,7 +811,36 @@ def traced(fn: Callable[P, R]) -> Callable[P, R]:
     )
 ```
 
-**3. Complex custom logic** — create wrappers manually with specific return types:
+**3. Per-call state with before/transform** — use `make_sync_async_decorator`:
+```python
+from scriptman.types import make_sync_async_decorator
+import time
+
+def timed():
+    """⏱️ Decorator that prints execution time."""
+    def logic(func, args, kwargs):
+        start = [0.0]
+        def before():
+            start[0] = time.time()
+        def transform(result):
+            duration = time.time() - start[0]
+            print(f"⏱️ {func.__name__} took {duration:.3f}s")
+            return result
+        return before, transform
+    return make_sync_async_decorator(logic)
+
+# Usage
+@timed()
+def process_data(): ...
+
+@timed()
+async def process_data_async(): ...
+```
+
+Use this when you need per-call state computed at call time. The `decorator_logic` function
+receives the decorated function plus args/kwargs and returns `(before_hook, transform_result)`.
+
+**4. Complex custom logic** — create wrappers manually with specific return types:
 ```python
 from functools import wraps
 from typing import Callable, cast

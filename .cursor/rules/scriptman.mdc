@@ -314,6 +314,38 @@ print(f"Processing invoice {invoice_id}")  # NO!
 logger.info(f"Processing invoice {invoice_id}")  # NO! (unless inside observe module)
 ```
 
+**RULE: Internal Modules Use `_internal.log`**
+To avoid circular imports, internal Scriptman modules must use the safe logging wrapper instead of importing observe directly at module level.
+
+| Who | Import | Use Case |
+|-----|--------|----------|
+| **Internal modules** | `from scriptman._internal import log` | config, cache, database, CLI |
+| **External users** | `from scriptman import observe` | User applications |
+
+```python
+# ✅ CORRECT - Internal module logging (no circular import risk)
+from scriptman._internal import log
+
+class Config:
+    def set(self, key: str, value: Any) -> None:
+        # ... logic ...
+        log.debug(f"✍️ Config updated: {key} = {value}")
+        log.event("Config changed", "config.changed", key=key)
+
+# ❌ WRONG - Top-level observe import in internal module
+from scriptman.observe import observe  # Causes circular import!
+
+class Config:
+    def set(self, key: str, value: Any) -> None:
+        observe.debug(...)  # May fail during initialization
+```
+
+The `_internal.log` module:
+- Uses lazy imports to break circular dependencies
+- Falls back to loguru if observe isn't ready
+- Mirrors the observe API (`log.info()`, `log.error()`, `log.event()`)
+- Handles recursive calls during initialization gracefully
+
 **SQLite-First for Local Storage**
 - Use SQLite for all local persistence (events, cache, queue, etc.)
 - Share the `SQLiteClient` abstraction from `scriptman.database`
@@ -844,6 +876,7 @@ with config.temporary(concurrent=False):
 - ABCs for contracts, explicit methods for access, clear visibility for every attribute
 - Decorators ALWAYS work with both sync and async — no exceptions
 - Observer integration everywhere — if it happens, we should be able to query it later
+- Internal modules use `_internal.log`, external users use `observe` — prevents circular imports
 - SQLite first, scale later — local-first design with upgrade path to Redis/Postgres
 - Track everything in `FEATURE_GUIDE.md` — our secondary memory for v3 migration
 - Simple things simple, complex things possible — YAGNI with an escape hatch

@@ -90,15 +90,15 @@ scriptman/
 
 ### Summary Table
 
-| File | Current Approach | Top-level Import Issue? | Action |
-|------|-----------------|-------------------------|--------|
-| `config/__init__.py` | Top-level `from scriptman.observe import observe` | 🔴 **CRITICAL** | Use `_internal.log` |
-| `config/readers/__init__.py` | Top-level `from scriptman.observe import observe` | 🔴 **CRITICAL** | Use `_internal.log` |
-| `config/readers/toml.py` | Top-level `from scriptman.observe import observe` | 🔴 **CRITICAL** | Use `_internal.log` |
-| `cache/__init__.py` | Uses `_observe_log()` helper | 🟡 Already handled | Replace with `_internal.log` |
-| `cache/backends/sqlite.py` | Uses `_observe_log()` and `_observe_event()` helpers | 🟡 Already handled | Replace with `_internal.log` |
-| `cache/backends/sharded.py` | Uses `_observe_log()` helper | 🟡 Already handled | Replace with `_internal.log` |
-| `database/sqlite.py` | Uses `_observe_log()` helper | 🟡 Already handled | Replace with `_internal.log` |
+| File                         | Current Approach                                     | Top-level Import Issue? | Action                       |
+| ---------------------------- | ---------------------------------------------------- | ----------------------- | ---------------------------- |
+| `config/__init__.py`         | Top-level `from scriptman.observe import observe`    | 🔴 **CRITICAL**          | Use `_internal.log`          |
+| `config/readers/__init__.py` | Top-level `from scriptman.observe import observe`    | 🔴 **CRITICAL**          | Use `_internal.log`          |
+| `config/readers/toml.py`     | Top-level `from scriptman.observe import observe`    | 🔴 **CRITICAL**          | Use `_internal.log`          |
+| `cache/__init__.py`          | Uses `_observe_log()` helper                         | 🟡 Already handled       | Replace with `_internal.log` |
+| `cache/backends/sqlite.py`   | Uses `_observe_log()` and `_observe_event()` helpers | 🟡 Already handled       | Replace with `_internal.log` |
+| `cache/backends/sharded.py`  | Uses `_observe_log()` helper                         | 🟡 Already handled       | Replace with `_internal.log` |
+| `database/sqlite.py`         | Uses `_observe_log()` helper                         | 🟡 Already handled       | Replace with `_internal.log` |
 
 **CLI modules** (safe, user-facing — don't need `_internal.log`):
 - `cli/__init__.py`, `cli/config.py`, `cli/observe.py`, `cli/dev/*.py`
@@ -993,22 +993,22 @@ assert value == "test_value"
 
 ## 📊 Implementation Summary
 
-| File | Lines (est.) | Complexity | Status |
-|------|-------------|------------|--------|
-| `_internal/__init__.py` | ~15 | Low | ✅ Complete |
-| `_internal/log.py` | ~229 | Low | ✅ Complete |
-| `config/schema/logging.py` | ~119 | Low | ✅ Complete |
-| `observe/formatting.py` | ~241 | Low | ✅ Complete |
-| `observe/logger.py` | +trace fn | Low | ✅ Complete |
-| `observe/__init__.py` updates | ~20 | Low | ✅ Complete |
-| `config/__init__.py` updates | ~10 changes | Low | ✅ Complete |
-| `config/readers/__init__.py` updates | ~10 changes | Low | ✅ Complete |
-| `config/readers/toml.py` updates | ~8 changes | Low | ✅ Complete |
-| `cache/__init__.py` updates | ~15 changes | Low | ✅ Complete |
-| `cache/backends/sqlite.py` updates | ~20 changes | Low | ✅ Complete |
-| `cache/backends/sharded.py` updates | ~8 changes | Low | ✅ Complete |
-| `database/sqlite.py` updates | ~15 changes | Low | ✅ Complete |
-| `tests/test_internal_log.py` | ~870 | Medium | ✅ Complete |
+| File                                 | Lines (est.) | Complexity | Status     |
+| ------------------------------------ | ------------ | ---------- | ---------- |
+| `_internal/__init__.py`              | ~15          | Low        | ✅ Complete |
+| `_internal/log.py`                   | ~229         | Low        | ✅ Complete |
+| `config/schema/logging.py`           | ~119         | Low        | ✅ Complete |
+| `observe/formatting.py`              | ~241         | Low        | ✅ Complete |
+| `observe/logger.py`                  | +trace fn    | Low        | ✅ Complete |
+| `observe/__init__.py` updates        | ~20          | Low        | ✅ Complete |
+| `config/__init__.py` updates         | ~10 changes  | Low        | ✅ Complete |
+| `config/readers/__init__.py` updates | ~10 changes  | Low        | ✅ Complete |
+| `config/readers/toml.py` updates     | ~8 changes   | Low        | ✅ Complete |
+| `cache/__init__.py` updates          | ~15 changes  | Low        | ✅ Complete |
+| `cache/backends/sqlite.py` updates   | ~20 changes  | Low        | ✅ Complete |
+| `cache/backends/sharded.py` updates  | ~8 changes   | Low        | ✅ Complete |
+| `database/sqlite.py` updates         | ~15 changes  | Low        | ✅ Complete |
+| `tests/test_internal_log.py`         | ~870         | Medium     | ✅ Complete |
 
 **Total:** ~620+ lines new/changed — **ALL IMPLEMENTED**
 
@@ -1916,19 +1916,19 @@ class TestObserveIntegration:
 
 ## 📊 Test Coverage Matrix
 
-| Category | Functions Covered | Edge Cases | Expected Coverage |
-|----------|------------------|------------|-------------------|
-| **Basic Logging** | trace, debug, info, warning, error, success, critical | All levels callable | 100% |
-| **Data Formatting** | _loguru_fallback with data | None, numbers, bools, lists, dicts | 100% |
-| **Exception Logging** | exception | With/without exception context | 100% |
-| **Event Emission** | event | Success, error, recursion skip | 100% |
-| **Fallback Behavior** | _loguru_fallback, _log | ImportError, RecursionError, generic | 100% |
-| **Circular Prevention** | _current_state, _LOGGING | State reset, sentinel uniqueness | 100% |
-| **Observe Delegation** | All log levels | Delegation verification | 100% |
-| **Formatting Integration** | Via observe and fallback | Custom formats | 100% |
-| **Edge Cases** | All functions | Unicode, long strings, special chars | 100% |
-| **Module API** | __all__, exports | Importability | 100% |
-| **Concurrency** | State isolation | Rapid calls | Basic |
+| Category                   | Functions Covered                                     | Edge Cases                           | Expected Coverage |
+| -------------------------- | ----------------------------------------------------- | ------------------------------------ | ----------------- |
+| **Basic Logging**          | trace, debug, info, warning, error, success, critical | All levels callable                  | 100%              |
+| **Data Formatting**        | _loguru_fallback with data                            | None, numbers, bools, lists, dicts   | 100%              |
+| **Exception Logging**      | exception                                             | With/without exception context       | 100%              |
+| **Event Emission**         | event                                                 | Success, error, recursion skip       | 100%              |
+| **Fallback Behavior**      | _loguru_fallback, _log                                | ImportError, RecursionError, generic | 100%              |
+| **Circular Prevention**    | _current_state, _LOGGING                              | State reset, sentinel uniqueness     | 100%              |
+| **Observe Delegation**     | All log levels                                        | Delegation verification              | 100%              |
+| **Formatting Integration** | Via observe and fallback                              | Custom formats                       | 100%              |
+| **Edge Cases**             | All functions                                         | Unicode, long strings, special chars | 100%              |
+| **Module API**             | __all__, exports                                      | Importability                        | 100%              |
+| **Concurrency**            | State isolation                                       | Rapid calls                          | Basic             |
 
 **Target Coverage: 95%+**
 

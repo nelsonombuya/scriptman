@@ -312,6 +312,37 @@ from typing import Optional, List, Dict  # Don't need these anymore
 - Docstrings follow Google style with emoji prefix
 - Comments explain WHY, not WHAT (code explains what)
 
+**Section Headers for Large Files**
+For files with multiple logical sections (150+ lines), use visual section headers to improve scanability:
+
+```python
+# ═══════════════════════════════════════════════════════════════════════════════
+# TYPE VARIABLES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DECORATOR UTILITIES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def is_async(func): ...
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOCKS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class StampedeLock: ...
+```
+
+Guidelines:
+- Use `═` (double-line box drawing) for major sections
+- Use `─` (single-line) for subsections if needed
+- Keep header text SHORT and descriptive
+- Add blank line before and after each header block
+- Only use in files with 3+ distinct logical sections
+
 **Import Organization**
 ```python
 # Standard library

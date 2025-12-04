@@ -23,12 +23,15 @@ Usage:
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from threading import Lock
+from typing import Any
 
-from loguru import logger
 from pydantic import TypeAdapter, ValidationError
+
+from scriptman._internal import log
 
 from .readers import (
     ConfigReader,
@@ -39,7 +42,31 @@ from .readers import (
 from .schema import ConfigSchema
 from .schema.data import DataCategory, DataConfig
 
-__all__ = ["config", "Config", "ConfigSchema"]
+__all__ = [
+    # Singleton and classes
+    "config",
+    "Config",
+    "ConfigSchema",
+    # Reading & writing
+    "get",
+    "set",
+    "reset",
+    "reset_all",
+    # Overrides
+    "override",
+    "temporary",
+    "clear_overrides",
+    # Reader management
+    "use_reader",
+    "migrate_to",
+    "generate_example",
+    # Path resolution
+    "resolve_path",
+    "ensure_path",
+    # New features
+    "reload",
+    "dump",
+]
 
 
 class Config:
@@ -48,8 +75,10 @@ class Config:
     Provides unified access to configuration with priority chain:
         1. Runtime overrides (config.override())
         2. Environment variables (SCRIPTMAN_*)
-        3. Config file (scriptman.toml / pyproject.toml)
+        3. Config file (scriptman.json default, or scriptman.toml/yaml if extras installed)
         4. Schema defaults
+
+    Thread-safe singleton pattern ensures one instance across the application.
 
     Supports multiple config formats via pluggable readers.
 
@@ -64,18 +93,41 @@ class Config:
         True
     """
 
+    # ─────────────────────────────────────────────────────────────
+    # Thread-Safe Singleton
+    # ─────────────────────────────────────────────────────────────
+
+    _instance: Config | None = None
+    _lock: Lock = Lock()
+    __initialized: bool = False
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> Config:
+        """🔒 Thread-safe singleton pattern."""
+        if cls._instance is None:
+            with cls._lock:
+                # Double-check locking
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(
         self,
         reader: ConfigReader | None = None,
         *,
         _is_secrets: bool = False,
+        _force_reinit: bool = False,
     ) -> None:
         """🚀 Initialize configuration manager.
 
         Args:
             reader: Custom reader, or None for auto-discovery.
             _is_secrets: Internal flag for secrets instance.
+            _force_reinit: Force reinitialization (for testing only).
         """
+        # Skip if already initialized (singleton)
+        if self.__initialized and not _force_reinit:
+            return
+
         self._schema = ConfigSchema
         self._reader = reader or (
             auto_discover_secrets_reader() if _is_secrets else auto_discover_reader()
@@ -88,10 +140,40 @@ class Config:
         # Secrets sub-instance (only for main config)
         self._secrets: Config | None = None
         if not _is_secrets:
-            self._secrets = Config(_is_secrets=True)
+            # Create secrets instance without triggering singleton
+            secrets_instance = object.__new__(Config)
+            # Manually initialize secrets instance
+            secrets_instance._schema = ConfigSchema
+            secrets_instance._reader = auto_discover_secrets_reader()
+            secrets_instance._store = secrets_instance._reader.read()
+            secrets_instance._overrides = {}
+            secrets_instance._env_reader = EnvVarReader()
+            secrets_instance._is_secrets = True
+            secrets_instance.__initialized = True
+            self._secrets = secrets_instance
+
+        self.__initialized = True
+
+    # ─────────────────────────────────────────────────────────────
+    # Debug Representation
+    # ─────────────────────────────────────────────────────────────
+
+    def __repr__(self) -> str:
+        """🔍 Debug representation of config state."""
+        return (
+            f"Config("
+            f"reader={self._reader.name!r}, "
+            f"file={self._reader.file_path}, "
+            f"keys={len(self.keys())}, "
+            f"overrides={len(self._overrides)})"
+        )
+
+    def __str__(self) -> str:
+        """📝 Human-readable config summary."""
+        return f"Scriptman Config ({self._reader.name}: {self._reader.file_path})"
 
     @property
-    def secrets(self) -> "Config":
+    def secrets(self) -> Config:
         """🔐 Access secrets configuration."""
         if self._is_secrets:
             raise AttributeError("Cannot access secrets.secrets")
@@ -123,9 +205,9 @@ class Config:
             >>> config.get("retry.max_delay", default=30)
             60.0
         """
-        # 1. Check overrides (highest priority)
-        if (value := self._get_nested(self._overrides, key)) is not None:
-            return value
+        # 1. Check overrides (highest priority) - stored as flat keys
+        if key in self._overrides:
+            return self._overrides[key]
 
         # 2. Check environment variables
         env_data = self._env_reader.read()
@@ -144,10 +226,9 @@ class Config:
 
     def __getitem__(self, key: str) -> Any:
         """🔍 Bracket notation access: config["retry.max_delay"]"""
-        value = self.get(key)
-        if value is None:
+        if key not in self:
             raise KeyError(f"Config key not found: {key}")
-        return value
+        return self.get(key)
 
     def __contains__(self, key: str) -> bool:
         """🔍 Check if key exists: "logging.level" in config"""
@@ -165,6 +246,46 @@ class Config:
         """🔍 Get all config key-value pairs."""
         return [(key, self.get(key)) for key in self.keys()]
 
+    def dump(self) -> dict[str, Any]:
+        """📤 Export entire configuration as a nested dictionary.
+
+        Returns the merged view of all config sources respecting priority.
+        Useful for debugging, serialization, and config inspection.
+
+        Returns:
+            Complete configuration as nested dict
+
+        Example:
+            >>> config.dump()
+            {'logging': {'level': 'INFO'}, 'execution': {'concurrent': True}}
+        """
+        result: dict[str, Any] = {}
+        for key in self.keys():
+            value = self.get(key)
+            self._set_nested(result, key, value)
+        return result
+
+    def reload(self) -> None:
+        """🔄 Reload configuration from file.
+
+        Re-reads the config file and updates the in-memory store.
+        Useful for picking up external changes without restarting.
+        Overrides are preserved.
+
+        Example:
+            >>> config.reload()
+        """
+        self._store = self._reader.read()
+        log.debug(f"🔄 Reloaded config from {self._reader.name}")
+
+        # Emit reload event
+        self._emit_event(
+            "Config reloaded",
+            event_type="config.reloaded",
+            reader=self._reader.name,
+            file=str(self._reader.file_path),
+        )
+
     # ─────────────────────────────────────────────────────────────
     # Path Resolution
     # ─────────────────────────────────────────────────────────────
@@ -176,7 +297,7 @@ class Config:
         Uses data.dir as the base directory.
 
         Args:
-            category: One of 'logs', 'db', 'cache', 'artifacts'
+            category: One of 'logs', 'db', 'cache', 'artifacts', 'observe'
 
         Returns:
             Full resolved path for the category
@@ -203,7 +324,7 @@ class Config:
         Same as resolve_path but also creates the directory.
 
         Args:
-            category: One of 'logs', 'db', 'cache', 'artifacts'
+            category: One of 'logs', 'db', 'cache', 'artifacts', 'observe'
 
         Returns:
             Full resolved path (directory created if needed)
@@ -256,7 +377,7 @@ class Config:
         # Persist to file
         if persist and self._reader.supports_write():
             self._reader.write(self._store)
-            logger.debug(f"✍️ Config updated: {key} = {value}")
+            log.debug(f"✍️ Config updated: {key} = {value}")
 
         # Emit config change event
         self._emit_event(
@@ -280,14 +401,14 @@ class Config:
         """
         default = self._schema.get_default(key)
         self.set(key, default)
-        logger.debug(f"🔄 Reset {key} to default: {default}")
+        log.debug(f"🔄 Reset {key} to default: {default}")
 
     def reset_all(self) -> None:
         """🔄 Reset all config to schema defaults."""
         self._store = {}
         if self._reader.supports_write():
             self._reader.write(self._store)
-        logger.info("🔄 Reset all config to defaults")
+        log.info("🔄 Reset all config to defaults")
 
     # ─────────────────────────────────────────────────────────────
     # Overrides
@@ -341,7 +462,7 @@ class Config:
     def clear_overrides(self) -> None:
         """🧹 Clear all runtime overrides."""
         self._overrides.clear()
-        logger.debug("🧹 Cleared all config overrides")
+        log.debug("🧹 Cleared all config overrides")
 
     @contextmanager
     def temporary(self, **kwargs: Any) -> Iterator[None]:
@@ -418,12 +539,12 @@ class Config:
         if old_path and old_path.exists():
             migrated_path = old_path.with_suffix(old_path.suffix + ".migrated")
             old_path.rename(migrated_path)
-            logger.info(f"📁 Renamed {old_path} → {migrated_path}")
+            log.info(f"📁 Renamed {old_path} → {migrated_path}")
 
         # Switch to new reader
         self._reader = new_reader
 
-        logger.success(f"✅ Migrated config: {old_reader.name} → {new_reader.name}")
+        log.success(f"✅ Migrated config: {old_reader.name} → {new_reader.name}")
 
     def use_reader(self, reader: ConfigReader) -> None:
         """📖 Switch to a different config reader.
@@ -433,32 +554,66 @@ class Config:
         """
         self._reader = reader
         self._store = reader.read()
-        logger.debug(f"📖 Switched to {reader.name} reader")
+        log.debug(f"📖 Switched to {reader.name} reader")
 
-    def generate_example(self, format: str = "toml") -> str:
+    def generate_example(self, format: str = "json") -> str:
         """📝 Generate example configuration in specified format.
 
         Args:
-            format: Output format ('toml', 'env', 'pyproject')
+            format: Output format ('json', 'toml', 'yaml', 'env', 'pyproject')
 
         Returns:
             Example configuration as a string
 
+        Raises:
+            ValueError: If format is unknown or dependencies not installed
+
         Example:
-            >>> example = config.generate_example("toml")
+            >>> example = config.generate_example("json")
             >>> print(example)
         """
-        from .readers import TomlReader
-
         reader: ConfigReader
-        if format == "pyproject":
-            reader = TomlReader(Path.cwd() / "pyproject.toml", section="scriptman")
+
+        if format == "json":
+            from .readers import JsonReader
+
+            reader = JsonReader(Path.cwd() / "scriptman.json")
+        elif format == "pyproject":
+            try:
+                from .readers.toml import TomlReader
+
+                reader = TomlReader(Path.cwd() / "pyproject.toml", section="scriptman")
+            except ImportError as e:
+                raise ValueError(
+                    f"⚠️ TOML support required for '{format}' format. "
+                    f"Install with: pip install scriptman[toml]"
+                ) from e
         elif format == "toml":
-            reader = TomlReader(Path.cwd() / "scriptman.toml")
+            try:
+                from .readers.toml import TomlReader
+
+                reader = TomlReader(Path.cwd() / "scriptman.toml")
+            except ImportError as e:
+                raise ValueError(
+                    f"⚠️ TOML support required for '{format}' format. "
+                    f"Install with: pip install scriptman[toml]"
+                ) from e
+        elif format in ("yaml", "yml"):
+            try:
+                from .readers.yaml import YamlReader
+
+                reader = YamlReader(Path.cwd() / "scriptman.yaml")
+            except ImportError as e:
+                raise ValueError(
+                    f"⚠️ YAML support required for '{format}' format. "
+                    f"Install with: pip install scriptman[yaml]"
+                ) from e
         elif format == "env":
             reader = EnvVarReader()
         else:
-            raise ValueError(f"⚠️ Unknown format: {format}")
+            raise ValueError(
+                f"⚠️ Unknown format: {format}. Supported: json, toml, yaml, env, pyproject"
+            )
 
         return reader.generate_example(self._schema)
 
@@ -474,8 +629,9 @@ class Config:
             adapter.validate_python(value)
         except KeyError:
             # Unknown key - allow for flexibility (user-defined keys)
-            logger.warning(f"⚠️ Unknown config key: {key}")
+            log.warning(f"⚠️ Unknown config key: {key}")
         except ValidationError as e:
+            log.exception(f"⚠️ Invalid value for {key}: {e}")
             raise ValueError(f"⚠️ Invalid value for {key}: {e}") from e
 
     @staticmethod
@@ -582,4 +738,7 @@ generate_example = config.generate_example
 # Path resolution helpers
 resolve_path = config.resolve_path
 ensure_path = config.ensure_path
-ensure_path = config.ensure_path
+
+# New features
+reload = config.reload
+dump = config.dump

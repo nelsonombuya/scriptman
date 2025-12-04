@@ -13,15 +13,19 @@ if TYPE_CHECKING:
 class ConfigReader(ABC):
     """📖 Base class for reading/writing configuration from any source.
 
-    Subclasses implement format-specific logic (TOML, YAML, JSON, etc.).
+    Subclasses implement format-specific logic (JSON, TOML, YAML, etc.).
     The Config class doesn't care about format - it just receives a dict.
 
-    Built-in readers:
-        - TomlReader: Reads .toml files (default)
+    Built-in readers (always available):
+        - JsonReader: Reads .json files (default, stdlib, no dependencies)
         - EnvVarReader: Reads SCRIPTMAN_* environment variables
 
-    Contributors can add:
-        - YamlReader, JsonReader, RemoteReader, etc.
+    Optional readers (require extras):
+        - TomlReader: Reads .toml files (requires: pip install scriptman[toml])
+        - YamlReader: Reads .yaml/.yml files (requires: pip install scriptman[yaml])
+        - DotEnvReader: Reads .env files (requires: pip install scriptman[dotenv])
+
+    Contributors can add custom readers via register_reader().
     """
 
     @property

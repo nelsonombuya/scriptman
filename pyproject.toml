@@ -45,7 +45,6 @@ classifiers = [
 dependencies = [
     "loguru>=0.7.3",   # Structured logging with rich formatting
     "pydantic>=2.0.0", # Config schema validation
-    "tomlkit>=0.13.2", # TOML config file handling (preserves comments)
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -53,14 +52,29 @@ dependencies = [
 # ─────────────────────────────────────────────────────────────────────────────
 
 [project.optional-dependencies]
+# Config format readers
+toml = ["tomlkit>=0.13.2"]
+yaml = ["pyyaml>=6.0"]
+dotenv = ["python-dotenv>=1.0"]
+
+# Bundle all config formats
+config-all = ["tomlkit>=0.13.2", "pyyaml>=6.0", "python-dotenv>=1.0"]
+
 # Web/API features
 api = ["fastapi>=0.100.0", "uvicorn>=0.23.0"]
 
 # All optional features
-all = ["fastapi>=0.100.0", "uvicorn>=0.23.0"]
+all = [
+    "tomlkit>=0.13.2",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+]
 
 # Development (for contributors)
 # Note: Ruff handles formatting + linting + import sorting
+# Includes toml/yaml/dotenv for testing config readers
 dev = [
     "mypy>=1.13.0",
     "pytest>=8.3.4",
@@ -68,6 +82,9 @@ dev = [
     "pytest-cov>=6.0.0",
     "pytest-mock>=3.14.0",
     "ruff>=0.9.8",
+    "tomlkit>=0.13.2",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────

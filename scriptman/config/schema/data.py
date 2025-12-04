@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 # Type alias for data categories
-DataCategory = Literal["logs", "db", "cache", "artifacts"]
+DataCategory = Literal["logs", "db", "cache", "artifacts", "observe"]
 
 
 class DataConfig(BaseModel):
@@ -27,6 +27,7 @@ class DataConfig(BaseModel):
         db: Subdirectory for database files (default: "db")
         cache: Subdirectory for cache files (default: "cache")
         artifacts: Subdirectory for generated artifacts (default: "artifacts")
+        observe: Subdirectory for observer storage (default: "observe")
 
     Example:
         >>> config.get("data.dir")
@@ -45,7 +46,8 @@ class DataConfig(BaseModel):
         ├── logs/              # Logging output
         ├── db/                # SQLite databases
         ├── cache/             # Runtime caches
-        └── artifacts/         # Generated files (reports, exports)
+        ├── artifacts/         # Generated files (reports, exports)
+        └── observe/           # Observer event storage
     """
 
     dir: Path = Field(
@@ -67,6 +69,10 @@ class DataConfig(BaseModel):
     artifacts: Path = Field(
         default=Path("artifacts"),
         description="Subdirectory name for generated artifacts",
+    )
+    observe: Path = Field(
+        default=Path("observe"),
+        description="Subdirectory name for observer storage",
     )
 
     @field_validator("dir", mode="before")
@@ -94,6 +100,9 @@ class DataConfig(BaseModel):
         Returns:
             Full resolved path for the category
 
+        Raises:
+            ValueError: If category is invalid
+
         Example:
             >>> data_config = DataConfig()
             >>> data_config.get_path("logs")
@@ -102,11 +111,19 @@ class DataConfig(BaseModel):
             PosixPath('.data/db')
         """
         subdirs: dict[DataCategory, Path] = {
-            "logs": self.logs,
             "db": self.db,
+            "logs": self.logs,
             "cache": self.cache,
+            "observe": self.observe,
             "artifacts": self.artifacts,
         }
+
+        if category not in subdirs:
+            valid = ", ".join(sorted(subdirs.keys()))
+            raise ValueError(
+                f"⚠️ Invalid data category: {category!r}. Valid categories: {valid}"
+            )
+
         return self.dir / subdirs[category]
 
     def ensure_path(self, category: DataCategory) -> Path:

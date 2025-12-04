@@ -91,16 +91,13 @@ class EnvVarReader(ConfigReader):
         model: type[BaseModel],
         lines: list[str],
         prefix: str,
-        parent_description: str = "",
     ) -> None:
-        """
-        ✍🏾 Recursively process a model and its nested fields.
+        """✍️ Recursively process a model and its nested fields.
 
         Args:
             model: The model to process.
             lines: The list of lines to append the examples to.
             prefix: The prefix to use for the environment variable name.
-            parent_description: The description of the parent model.
 
         Returns:
             None
@@ -127,7 +124,6 @@ class EnvVarReader(ConfigReader):
                     annotation,
                     lines,
                     prefix=env_name if prefix else f"{self.PREFIX}{field_name.upper()}",
-                    parent_description=section_desc,
                 )
             else:
                 # Regular field - add example
@@ -167,7 +163,7 @@ class EnvVarReader(ConfigReader):
         # Format for env file
         if isinstance(value, bool):
             return "true" if value else "false"
-        if isinstance(value, (int, float)):
+        if isinstance(value, (int | float)):
             return str(value)
         if isinstance(value, str):
             # Quote strings if they contain spaces

@@ -115,11 +115,12 @@ class Config:
 ```
 
 **Minimal Core, Modular Extensions**
-- Core utilities require ≤5 dependencies
-- Build lightweight implementations for simple functionality (scheduling, caching basics)
+- Core utilities require ≤3 dependencies (loguru, pydantic)
+- Default to stdlib where possible (JSON config, not TOML)
 - Keep exceptional libraries (Pydantic, FastAPI) - don't reinvent excellence
-- Use optional extras: `scriptman[db]`, `scriptman[selenium]`, `scriptman[api]`
+- Use optional extras: `scriptman[toml]`, `scriptman[yaml]`, `scriptman[api]`
 - Every dependency must justify its complexity cost
+- See "Optional Dependencies Pattern" for implementation details
 
 **Top-Level Module Organization**
 Scriptman v3 uses a flat, discoverable structure:
@@ -282,8 +283,10 @@ def deco(func: Callable[P, Coroutine[...]]) -> ...: ...  # Never reached
 - Every tunable parameter respects configuration hierarchy:
   1. Runtime overrides (`config.override()`) - highest priority
   2. Environment variables (`SCRIPTMAN_*`)
-  3. Config file (`scriptman.toml` / `pyproject.toml`)
+  3. Config file (`scriptman.json` default, or `.toml`/`.yaml` with extras)
   4. Schema defaults - lowest priority
+- JSON is the default format (stdlib, no extra deps)
+- TOML/YAML available via `scriptman[toml]` / `scriptman[yaml]`
 - Defaults work for 80% of use cases out of the box
 - Use Pydantic for configuration validation
 
@@ -609,18 +612,102 @@ from scriptman.config import config
 from scriptman.config.schema import ConfigSchema
 ```
 
-**Lazy Imports for Optional Dependencies**
+**Import Style: Full Module vs Specific**
+
+This is context-dependent, not a strict rule:
+
+| Context                        | Preferred Style  | Why                                         |
+| ------------------------------ | ---------------- | ------------------------------------------- |
+| **Optional dependencies**      | `import yaml`    | Clearer namespace, better for try/except    |
+| **Standard library**           | Either is fine   | `json.dumps()` or `dumps()` both acceptable |
+| **Internal Scriptman modules** | Specific imports | `from scriptman.types import P, R`          |
+
 ```python
-# At module level for optional heavy dependencies
-def get_selenium():
-    try:
-        from selenium import webdriver
-        return webdriver
-    except ImportError:
-        raise ImportError(
-            "🚫 Selenium not installed. Install with: pip install scriptman[selenium]"
-        )
+# ✅ GOOD - Optional deps use full module import
+import yaml
+yaml.safe_load(f)  # Clear where this comes from
+
+# ✅ ALSO GOOD - Stdlib can use either
+from json import dumps, load
+dumps(data)
+
+# ✅ GOOD - Internal modules use specific imports
+from scriptman.types import P, R
 ```
+
+**Optional Dependencies Pattern**
+
+Scriptman uses **module-level imports with try/except** for optional dependencies. This provides:
+- **Full typing** — Type checker knows all methods/attributes
+- **Fast failure** — Error at import, not first method call
+- **Clear errors** — Helpful installation instructions
+- **Graceful degradation** — Auto-discovery skips unavailable formats
+
+```python
+# ═══════════════════════════════════════════════════════════════════════════════
+# OPTIONAL DEPENDENCY
+# ═══════════════════════════════════════════════════════════════════════════════
+
+try:
+    import yaml
+except ImportError as e:
+    raise ImportError(
+        "🚫 YAML support requires pyyaml. Install with:\n"
+        "    pip install scriptman[yaml]\n"
+        "    # or\n"
+        "    pip install pyyaml"
+    ) from e
+
+
+class YamlReader(ConfigReader):
+    def read(self) -> dict[str, Any]:
+        # yaml.safe_load is fully typed! ✅
+        data = yaml.safe_load(f)
+        return dict(data) if data else {}
+```
+
+**How it works with auto-discovery:**
+
+```python
+# In readers/__init__.py — catches ImportError gracefully
+def _get_reader_registry():
+    registry = {".json": JsonReader}  # Always available (stdlib)
+
+    try:
+        from .yaml import YamlReader  # Fails if pyyaml not installed
+        registry[".yaml"] = YamlReader
+    except ImportError:
+        pass  # Format just not registered
+
+    return registry
+```
+
+**When to use lazy import instead:**
+
+CLI commands that need graceful exit codes (not crashes) should use lazy imports:
+
+```python
+# CLI commands — need graceful error handling
+def _get_tomlkit() -> tuple[Any, Any]:
+    try:
+        from tomlkit import dumps, parse
+        return dumps, parse
+    except ImportError:
+        raise ImportError("🚫 Requires tomlkit...") from None
+
+def run_bump(level: str) -> int:
+    try:
+        dumps, parse = _get_tomlkit()
+    except ImportError as e:
+        observe.error(str(e))
+        return 1  # Graceful exit, not crash
+```
+
+| Context                     | Pattern              | Why                                 |
+| --------------------------- | -------------------- | ----------------------------------- |
+| **Reader/Module classes**   | Module-level import  | Full typing, fails at import        |
+| **CLI commands**            | Lazy import + try    | Graceful exit code (1), not crash   |
+| **Auto-discovery registry** | try/except on import | Skip unavailable formats gracefully |
 
 ### 7. Documentation Requirements
 
@@ -970,20 +1057,29 @@ scriptman.config.get("log_level")
 | `json`       | Structured JSON                        | Log aggregation (Datadog, ELK) |
 | `production` | Clean, no colors                       | File logging                   |
 
-**Configuration via `scriptman.toml`:**
+**Configuration via `scriptman.json` (default) or `scriptman.toml` (with extras):**
+```json
+{
+  "logging": {
+    "level": "DEBUG",
+    "format": "detailed",
+    "colorize": true,
+    "diagnose": true,
+    "backtrace": true,
+    "file_enabled": true,
+    "file_rotation": "10 MB",
+    "file_retention": "7 days",
+    "file_compression": "zip"
+  }
+}
+```
+
+Or with TOML (requires `pip install scriptman[toml]`):
 ```toml
 [logging]
 level = "DEBUG"
-format = "detailed"          # Preset name or custom format string
+format = "detailed"
 colorize = true
-diagnose = true
-backtrace = true
-
-# File logging (optional)
-file_enabled = true
-file_rotation = "10 MB"
-file_retention = "7 days"
-file_compression = "zip"
 ```
 
 **Configuration via Code:**

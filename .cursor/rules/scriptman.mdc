@@ -125,11 +125,35 @@ class Config:
 Scriptman v3 uses a flat, discoverable structure:
 ```
 scriptman/
-├── __init__.py      # Lazy imports, exposes config, etc.
-├── config/          # Configuration management (top-level, not in core/)
-├── cli/             # Command-line interface (top-level, not in core/)
-├── orchestrator/    # Command Deck - runtime coordination
+├── __init__.py      # Lazy imports, exposes config, observe, types, etc.
+├── types.py         # Reusable type aliases and sync/async utilities
+├── serialization.py # Type conversion utilities
+├── config/          # Configuration management
+├── observe/         # Telemetry and observability
+├── database/        # Database clients (SQLiteClient, etc.)
+├── cli/             # Command-line interface
+├── cache/           # Caching with TTL, tags, LRU (planned)
 └── (other modules)  # Each feature as a top-level module
+```
+
+**Types Module (`scriptman.types`)**
+Provides reusable utilities for generic programming and sync/async handling:
+```python
+from scriptman.types import (
+    T, P, R,           # Type variables
+    SyncFunc,          # Callable[P, R]
+    AsyncFunc,         # Callable[P, Awaitable[R]]
+    Func,              # Union of both
+    is_async,          # Detect if function is async
+    wrap_function,     # Wrap with before/after hooks
+    StampedeLock,      # Per-key locks for stampede prevention
+)
+
+# Use in decorators
+if is_async(func):
+    # async wrapper
+else:
+    # sync wrapper
 ```
 
 **Unified Sync/Async Experience (Sync-First)**
@@ -139,6 +163,46 @@ scriptman/
 - Same API surface for both paradigms where possible
 - Example: `@retry` works on both sync and async functions transparently
 
+**RULE: All Decorators Must Support Sync AND Async**
+- Every decorator in Scriptman MUST work transparently with both sync and async functions
+- Use `scriptman.types.is_async()` to detect function type at decoration time
+- Create separate sync and async wrappers internally
+- Use `scriptman.types.StampedeLock` for stampede prevention in both contexts
+- Users should never need to choose a "sync" vs "async" version of a decorator
+
+```python
+# ✅ CORRECT - Decorator works with both
+from scriptman.types import is_async, StampedeLock
+
+def my_decorator(func):
+    if is_async(func):
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            # async-specific logic
+            return await func(*args, **kwargs)
+        return async_wrapper
+    else:
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            # sync-specific logic
+            return func(*args, **kwargs)
+        return sync_wrapper
+
+# ❌ WRONG - Forcing users to choose
+@cache_sync  # NO!
+def my_func(): ...
+
+@cache_async  # NO!
+async def my_async_func(): ...
+
+# ✅ CORRECT - Single decorator, automatic detection
+@cache.result(ttl=3600)
+def my_func(): ...
+
+@cache.result(ttl=3600)  # Same decorator works!
+async def my_async_func(): ...
+```
+
 **Configuration-Driven Defaults**
 - Every tunable parameter respects configuration hierarchy:
   1. Runtime overrides (`config.override()`) - highest priority
@@ -147,6 +211,47 @@ scriptman/
   4. Schema defaults - lowest priority
 - Defaults work for 80% of use cases out of the box
 - Use Pydantic for configuration validation
+
+**Observer by Default (Observability-First)**
+- All Scriptman modules integrate with the Observer for telemetry
+- Use `observe.info()`, `observe.error()` instead of `print()` or raw `logger`
+- Every significant operation should emit events for later querying
+- Correlation IDs flow through all operations automatically
+- When implementing new features, ask: "How will users debug this?"
+
+```python
+# ✅ CORRECT - Use Observer for all logging
+from scriptman.observe import observe
+
+def process_invoice(invoice_id: str):
+    observe.info(f"Processing invoice", invoice_id=invoice_id)
+    # ... process ...
+    observe.success(f"Invoice processed", invoice_id=invoice_id, duration_ms=123)
+
+# ❌ WRONG - Raw print or logger bypasses observability
+print(f"Processing invoice {invoice_id}")  # NO!
+logger.info(f"Processing invoice {invoice_id}")  # NO! (unless inside observe module)
+```
+
+**SQLite-First for Local Storage**
+- Use SQLite for all local persistence (events, cache, queue, etc.)
+- Share the `SQLiteClient` abstraction from `scriptman.database`
+- Store all data under `.data/` directory by default
+- Design for local-first, add Redis/Postgres backends later for scale
+- Configuration determines storage location via `config.resolve_path()`
+
+**Standard Data Directory Structure:**
+```
+.data/                          # Base (config: data.dir)
+├── db/                         # Database files
+│   └── default.db              # Default SQLite database
+├── cache/                      # Cache storage
+│   └── cache.db                # Cache database (or cache_*.db for shards)
+├── observe/                    # Observer storage
+│   └── events.db               # Event store
+├── logs/                       # Log files (if file logging enabled)
+└── artifacts/                  # Build/output artifacts
+```
 
 ### 3. Quality & Reliability
 
@@ -284,6 +389,27 @@ Before marking any feature complete:
 - [ ] Dependencies justified (or eliminated)
 - [ ] Variable visibility reviewed (public/protected/private)
 - [ ] No magic attribute access (use explicit methods)
+- [ ] Decorators work with both sync AND async functions
+- [ ] Observer integration for telemetry (log operations, emit events)
+- [ ] Update `FEATURE_GUIDE.md` with new feature status
+
+### 9. Project Documentation
+
+**Feature Tracking**
+- All features (implemented, planned, future) are tracked in `FEATURE_GUIDE.md`
+- Update feature status as work progresses (📋 → 🚧 → ✅)
+- Use status legend: ✅ Implemented, 🚧 In Progress, 📋 Planned, 💡 Idea, ❌ Removed
+
+**Migration Plans**
+- Detailed implementation plans live in `.migration/` folder
+- Each plan is a self-contained markdown file with full context
+- Plans include: file structure, code examples, testing checklist
+- Plans are designed to be imported into a new Cursor thread for implementation
+
+**Reference Documents:**
+- `.migration/FEATURE_GUIDE.md` — Living feature inventory and changelog
+- `.migration/*.md` — Step-by-step implementation plans
+- `.cursor/rules/scriptman.mdc` — Development rules (this file)
 
 ## Implementation Patterns
 
@@ -357,30 +483,58 @@ class ConfigReader(ABC):
         return self.file_path.exists()
 ```
 
-**Retry Decorator (Sync/Async):**
+**Sync/Async Decorator Pattern (using scriptman.types):**
 ```python
 from functools import wraps
 import asyncio
+import time
 
-def retry(max_retries: int = 3, backoff: float = 1.0):
-    def decorator(func):
-        @wraps(func)
-        async def async_wrapper(*args, **kwargs):
-            for attempt in range(max_retries):
-                try:
-                    return await func(*args, **kwargs)
-                except Exception as e:
-                    if attempt == max_retries - 1:
-                        raise
-                    await asyncio.sleep(backoff * (2 ** attempt))
+from scriptman.types import is_async, Func, P, R
+from scriptman.observe import observe
 
-        @wraps(func)
-        def sync_wrapper(*args, **kwargs):
-            # Similar pattern for sync
-            pass
+def retry(max_retries: int = 3, backoff: float = 1.0) -> Callable[[Func[P, R]], Func[P, R]]:
+    """🔄 Retry decorator that works with both sync and async functions."""
 
-        return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+    def decorator(func: Func[P, R]) -> Func[P, R]:
+        if is_async(func):
+            @wraps(func)
+            async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                last_exception = None
+                for attempt in range(max_retries):
+                    try:
+                        return await func(*args, **kwargs)
+                    except Exception as e:
+                        last_exception = e
+                        if attempt < max_retries - 1:
+                            delay = backoff * (2 ** attempt)
+                            observe.warning(f"🔄 Retry {attempt + 1}/{max_retries}", error=str(e))
+                            await asyncio.sleep(delay)
+                raise last_exception
+            return async_wrapper
+        else:
+            @wraps(func)
+            def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                last_exception = None
+                for attempt in range(max_retries):
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception as e:
+                        last_exception = e
+                        if attempt < max_retries - 1:
+                            delay = backoff * (2 ** attempt)
+                            observe.warning(f"🔄 Retry {attempt + 1}/{max_retries}", error=str(e))
+                            time.sleep(delay)
+                raise last_exception
+            return sync_wrapper
+
     return decorator
+
+# Usage - same decorator works for both!
+@retry(max_retries=3)
+def fetch_data(): ...
+
+@retry(max_retries=3)
+async def fetch_data_async(): ...
 ```
 
 ## Reference Implementation Style
@@ -536,3 +690,8 @@ with config.temporary(concurrent=False):
 - Users range from beginners to your production team - design for the beginner, document for the expert
 - Every line of code should answer: "Does this make the developer's life easier?"
 - ABCs for contracts, explicit methods for access, clear visibility for every attribute
+- Decorators ALWAYS work with both sync and async — no exceptions
+- Observer integration everywhere — if it happens, we should be able to query it later
+- SQLite first, scale later — local-first design with upgrade path to Redis/Postgres
+- Track everything in `FEATURE_GUIDE.md` — our secondary memory for v3 migration
+- Simple things simple, complex things possible — YAGNI with an escape hatch

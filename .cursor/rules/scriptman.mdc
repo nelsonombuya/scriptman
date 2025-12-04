@@ -709,6 +709,44 @@ def run_bump(level: str) -> int:
 | **CLI commands**            | Lazy import + try    | Graceful exit code (1), not crash   |
 | **Auto-discovery registry** | try/except on import | Skip unavailable formats gracefully |
 
+**Dependency Ordering in `pyproject.toml`**
+
+All dependency lists in `pyproject.toml` must be sorted **alphabetically** for consistency and easier scanning:
+
+```toml
+# ✅ CORRECT - Alphabetical order
+dependencies = [
+    "loguru>=0.7.3",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+all = [
+    "fastapi>=0.100.0",
+    "pyodbc>=5.0",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "tomlkit>=0.13.2",
+    "uvicorn>=0.23.0",
+]
+
+# ❌ WRONG - Random/grouped order
+all = [
+    "tomlkit>=0.13.2",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "pyodbc>=5.0",
+]
+```
+
+**Why alphabetical?**
+- Easier to scan and find specific packages
+- Reduces merge conflicts (changes are localized)
+- Consistent with import sorting conventions
+- No debates about "logical grouping"
+
 ### 7. Documentation Requirements
 
 **Every Public API Must Have:**

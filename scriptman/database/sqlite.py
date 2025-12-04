@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from threading import Lock
-from typing import Any, Iterator
+from threading import RLock
+from typing import Any
 
+from scriptman._internal import log
 from scriptman.database.client import DatabaseClient
 from scriptman.database.exceptions import DatabaseError
 
@@ -19,10 +21,9 @@ class SQLiteClient(DatabaseClient):
     Perfect for local data storage, caching, event logs, etc.
 
     Note:
-        WAL Mode is enabled by default.
-        To enable WAL Mode, use the `enable_wal_mode()` method.
-        To disable WAL Mode, use the `disable_wal_mode()` method.
-        To check if WAL Mode is enabled, use the `is_wal_mode()` method.
+        WAL Mode is enabled automatically on connect for better concurrency.
+        Use `disable_wal_mode()` if you prefer traditional rollback journal.
+        Use `is_wal_mode()` to check current mode.
 
     Args:
         path: Path to SQLite database file (created if doesn't exist)
@@ -85,7 +86,8 @@ class SQLiteClient(DatabaseClient):
         self._path: str | Path = self._resolve_path(path, name)
         self._timeout = timeout
         self._conn: sqlite3.Connection | None = None
-        self._lock = Lock()
+        self._lock = RLock()  # Reentrant lock for nested execute() in transaction()
+        self._in_transaction = False  # Track if we're inside a transaction
 
     def _resolve_path(self, path: str | Path | None, name: str) -> str | Path:
         """📁 Resolve database path based on input.
@@ -154,8 +156,9 @@ class SQLiteClient(DatabaseClient):
             )
             self._conn.row_factory = sqlite3.Row  # Dict-like row access
             self.enable_wal_mode()
-            self._log.debug(f"🔌 Connected to SQLite: {self._path} with WAL mode")
+            log.debug(f"🔌 Connected to SQLite: {self._path} with WAL mode")
         except sqlite3.Error as e:
+            log.critical(f"🔥 Failed to connect to database: {self._path}")
             raise DatabaseError(f"Failed to connect to {self._path}", e)
 
     def close(self) -> None:
@@ -167,7 +170,7 @@ class SQLiteClient(DatabaseClient):
             if self._conn is not None:
                 self._conn.close()
                 self._conn = None
-                self._log.debug(f"🔌 Closed SQLite: {self._path}")
+                log.debug(f"🔌 Closed SQLite: {self._path}")
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
@@ -178,6 +181,7 @@ class SQLiteClient(DatabaseClient):
             raise DatabaseError("Connection is not established")
 
         with self._lock:
+            self._in_transaction = True
             try:
                 yield
                 self._conn.commit()
@@ -189,6 +193,8 @@ class SQLiteClient(DatabaseClient):
                 # Re-raise user exceptions unchanged (don't hide their type)
                 self._conn.rollback()
                 raise
+            finally:
+                self._in_transaction = False
 
     # ─────────────────────────────────────────────────────────────
     # Query Execution
@@ -213,7 +219,7 @@ class SQLiteClient(DatabaseClient):
                 cursor = self._conn.execute(native_sql, native_params or {})
                 return [dict(row) for row in cursor.fetchall()]
             except sqlite3.Error as e:
-                self._log.error(f"❌ Query failed: {sql[:100]}...")
+                log.error(f"❌ Query failed: {sql[:100]}...")
                 raise DatabaseError("Query execution failed", e)
 
     def execute(
@@ -233,12 +239,14 @@ class SQLiteClient(DatabaseClient):
                     raise DatabaseError("Connection is not established")
 
                 cursor = self._conn.execute(native_sql, native_params or {})
-                self._conn.commit()
+                # Only auto-commit if NOT inside a transaction
+                if not self._in_transaction:
+                    self._conn.commit()
                 return cursor.rowcount
             except sqlite3.Error as e:
-                if self._conn is not None:
+                if self._conn is not None and not self._in_transaction:
                     self._conn.rollback()
-                self._log.error(f"❌ Execute failed: {sql[:100]}...")
+                log.error(f"❌ Execute failed: {sql[:100]}...")
                 raise DatabaseError("Execute failed", e)
 
     def execute_many(
@@ -262,12 +270,14 @@ class SQLiteClient(DatabaseClient):
                     raise DatabaseError("Connection is not established")
 
                 cursor = self._conn.executemany(native_sql, params_list)
-                self._conn.commit()
+                # Only auto-commit if NOT inside a transaction
+                if not self._in_transaction:
+                    self._conn.commit()
                 return cursor.rowcount
             except sqlite3.Error as e:
-                if self._conn is not None:
+                if self._conn is not None and not self._in_transaction:
                     self._conn.rollback()
-                self._log.error(f"❌ Execute many failed: {sql[:100]}...")
+                log.error(f"❌ Execute many failed: {sql[:100]}...")
                 raise DatabaseError("Bulk execute failed", e)
 
     def execute_script(self, sql: str) -> None:
@@ -277,6 +287,9 @@ class SQLiteClient(DatabaseClient):
 
         Args:
             sql: SQL script with multiple statements
+
+        Raises:
+            DatabaseError: If script execution fails
 
         Example:
             >>> db.execute_script('''
@@ -293,10 +306,13 @@ class SQLiteClient(DatabaseClient):
                     raise DatabaseError("Connection is not established")
 
                 self._conn.executescript(sql)
-                self._conn.commit()
+                # Only auto-commit if NOT inside a transaction
+                if not self._in_transaction:
+                    self._conn.commit()
             except sqlite3.Error as e:
-                if self._conn is not None:
+                if self._conn is not None and not self._in_transaction:
                     self._conn.rollback()
+                log.exception(f"❌ Script execution failed: {sql[:100]}...")
                 raise DatabaseError("Script execution failed", e)
 
     # ─────────────────────────────────────────────────────────────
@@ -326,6 +342,9 @@ class SQLiteClient(DatabaseClient):
             primary_key: Column names for composite primary key
             if_not_exists: Add IF NOT EXISTS clause
 
+        Raises:
+            DatabaseError: If table creation fails
+
         Example:
             >>> db.create_table(
             ...     "events",
@@ -348,7 +367,7 @@ class SQLiteClient(DatabaseClient):
 
         sql = f'CREATE TABLE {exists_clause}"{table_name}" ({col_defs})'
         self.execute(sql)
-        self._log.debug(f"🏗️ Created table: {table_name}")
+        log.debug(f"🏗️ Created table: {table_name}")
 
     def drop_table(self, table_name: str, if_exists: bool = True) -> None:
         """🗑️ Drop a table.
@@ -356,10 +375,13 @@ class SQLiteClient(DatabaseClient):
         Args:
             table_name: Name of the table
             if_exists: Add IF EXISTS clause
+
+        Raises:
+            DatabaseError: If table drop fails
         """
         exists_clause = "IF EXISTS " if if_exists else ""
         self.execute(f'DROP TABLE {exists_clause}"{table_name}"')
-        self._log.debug(f"🗑️ Dropped table: {table_name}")
+        log.debug(f"🗑️ Dropped table: {table_name}")
 
     def create_index(
         self,
@@ -378,6 +400,9 @@ class SQLiteClient(DatabaseClient):
             unique: Create unique index
             if_not_exists: Add IF NOT EXISTS clause
 
+        Raises:
+            DatabaseError: If index creation fails
+
         Example:
             >>> db.create_index(
             ...     "idx_events_timestamp",
@@ -394,7 +419,7 @@ class SQLiteClient(DatabaseClient):
             f'ON "{table_name}" ({cols})'
         )
         self.execute(sql)
-        self._log.debug(f"📇 Created index: {index_name}")
+        log.debug(f"📇 Created index: {index_name}")
 
     def list_tables(self) -> list[str]:
         """📋 List all tables in the database.
@@ -412,27 +437,32 @@ class SQLiteClient(DatabaseClient):
 
         Rebuilds the database file, reclaiming unused space.
         Run periodically after many deletes.
+
+        Raises:
+            DatabaseError: If vacuum operation fails
         """
         self.execute("VACUUM")
-        self._log.debug("🧹 Vacuumed database")
+        log.debug("🧹 Vacuumed database")
 
     def enable_wal_mode(self) -> None:
         """⚡ Enable WAL mode for better concurrent performance.
 
         Write-Ahead Logging allows concurrent reads during writes.
         Recommended for high-concurrency workloads.
+        Called automatically on connect().
         """
         self.execute("PRAGMA journal_mode = WAL")
-        self._log.info("⚡ Enabled WAL mode")
+        log.debug("⚡ Enabled WAL mode")
 
     def disable_wal_mode(self) -> None:
-        """🔒 Disable WAL mode for better write performance.
+        """🔒 Disable WAL mode and use traditional rollback journal.
 
-        Write-Ahead Logging allows concurrent reads during writes.
-        Recommended for low-concurrency workloads.
+        Traditional mode may have better single-writer performance
+        but doesn't allow concurrent reads during writes.
+        Use for low-concurrency or single-threaded workloads.
         """
         self.execute("PRAGMA journal_mode = DELETE")
-        self._log.info("🔒 Disabled WAL mode")
+        log.debug("🔒 Disabled WAL mode")
 
     def is_wal_mode(self) -> bool:
         """🔍 Check if WAL mode is currently enabled."""

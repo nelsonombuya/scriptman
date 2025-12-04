@@ -36,8 +36,8 @@ Query Portability:
 
 Available Clients:
     - SQLiteClient: Local file storage (built-in)
-    - PostgresClient: PostgreSQL (requires scriptman[postgres])
     - MSSQLClient: SQL Server (requires scriptman[mssql])
+    - PostgresClient: PostgreSQL (requires scriptman[postgres]) — planned
 
 Implementing Custom Clients:
     Extend DatabaseClient and override `_prepare_query()` to convert
@@ -45,13 +45,36 @@ Implementing Custom Clients:
     `DatabaseClient._prepare_query()` for detailed examples.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from scriptman.database.client import DatabaseClient, PreparedQuery
 from scriptman.database.exceptions import DatabaseError
 from scriptman.database.sqlite import SQLiteClient
 
+if TYPE_CHECKING:
+    from scriptman.database.mssql import MSSQLClient
+
+
+def __getattr__(name: str) -> Any:
+    """🔄 Lazy import for optional database clients.
+
+    MSSQLClient requires pyodbc which is an optional dependency.
+    This allows importing the module without pyodbc installed,
+    but raises ImportError when MSSQLClient is actually used.
+    """
+    if name == "MSSQLClient":
+        from scriptman.database.mssql import MSSQLClient
+
+        return MSSQLClient
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
     "DatabaseClient",
     "DatabaseError",
+    "MSSQLClient",
     "PreparedQuery",
     "SQLiteClient",
 ]

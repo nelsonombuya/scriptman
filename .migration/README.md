@@ -10,27 +10,29 @@ This folder contains detailed implementation plans for migrating/implementing Sc
 | `02-types.md`         | Types         | ✅ Complete    | Type aliases and sync/async utilities (simplified)    |
 | `03-config.md`        | Config        | 🚧 In Progress | Configuration management with optional format readers |
 | `04-internal-log.md`  | Internal Log  | ✅ Complete    | Safe internal logging + formatting presets            |
-| `05-cache.md`         | Cache         | ✅ Complete    | SQLite-backed caching with TTL, tags, LRU             |
-| `06-retry.md`         | Retry         | 💡 Future      | Retry decorator with backoff                          |
-| `07-queue.md`         | Queue         | 💡 Future      | SQLite-backed message queue                           |
-| `08-scheduler.md`     | Scheduler     | 💡 Future      | Task scheduling system                                |
-| `09-tasks.md`         | Tasks         | 📋 Planned     | Thread-based task execution                           |
+| `05-database.md`      | Database      | ✅ Complete    | SQLite client + MSSQL support                         |
+| `06-cache.md`         | Cache         | ✅ Complete    | SQLite-backed caching with TTL, tags, LRU             |
+| `07-queue.md`         | Queue         | 📋 Planned     | Kafka-inspired SQLite queue with consumer groups      |
+| `08-retry.md`         | Retry         | 💡 Future      | Retry decorator with backoff                          |
+| `09-scheduler.md`     | Scheduler     | 💡 Future      | Task scheduling system                                |
+| `10-tasks.md`         | Tasks         | 📋 Planned     | Thread-based task execution                           |
 
 ## 🎯 Implementation Order
 
 The files are numbered in the recommended implementation order:
 
 1. **Serialization** — Basic utilities with no dependencies
-2. **Types Simplification** — Type definitions for decorators (`@overload` pattern)
+2. **Types** — Type definitions for decorators (`@overload` pattern)
 3. **Config** — Configuration system (foundation for everything)
    - JSON default (no deps)
    - TOML/YAML/dotenv as optional extras
 4. **Internal Log** — Safe internal logging + formatting presets
-5. **Cache** — Persistent caching with TTL, tags, LRU (uses database, config, types)
-6. **Retry** — Retry decorator (uses types, observe)
-7. **Queue** — Message queue (uses database patterns from cache)
-8. **Scheduler** — Task scheduling (uses queue, tasks)
-9. **Tasks** — High-level task execution (uses types, observe, config)
+5. **Database** — SQLite client + MSSQL support
+6. **Cache** — Persistent caching with TTL, tags, LRU (uses database, config, types)
+7. **Queue** — Kafka-inspired message queue with consumer groups, DLQ
+8. **Retry** — Retry decorator (uses types, observe)
+9. **Scheduler** — Task scheduling (uses queue, tasks)
+10. **Tasks** — High-level task execution (uses types, observe, config)
 
 ## 📦 Dependency Philosophy
 

@@ -116,6 +116,16 @@ Telemetry and observability for tracking operations, correlating events, and que
 | **Storage**                              |        |                                             |
 | SQLite store                             | ✅      | Default persistent storage                  |
 | `get_store()` / `set_store()`            | ✅      | Custom store backends                       |
+| **Exporters (Future)**                   |        |                                             |
+| `observe.add_exporter(name, config)`     | 💡      | Export events to external systems           |
+| Elasticsearch exporter                   | 💡      | Cloud/large scale search                    |
+| Datadog exporter                         | 💡      | SaaS observability                          |
+| CloudWatch exporter                      | 💡      | AWS integration                             |
+
+**Exporter Strategy:**
+- SQLite store handles local persistence
+- Exporters send events to external systems in parallel
+- Multiple exporters can be active simultaneously
 
 **Event Fields:**
 - `id`, `timestamp`, `type`, `level`, `message`
@@ -287,27 +297,60 @@ SQLite-backed caching with TTL, tags, LRU eviction, and sharding.
 | **Backends**                       |        |                                     |
 | `CacheBackend` ABC                 | ✅      | Extensible backend interface        |
 | `SQLiteCacheBackend`               | ✅      | Default SQLite backend              |
-| `MemoryCacheBackend`               | 💡      | For testing                         |
-| `RedisCacheBackend`                | 💡      | Distributed caching                 |
+| `ShardedSQLiteBackend`             | ✅      | Multiple SQLite files               |
+| `MemoryCacheBackend`               | 📋      | For testing (in-memory, ephemeral)  |
+| `RedisCacheBackend`                | 💡      | Distributed caching (future)        |
 | **Observer Integration**           |        |                                     |
 | Auto-log operations                | ✅      | Log hits/misses via `_internal.log` |
 
 ---
 
-### Queue 💡
+### Queue 📋
 
-**Location:** `scriptman/queue/` (future)
+**Location:** `scriptman/queue/`
 
-SQLite-backed message queue for reliable task processing.
+Kafka-inspired SQLite queue with consumer groups, position tracking, and DLQ.
 
-| Feature              | Status | Description                    |
-| -------------------- | ------ | ------------------------------ |
-| `queue.push(data)`   | 💡      | Add message to queue           |
-| `queue.consume()`    | 💡      | Get messages for processing    |
-| `@queue.worker()`    | 💡      | Process messages automatically |
-| Retry with backoff   | 💡      | Automatic retries              |
-| Dead letter queue    | 💡      | Failed message handling        |
-| Observer integration | 💡      | Correlation with spans         |
+| Feature                            | Status | Description                            |
+| ---------------------------------- | ------ | -------------------------------------- |
+| **Producer API**                   |        |                                        |
+| `queue.push(topic, data)`          | 📋      | Push message to topic                  |
+| `queue.push_many(topic, messages)` | 📋      | Batch push                             |
+| Idempotency (default ON)           | 📋      | Auto-generated keys prevent duplicates |
+| Delayed messages                   | 📋      | `delay=seconds` parameter              |
+| **Consumer API**                   |        |                                        |
+| `@queue.consumer(topic)`           | 📋      | Process messages from topic            |
+| `msg.accept()`                     | 📋      | Mark as successfully processed         |
+| `msg.reject(reason)`               | 📋      | Move to DLQ                            |
+| `msg.retry(delay)`                 | 📋      | Schedule retry with backoff            |
+| **Consumer Groups**                | 📋      | Multiple groups process independently  |
+| **Decorators**                     |        |                                        |
+| `@queue.producer(topic)`           | 📋      | Fire-and-forget (API routes)           |
+| `@queue.consumer(topic, group)`    | 📋      | Process queued messages                |
+| `@queue.defer(topic)`              | 📋      | Queue function call for later          |
+| **Position Tracking**              |        |                                        |
+| `queue.current_position()`         | 📋      | Get current position                   |
+| `queue.jump_to_position()`         | 📋      | Replay from position                   |
+| `queue.restart()`                  | 📋      | Replay all messages                    |
+| **DLQ (Dead Letter Queue)**        |        |                                        |
+| `queue.dlq(topic)`                 | 📋      | Get failed messages                    |
+| `queue.retry_dlq(topic)`           | 📋      | Move back to main queue                |
+| **Observability**                  |        |                                        |
+| `queue.pending(topic)`             | 📋      | Count of waiting messages              |
+| `queue.stats(topic)`               | 📋      | Full statistics                        |
+| Correlation ID flow                | 📋      | Producer → Consumer tracing            |
+| **Storage**                        |        |                                        |
+| Topic sharding                     | 📋      | One SQLite file per topic              |
+| WAL mode                           | 📋      | Concurrent reads/writes                |
+| **Backends**                       |        |                                        |
+| `QueueBackend` ABC                 | 📋      | Extensible backend interface           |
+| `SQLiteQueueBackend`               | 📋      | Default SQLite backend                 |
+| `RedisQueueBackend`                | 💡      | Distributed multi-worker (future)      |
+
+**Backend Strategy:**
+- SQLite for local/development/simple production
+- Redis for distributed, multi-worker scenarios
+- For enterprise (Celery/RabbitMQ): use directly with Observer middleware
 
 ---
 
@@ -383,13 +426,13 @@ Web UI for monitoring and managing Scriptman.
 
 Reusable type definitions for sync/async function handling. Uses `@overload` pattern for decorators.
 
-| Feature                      | Status | Description                                         |
-| ---------------------------- | ------ | --------------------------------------------------- |
-| Type aliases                 | 🚧      | `T`, `P`, `R`, `C`, `Func`, `AsyncFunc` (simplified) |
-| `is_async()`                 | ✅      | Check if function is async def                      |
-| `@overload` pattern          | 📋      | Documented pattern for sync/async decorators        |
-| `StampedeLock`               | ✅      | Per-key locks for stampede prevention               |
-| `AsyncLock`                  | ✅      | Dual sync/async lock                                |
+| Feature             | Status | Description                                          |
+| ------------------- | ------ | ---------------------------------------------------- |
+| Type aliases        | 🚧      | `T`, `P`, `R`, `C`, `Func`, `AsyncFunc` (simplified) |
+| `is_async()`        | ✅      | Check if function is async def                       |
+| `@overload` pattern | 📋      | Documented pattern for sync/async decorators         |
+| `StampedeLock`      | ✅      | Per-key locks for stampede prevention                |
+| `AsyncLock`         | ✅      | Dual sync/async lock                                 |
 
 **Migration needed:**
 - Remove `SyncFunc` (redundant, same as `Func`)

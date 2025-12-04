@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
-from typing import Any, Iterator
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
+from typing import Any
 
-from loguru import logger
+from scriptman._internal import log
 
 # Type alias for prepared query results
 PreparedQuery = tuple[str, dict[str, Any] | list[Any] | None]
@@ -54,7 +55,8 @@ class DatabaseClient(ABC):
 
     def __init__(self) -> None:
         """🚀 Initialize client with contextual logging."""
-        self._log = logger.bind(component=self.__class__.__name__)
+        # Base class stores reference for subclass convenience
+        self._log = log  # Subclasses can use self._log.debug(...)
 
     # ─────────────────────────────────────────────────────────────
     # Abstract Properties
@@ -375,7 +377,7 @@ class DatabaseClient(ABC):
     # Context Manager Protocol
     # ─────────────────────────────────────────────────────────────
 
-    def __enter__(self) -> "DatabaseClient":
+    def __enter__(self) -> DatabaseClient:
         """📥 Enter context — connect."""
         self.connect()
         return self
@@ -386,10 +388,8 @@ class DatabaseClient(ABC):
 
     def __del__(self) -> None:
         """🧹 Cleanup on garbage collection."""
-        try:
+        with suppress(Exception):
             self.close()
-        except Exception:
-            pass
 
 
 __all__ = ["DatabaseClient", "PreparedQuery"]

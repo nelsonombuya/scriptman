@@ -7,8 +7,6 @@ Usage:
     >>> import scriptman
     >>> scriptman.serialize(Path(".logs"))
     '.logs'
-    >>> scriptman.to_path(".logs")
-    PosixPath('.logs')
 """
 
 from __future__ import annotations
@@ -16,11 +14,11 @@ from __future__ import annotations
 from datetime import date, datetime, time
 from decimal import Decimal
 from enum import Enum
-from pathlib import Path, PurePath
+from pathlib import PurePath
 from typing import Any
 from uuid import UUID
 
-__all__ = ["serialize", "to_path"]
+__all__ = ["serialize"]
 
 
 def serialize(value: Any) -> Any:
@@ -34,6 +32,12 @@ def serialize(value: Any) -> Any:
 
     Returns:
         Serializable value (str, int, float, bool, list, dict, None)
+
+    Raises:
+        RecursionError: If value contains circular references.
+
+    Note:
+        Non-serializable custom types pass through unchanged.
 
     Example:
         >>> serialize(Path(".logs"))
@@ -49,7 +53,7 @@ def serialize(value: Any) -> Any:
         return str(value)
 
     # DateTime types -> ISO format
-    if isinstance(value, (datetime, date, time)):
+    if isinstance(value, (datetime | date | time)):
         return value.isoformat()
 
     # Enum -> value
@@ -73,28 +77,8 @@ def serialize(value: Any) -> Any:
         return {k: serialize(v) for k, v in value.items()}
 
     # Nested list/tuple/set
-    if isinstance(value, (list, tuple, set, frozenset)):
+    if isinstance(value, (list | tuple | set | frozenset)):
         return [serialize(v) for v in value]
 
     # Primitives pass through
     return value
-
-
-def to_path(value: str | Path, *, resolve: bool = False) -> Path:
-    """📁 Convert to Path, optionally resolving to absolute.
-
-    Args:
-        value: Path string or Path object
-        resolve: If True, convert to absolute path
-
-    Returns:
-        Path object
-
-    Example:
-        >>> to_path(".logs")
-        PosixPath('.logs')
-        >>> to_path(".logs", resolve=True)
-        PosixPath('/absolute/path/to/.logs')
-    """
-    path = Path(value)
-    return path.resolve() if resolve else path

@@ -2,23 +2,22 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // SCRIPTMAN - VSCode/Cursor Workspace Settings
   // ═══════════════════════════════════════════════════════════════════════════
-
   // ─────────────────────────────────────────────────────────────────────────
   // Python Configuration
   // ─────────────────────────────────────────────────────────────────────────
-
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
   "python.terminal.activateEnvironment": true,
-  "python.analysis.typeCheckingMode": "basic",
-  "python.analysis.autoImportCompletions": true,
-  "python.analysis.diagnosticMode": "workspace",
-
+  // ─────────────────────────────────────────────────────────────────────────
+  // CursorPyright
+  // ─────────────────────────────────────────────────────────────────────────
+  "cursorpyright.analysis.autoImportCompletions": true,
+  "cursorpyright.analysis.diagnosticMode": "workspace",
+  "cursorpyright.analysis.typeCheckingMode": "basic",
   // ─────────────────────────────────────────────────────────────────────────
   // Formatting & Linting (Ruff - native server)
   // https://docs.astral.sh/ruff/editors/migration/
   // Ruff handles: formatting, import sorting, and linting (replaces Black + isort)
   // ─────────────────────────────────────────────────────────────────────────
-
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true,
@@ -28,11 +27,9 @@
       "source.fixAll.ruff": "explicit"
     }
   },
-
   // Ruff native server settings
   "ruff.enable": true,
   "ruff.lineLength": 90,
-
   // Lint rules (matches pyproject.toml)
   "ruff.lint.select": [
     "E", // pycodestyle errors
@@ -45,50 +42,47 @@
     "ARG", // flake8-unused-arguments
     "SIM" // flake8-simplify
   ],
-
   "ruff.lint.ignore": [
     "E501", // line too long (handled by formatter)
     "B008", // function call in default argument
     "ARG001" // unused function argument
   ],
-
   // Additional configuration
   "ruff.configuration": {
     "target-version": "py312"
   },
-
   // ─────────────────────────────────────────────────────────────────────────
   // Type Checking (MyPy)
   // ─────────────────────────────────────────────────────────────────────────
-
-  "mypy-type-checker.args": ["--strict"],
-
+  "mypy-type-checker.args": [
+    "--strict"
+  ],
   // ─────────────────────────────────────────────────────────────────────────
   // Testing (Pytest)
   // ─────────────────────────────────────────────────────────────────────────
-
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestArgs": ["tests", "-v", "--tb=short"],
-
+  "python.testing.pytestArgs": [
+    "tests",
+    "-v",
+    "--tb=short"
+  ],
   // ─────────────────────────────────────────────────────────────────────────
   // Editor Settings
   // ─────────────────────────────────────────────────────────────────────────
-
-  "editor.rulers": [90],
+  "editor.rulers": [
+    90
+  ],
   "editor.tabSize": 4,
   "editor.insertSpaces": true,
   "editor.trimAutoWhitespace": true,
   "editor.renderWhitespace": "trailing",
-
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
-
   // ─────────────────────────────────────────────────────────────────────────
   // File Associations
   // ─────────────────────────────────────────────────────────────────────────
-
   "files.associations": {
     "*.toml": "toml",
     "*.mdc": "markdown",
@@ -96,11 +90,9 @@
     "pyproject.toml": "toml",
     ".secrets.toml": "toml"
   },
-
   // ─────────────────────────────────────────────────────────────────────────
   // File Exclusions (Explorer)
   // ─────────────────────────────────────────────────────────────────────────
-
   "files.exclude": {
     "**/__pycache__": true,
     "**/*.pyc": true,
@@ -110,11 +102,9 @@
     "**/coverage_html": true,
     "**/*.egg-info": true
   },
-
   // ─────────────────────────────────────────────────────────────────────────
   // Search Exclusions
   // ─────────────────────────────────────────────────────────────────────────
-
   "search.exclude": {
     "**/__pycache__": true,
     "**/.venv": true,
@@ -122,11 +112,9 @@
     "**/.data": true,
     "**/poetry.lock": true
   },
-
   // ─────────────────────────────────────────────────────────────────────────
   // Markdown
   // ─────────────────────────────────────────────────────────────────────────
-
   "[markdown]": {
     "editor.wordWrap": "on",
     "editor.quickSuggestions": {
@@ -135,19 +123,15 @@
       "strings": true
     }
   },
-
   // ─────────────────────────────────────────────────────────────────────────
   // TOML
   // ─────────────────────────────────────────────────────────────────────────
-
   "[toml]": {
     "editor.defaultFormatter": "tamasfe.even-better-toml"
   },
-
   // ─────────────────────────────────────────────────────────────────────────
   // Spell Checker
   // ─────────────────────────────────────────────────────────────────────────
-
   "cSpell.words": [
     "aaron",
     "abstractmethod",
@@ -162,6 +146,7 @@
     "contextmanager",
     "coro",
     "coroutine",
+    "cursorpyright",
     "dataclass",
     "dataclasses",
     "debugpy",
@@ -225,6 +210,10 @@
     "wrappers",
     "yzhang"
   ],
-
-  "cSpell.ignorePaths": [".venv", "__pycache__", "poetry.lock", "coverage_html"]
+  "cSpell.ignorePaths": [
+    ".venv",
+    "__pycache__",
+    "poetry.lock",
+    "coverage_html"
+  ],
 }

@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 from asyncio import Lock as AsyncIOLock
+from contextlib import AbstractContextManager
 from functools import wraps
 from inspect import iscoroutinefunction
 from threading import Lock as ThreadingLock
@@ -29,6 +30,7 @@ __all__ = [
     "T",
     "P",
     "R",
+    "C",
     "BaseModelT",
     # Function type aliases
     "SyncFunc",
@@ -37,6 +39,7 @@ __all__ = [
     # Utilities
     "is_async",
     "wrap_function",
+    "wrap_function_in_context",
     "make_sync_async_decorator",
     # Locks
     "AsyncLock",
@@ -56,6 +59,9 @@ P = ParamSpec("P")
 
 R = TypeVar("R")
 """Return type variable (use when T is already used for arguments)."""
+
+C = TypeVar("C")
+"""Context type variable (for context manager return types)."""
 
 BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
 """TypeVar bound to Pydantic BaseModel for model-generic functions."""
@@ -251,6 +257,82 @@ def make_sync_async_decorator(
             return cast(SyncFunc[P, R], sync_wrapper)
 
     return decorator
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONTEXT MANAGER WRAPPER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def wrap_function_in_context(
+    func: Func[P, R],
+    *,
+    context_factory: Callable[..., AbstractContextManager[C]],
+    context_args: (
+        Callable[[tuple[Any, ...], dict[str, Any]], dict[str, Any]] | None
+    ) = None,
+    on_result: Callable[[C, R], None] | None = None,
+) -> Func[P, R]:
+    """🔄 Wrap a function inside a context manager (works with sync and async).
+
+    This utility wraps function execution inside a context manager, useful for
+    decorators that need tracing spans, database transactions, or resource locks.
+
+    The context manager is created fresh for each function call using the
+    `context_factory`. Arguments for the context can be derived from the
+    function's args/kwargs using `context_args`.
+
+    Args:
+        func: Function to wrap
+        context_factory: Callable that creates the context manager (e.g., Span)
+        context_args: Optional function to build context kwargs from (args, kwargs)
+        on_result: Optional callback receiving (context, result) after execution
+
+    Returns:
+        Wrapped function (same sync/async type as input)
+
+    Example:
+        >>> from scriptman.observe.span import Span
+        >>>
+        >>> def make_span_args(args, kwargs):
+        ...     return {"operation": "my_op", "entity_id": kwargs.get("id")}
+        >>>
+        >>> @lambda f: wrap_function_in_context(
+        ...     f,
+        ...     context_factory=Span,
+        ...     context_args=make_span_args,
+        ...     on_result=lambda span, result: span.set_data(result=result),
+        ... )
+        ... def process(id: str) -> dict:
+        ...     return {"processed": id}
+    """
+    if is_async(func):
+        async_fn = cast(AsyncFunc[P, R], func)
+
+        @wraps(func)
+        async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            ctx_kwargs = context_args(args, kwargs) if context_args else {}
+            with context_factory(**ctx_kwargs) as ctx:
+                result = await async_fn(*args, **kwargs)
+                if on_result:
+                    on_result(ctx, result)
+                return result
+
+        return cast(AsyncFunc[P, R], async_wrapper)
+
+    else:
+        sync_fn = cast(SyncFunc[P, R], func)
+
+        @wraps(func)
+        def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            ctx_kwargs = context_args(args, kwargs) if context_args else {}
+            with context_factory(**ctx_kwargs) as ctx:
+                result = sync_fn(*args, **kwargs)
+                if on_result:
+                    on_result(ctx, result)
+                return result
+
+        return cast(SyncFunc[P, R], sync_wrapper)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

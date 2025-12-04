@@ -140,13 +140,14 @@ scriptman/
 Provides reusable utilities for generic programming and sync/async handling:
 ```python
 from scriptman.types import (
-    T, P, R,           # Type variables
-    SyncFunc,          # Callable[P, R]
-    AsyncFunc,         # Callable[P, Awaitable[R]]
-    Func,              # Union of both
-    is_async,          # Detect if function is async
-    wrap_function,     # Wrap with before/after hooks
-    StampedeLock,      # Per-key locks for stampede prevention
+    T, P, R, C,              # Type variables (C for context managers)
+    SyncFunc,                # Callable[P, R]
+    AsyncFunc,               # Callable[P, Awaitable[R]]
+    Func,                    # Union of both
+    is_async,                # Detect if function is async
+    wrap_function,           # Wrap with before/after hooks
+    wrap_function_in_context,  # Wrap inside context manager (for spans, etc.)
+    StampedeLock,            # Per-key locks for stampede prevention
 )
 
 # Use in decorators
@@ -154,6 +155,24 @@ if is_async(func):
     # async wrapper
 else:
     # sync wrapper
+```
+
+**Reuse Shared Type Variables**
+- Import `P`, `R`, `T`, `C` from `scriptman.types` instead of defining locally
+- This ensures consistency and reduces duplication across modules
+- Only define local TypeVars if they have different constraints
+
+```python
+# ✅ CORRECT - Import shared type variables
+from scriptman.types import P, R
+
+def my_decorator(func: Callable[P, R]) -> Callable[P, R]:
+    ...
+
+# ❌ WRONG - Defining duplicates
+from typing import ParamSpec, TypeVar
+P = ParamSpec("P")  # Already exists in scriptman.types!
+R = TypeVar("R")    # Already exists in scriptman.types!
 ```
 
 **Unified Sync/Async Experience (Sync-First)**
@@ -201,6 +220,68 @@ def my_func(): ...
 
 @cache.result(ttl=3600)  # Same decorator works!
 async def my_async_func(): ...
+```
+
+**RULE: Wrapper Return Types Must Be Specific**
+When creating sync/async wrappers, return the specific type (`SyncFunc` or `AsyncFunc`), not the union type (`Func`). This enables proper type inference for callers.
+
+```python
+from scriptman.types import SyncFunc, AsyncFunc, Func, P, R, is_async
+from typing import cast
+
+# ✅ CORRECT - Return specific types
+def my_decorator(func: Func[P, R]) -> Func[P, R]:
+    if is_async(func):
+        async_fn = cast(AsyncFunc[P, R], func)
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs) -> R:
+            return await async_fn(*args, **kwargs)
+        return cast(AsyncFunc[P, R], async_wrapper)  # ✅ Specific type
+    else:
+        sync_fn = cast(SyncFunc[P, R], func)
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs) -> R:
+            return sync_fn(*args, **kwargs)
+        return cast(SyncFunc[P, R], sync_wrapper)  # ✅ Specific type
+
+# ❌ WRONG - Returning union type loses type information
+return cast(Func[P, R], async_wrapper)  # Type checker loses async info
+```
+
+**RULE: Prefer `wrap_function_in_context` for Context Manager Decorators**
+When a decorator needs to wrap execution inside a context manager (spans, transactions, locks), use `wrap_function_in_context` instead of duplicating sync/async logic.
+
+```python
+from scriptman.types import wrap_function_in_context, P, R
+from scriptman.observe.span import Span
+from typing import Callable, cast
+
+# ✅ CORRECT - Use utility for context manager wrapping
+def traced(fn: Callable[P, R]) -> Callable[P, R]:
+    def build_context_args(args, kwargs) -> dict:
+        return {"operation": fn.__name__}
+
+    return cast(
+        Callable[P, R],
+        wrap_function_in_context(
+            fn,
+            context_factory=Span,
+            context_args=build_context_args,
+        ),
+    )
+
+# ❌ WRONG - Duplicating sync/async context manager logic
+def traced_bad(fn):
+    if is_async(fn):
+        async def async_wrapper(*args, **kwargs):
+            with Span(...) as s:  # Duplicated!
+                return await fn(*args, **kwargs)
+        return async_wrapper
+    else:
+        def sync_wrapper(*args, **kwargs):
+            with Span(...) as s:  # Duplicated!
+                return fn(*args, **kwargs)
+        return sync_wrapper
 ```
 
 **Configuration-Driven Defaults**
@@ -514,13 +595,49 @@ class ConfigReader(ABC):
         return self.file_path.exists()
 ```
 
-**Sync/Async Decorator Pattern (using scriptman.types):**
+**Sync/Async Decorator Patterns (using scriptman.types):**
+
+Choose the right utility based on your decorator's needs:
+
+**1. Simple before/after hooks** — use `wrap_function`:
+```python
+from scriptman.types import wrap_function, Func, P, R
+
+def logged(func: Func[P, R]) -> Func[P, R]:
+    return wrap_function(
+        func,
+        before=lambda: print("starting"),
+        after=lambda result: print(f"done: {result}"),
+        on_error=lambda e: print(f"failed: {e}"),
+    )
+```
+
+**2. Context manager wrapping** (spans, transactions) — use `wrap_function_in_context`:
+```python
+from scriptman.types import wrap_function_in_context, P, R
+from scriptman.observe.span import Span
+from typing import Callable, cast
+
+def traced(fn: Callable[P, R]) -> Callable[P, R]:
+    return cast(
+        Callable[P, R],
+        wrap_function_in_context(
+            fn,
+            context_factory=Span,
+            context_args=lambda args, kwargs: {"operation": fn.__name__},
+            on_result=lambda span, result: span.set_data(result=result),
+        ),
+    )
+```
+
+**3. Complex custom logic** — create wrappers manually with specific return types:
 ```python
 from functools import wraps
+from typing import Callable, cast
 import asyncio
 import time
 
-from scriptman.types import is_async, Func, P, R
+from scriptman.types import is_async, Func, SyncFunc, AsyncFunc, P, R
 from scriptman.observe import observe
 
 def retry(max_retries: int = 3, backoff: float = 1.0) -> Callable[[Func[P, R]], Func[P, R]]:
@@ -528,12 +645,14 @@ def retry(max_retries: int = 3, backoff: float = 1.0) -> Callable[[Func[P, R]], 
 
     def decorator(func: Func[P, R]) -> Func[P, R]:
         if is_async(func):
+            async_fn = cast(AsyncFunc[P, R], func)
+
             @wraps(func)
             async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                 last_exception = None
                 for attempt in range(max_retries):
                     try:
-                        return await func(*args, **kwargs)
+                        return await async_fn(*args, **kwargs)
                     except Exception as e:
                         last_exception = e
                         if attempt < max_retries - 1:
@@ -541,14 +660,16 @@ def retry(max_retries: int = 3, backoff: float = 1.0) -> Callable[[Func[P, R]], 
                             observe.warning(f"🔄 Retry {attempt + 1}/{max_retries}", error=str(e))
                             await asyncio.sleep(delay)
                 raise last_exception
-            return async_wrapper
+            return cast(AsyncFunc[P, R], async_wrapper)  # ✅ Specific type
         else:
+            sync_fn = cast(SyncFunc[P, R], func)
+
             @wraps(func)
             def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                 last_exception = None
                 for attempt in range(max_retries):
                     try:
-                        return func(*args, **kwargs)
+                        return sync_fn(*args, **kwargs)
                     except Exception as e:
                         last_exception = e
                         if attempt < max_retries - 1:
@@ -556,7 +677,7 @@ def retry(max_retries: int = 3, backoff: float = 1.0) -> Callable[[Func[P, R]], 
                             observe.warning(f"🔄 Retry {attempt + 1}/{max_retries}", error=str(e))
                             time.sleep(delay)
                 raise last_exception
-            return sync_wrapper
+            return cast(SyncFunc[P, R], sync_wrapper)  # ✅ Specific type
 
     return decorator
 

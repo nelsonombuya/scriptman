@@ -85,11 +85,11 @@ class ConfigReader(Protocol):  # NO!
 **Variable Visibility Conventions**
 When designing classes, explicitly consider visibility for every attribute and method:
 
-| Prefix | Visibility | Use Case | Example |
-|--------|------------|----------|---------|
-| (none) | Public | Part of the API, documented, stable | `config.get()`, `self.options` |
-| `_` | Protected | Internal implementation, may be used by subclasses | `self._store`, `_validate()` |
-| `__` | Private | Strictly internal, name-mangled, never override | `self.__initialized`, `__parse()` |
+| Prefix | Visibility | Use Case                                           | Example                           |
+| ------ | ---------- | -------------------------------------------------- | --------------------------------- |
+| (none) | Public     | Part of the API, documented, stable                | `config.get()`, `self.options`    |
+| `_`    | Protected  | Internal implementation, may be used by subclasses | `self._store`, `_validate()`      |
+| `__`   | Private    | Strictly internal, name-mangled, never override    | `self.__initialized`, `__parse()` |
 
 **Visibility Decision Questions:**
 1. Is this part of the public API users should call? → **Public**
@@ -317,10 +317,10 @@ logger.info(f"Processing invoice {invoice_id}")  # NO! (unless inside observe mo
 **RULE: Internal Modules Use `_internal.log`**
 To avoid circular imports, internal Scriptman modules must use the safe logging wrapper instead of importing observe directly at module level.
 
-| Who | Import | Use Case |
-|-----|--------|----------|
+| Who                  | Import                                | Use Case                     |
+| -------------------- | ------------------------------------- | ---------------------------- |
 | **Internal modules** | `from scriptman._internal import log` | config, cache, database, CLI |
-| **External users** | `from scriptman import observe` | User applications |
+| **External users**   | `from scriptman import observe`       | User applications            |
 
 ```python
 # ✅ CORRECT - Internal module logging (no circular import risk)
@@ -345,6 +345,29 @@ The `_internal.log` module:
 - Falls back to loguru if observe isn't ready
 - Mirrors the observe API (`log.info()`, `log.error()`, `log.event()`)
 - Handles recursive calls during initialization gracefully
+
+**Formatting Integration with Internal Log**
+The internal log respects formatting configuration through two paths:
+
+1. **Observe Delegation (normal operation):** When observe is available, `_internal.log` delegates to it, which uses the configured loguru format presets.
+
+2. **Loguru Fallback (during initialization):** Falls back to direct loguru calls, which still use loguru's active configuration if `configure_logging()` was called.
+
+```python
+# Both paths use the same configured loguru logger
+# Format presets (minimal, simple, detailed, json, production) apply everywhere
+
+# Configure via config
+config.set("logging.format", "detailed")
+config.set("logging.colorize", True)
+observe.configure_from_config()
+
+# Or programmatically
+observe.configure_logging(format="minimal", level="DEBUG")
+```
+
+**RULE: Fallback Path is Intentionally Simple**
+The `_loguru_fallback()` function has hardcoded data formatting (` | key=value`) because it must work during early initialization before config is loaded. This is by design — don't try to make it configurable.
 
 **SQLite-First for Local Storage**
 - Use SQLite for all local persistence (events, cache, queue, etc.)
@@ -381,6 +404,124 @@ The `_internal.log` module:
 - Focus on edge cases, error conditions, and resource cleanup
 - Integration tests for cross-module functionality
 - Performance benchmarks for critical paths
+
+### Testing Guidelines
+
+**Test File Organization**
+```
+tests/
+├── __init__.py
+├── test_internal_log.py      # Tests for _internal/log.py
+├── test_config.py            # Tests for config module
+├── test_observe.py           # Tests for observe module
+├── test_cache.py             # Tests for cache module
+├── test_database.py          # Tests for database module
+├── test_types.py             # Tests for types.py utilities
+├── test_serialization.py     # Tests for serialization.py
+└── conftest.py               # Shared fixtures
+```
+
+**RULE: Test Class Organization**
+Organize tests into classes by functionality, not just by function name:
+
+```python
+class TestBasicLogging:
+    """Test all log level functions work correctly."""
+    def test_info_logs_message(self): ...
+    def test_debug_logs_message(self): ...
+
+class TestDataFormatting:
+    """Test that kwargs are formatted correctly."""
+    def test_single_kwarg_formatted(self): ...
+    def test_multiple_kwargs_formatted(self): ...
+
+class TestEdgeCases:
+    """Test edge cases and error conditions."""
+    def test_unicode_message(self): ...
+    def test_very_long_message(self): ...
+```
+
+**Standard Fixture Patterns for Loguru Testing**
+```python
+import pytest
+from io import StringIO
+from loguru import logger
+import sys
+
+@pytest.fixture
+def capture_logs():
+    """Capture loguru output for assertion."""
+    output = StringIO()
+    logger.remove()  # Remove default handler
+    handler_id = logger.add(
+        output,
+        format="{level} | {message}",
+        level="TRACE",
+        colorize=False,
+    )
+    yield output
+    logger.remove(handler_id)
+    logger.add(sys.stderr, level="DEBUG")  # Restore default
+
+@pytest.fixture(autouse=True)
+def reset_module_state():
+    """Reset module state between tests for isolation."""
+    # Reset any global state before/after each test
+    yield
+    # Cleanup after test
+```
+
+**Edge Case Categories to Always Test**
+| Category               | Examples                                           |
+| ---------------------- | -------------------------------------------------- |
+| **Empty/None**         | Empty strings, None values, empty dicts/lists      |
+| **Unicode**            | Chinese characters, emojis, RTL text               |
+| **Long Values**        | 10,000+ character strings, deeply nested dicts     |
+| **Special Characters** | `{curly}`, `%s`, `\n`, `\t`, quotes                |
+| **Type Variations**    | int, float, bool, bytes, callable, custom classes  |
+| **Error Paths**        | ImportError, RecursionError, generic Exception     |
+| **State Management**   | State reset after success, state reset after error |
+| **Concurrent Access**  | Rapid sequential calls, state isolation            |
+
+**RULE: Docstrings with Emoji for Test Methods**
+Use emoji prefixes in test docstrings to match Scriptman's visual language:
+
+```python
+def test_info_logs_message(self):
+    """📝 log.info() should emit info-level message."""
+    ...
+
+def test_exception_includes_traceback(self):
+    """💥 log.exception() should include traceback in data."""
+    ...
+
+def test_recursive_call_uses_fallback(self):
+    """🔄 Recursive calls should use loguru fallback."""
+    ...
+```
+
+**Mocking Strategy for Internal Modules**
+```python
+from unittest.mock import patch, MagicMock
+
+# Mock observe delegation
+with patch("scriptman.observe.observe.info") as mock_info:
+    log.info("Test message", key="value")
+    mock_info.assert_called_once_with("Test message", key="value")
+
+# Simulate error conditions
+with patch(
+    "scriptman.observe.observe.info",
+    side_effect=RuntimeError("Error"),
+):
+    log.info("Should fallback")  # Should not raise
+```
+
+**Integration Test Requirements**
+- Test circular import scenarios: `python -c "from scriptman import config"`
+- Test import order independence across modules
+- Test configuration propagation (config → observe → formatting)
+- Test end-to-end flows (e.g., cache decorator with observability)
 
 **Type Safety Without Verbosity**
 - Extensive type hints using modern Python (3.12+) syntax
@@ -528,13 +669,17 @@ Before marking any feature complete:
 - [ ] Error handling with helpful messages
 - [ ] Resource cleanup (if applicable)
 - [ ] Tests written with 95%+ coverage
-- [ ] Edge cases handled
+- [ ] Edge cases handled (unicode, empty, long values, error paths)
+- [ ] Test classes organized by functionality
+- [ ] Test docstrings use emoji prefixes
+- [ ] Integration tests for cross-module interactions
 - [ ] Performance acceptable for target use case
 - [ ] Dependencies justified (or eliminated)
 - [ ] Variable visibility reviewed (public/protected/private)
 - [ ] No magic attribute access (use explicit methods)
 - [ ] Decorators work with both sync AND async functions
 - [ ] Observer integration for telemetry (log operations, emit events)
+- [ ] Formatting respects config presets (if logging involved)
 - [ ] Update `.migration/FEATURE_GUIDE.md` with new feature status
 
 ### 9. Project Documentation
@@ -846,6 +991,53 @@ import scriptman
 scriptman.config.get("log_level")
 ```
 
+### Logging Format Configuration
+
+**Available Format Presets:**
+| Preset       | Description                            | Use Case                       |
+| ------------ | -------------------------------------- | ------------------------------ |
+| `minimal`    | `{level.icon} {message}`               | Clean, emoji-only              |
+| `simple`     | Time + level + message **(default)**   | Development                    |
+| `detailed`   | Full context with module:function:line | Debugging                      |
+| `json`       | Structured JSON                        | Log aggregation (Datadog, ELK) |
+| `production` | Clean, no colors                       | File logging                   |
+
+**Configuration via `scriptman.toml`:**
+```toml
+[logging]
+level = "DEBUG"
+format = "detailed"          # Preset name or custom format string
+colorize = true
+diagnose = true
+backtrace = true
+
+# File logging (optional)
+file_enabled = true
+file_rotation = "10 MB"
+file_retention = "7 days"
+file_compression = "zip"
+```
+
+**Configuration via Code:**
+```python
+from scriptman import observe
+
+# Use a preset
+observe.configure_logging(format="minimal", level="DEBUG")
+
+# Use custom format string (loguru syntax)
+observe.configure_logging(format="{time:HH:mm} | {level.icon} | {message}")
+
+# Auto-configure from scriptman.toml
+observe.configure_from_config()
+
+# Add file logging
+observe.add_file_handler(".data/logs/app.log", level="INFO", rotation="1 day")
+```
+
+**RULE: Format Presets Affect Message Structure Only**
+Format presets control timestamp/level/module formatting. Data kwargs (` | key=value`) are always appended the same way for consistency across all formats.
+
 **Access Patterns:**
 ```python
 # ✅ Explicit access (preferred)
@@ -869,6 +1061,29 @@ with config.temporary(concurrent=False):
 # Original restored
 ```
 
+## Environment & Commands
+
+**Running Poetry and Python Tasks**
+On this development machine, use `python -m` prefix for poetry and related commands:
+
+```bash
+# ✅ CORRECT - Use python -m prefix
+python -m poetry install
+python -m poetry run pytest
+python -m poetry add package-name
+python -m pytest tests/
+python -m pip install package
+
+# ❌ WRONG - Direct commands may not work
+poetry install
+pytest tests/
+pip install package
+```
+
+This ensures the correct Python interpreter and virtual environment are used.
+
+---
+
 ## Remember
 - This library is a learning tool AND production code - balance exploration with reliability
 - Users range from beginners to your production team - design for the beginner, document for the expert
@@ -877,6 +1092,9 @@ with config.temporary(concurrent=False):
 - Decorators ALWAYS work with both sync and async — no exceptions
 - Observer integration everywhere — if it happens, we should be able to query it later
 - Internal modules use `_internal.log`, external users use `observe` — prevents circular imports
+- Formatting presets flow through both paths — `observe` and `_internal.log` respect config
 - SQLite first, scale later — local-first design with upgrade path to Redis/Postgres
 - Track everything in `.migration/FEATURE_GUIDE.md` — our secondary memory for v3 migration
 - Simple things simple, complex things possible — YAGNI with an escape hatch
+- Tests are mandatory — 95%+ coverage, organized by functionality, edge cases covered
+- Test docstrings use emoji prefixes — matches Scriptman's visual language everywhere

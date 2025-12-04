@@ -112,3 +112,13 @@ Removed deprecated exports.
 - [x] `StampedeLock` prevents stampedes correctly
 - [x] Existing decorators work with new pattern
 - [x] No linter errors for users of decorated functions
+
+---
+
+## 🔗 References
+
+- **Module:** `scriptman/types.py`
+- **Tests:** `tests/test_types.py`
+- **Documentation:** `docs/sync-async-decorators.md`
+- **Feature Guide:** `.migration/FEATURE_GUIDE.md`
+- **Rules:** `.cursor/rules/scriptman.mdc`

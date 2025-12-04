@@ -42,7 +42,7 @@ MANIFEST
 
 .pytest_cache/
 pytest_cache/
-.coverage
+.coverage*
 *.coverage
 coverage.xml
 coverage_html/

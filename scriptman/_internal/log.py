@@ -101,9 +101,15 @@ def _loguru_fallback(level: str, message: str, **data: Any) -> None:
     """📝 Direct loguru output when observe isn't available."""
     log_method = getattr(logger, level.lower(), logger.info)
 
-    # Format data for console
+    # Format data for console (serialize for consistency with observe)
     if data:
-        data_str = " | " + " ".join(f"{k}={v}" for k, v in data.items())
+        try:
+            from scriptman.serialization import serialize
+
+            data_str = " | " + " ".join(f"{k}={serialize(v)}" for k, v in data.items())
+        except ImportError:
+            # Serialization not available during early init — use str()
+            data_str = " | " + " ".join(f"{k}={v}" for k, v in data.items())
         log_method(f"{message}{data_str}")
     else:
         log_method(message)
@@ -224,5 +230,3 @@ def event(message: str, event_type: str, **data: Any) -> None:
         pass  # Events are optional — don't fail
     finally:
         _current_state = None
-
-

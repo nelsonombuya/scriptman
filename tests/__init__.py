@@ -1,0 +1,1 @@
+"""Scriptman test suite."""

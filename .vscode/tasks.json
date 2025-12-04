@@ -1,0 +1,300 @@
+{
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCRIPTMAN - Task Configurations
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  "version": "2.0.0",
+  "tasks": [
+    // ─────────────────────────────────────────────────────────────────────────
+    // Formatting (Ruff - replaces Black + isort)
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "label": "🎨 Format: Ruff",
+      "type": "shell",
+      "command": "ruff",
+      "args": ["format", "scriptman", "tests"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🎨 Format: Ruff (check only)",
+      "type": "shell",
+      "command": "ruff",
+      "args": ["format", "--check", "scriptman", "tests"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🎨 Sort Imports: Ruff",
+      "type": "shell",
+      "command": "ruff",
+      "args": ["check", "--select", "I", "--fix", "scriptman", "tests"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Linting (Ruff)
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "label": "🔍 Lint: Ruff",
+      "type": "shell",
+      "command": "ruff",
+      "args": ["check", "scriptman", "tests"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔍 Lint: Ruff (fix)",
+      "type": "shell",
+      "command": "ruff",
+      "args": ["check", "--fix", "scriptman", "tests"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔍 Lint: MyPy",
+      "type": "shell",
+      "command": "mypy",
+      "args": ["scriptman", "--strict"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Testing
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "label": "🧪 Test: All",
+      "type": "shell",
+      "command": "pytest",
+      "args": ["tests", "-v", "--tb=short"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🧪 Test: With Coverage",
+      "type": "shell",
+      "command": "pytest",
+      "args": [
+        "tests",
+        "-v",
+        "--cov=scriptman",
+        "--cov-report=term-missing",
+        "--cov-report=html:coverage_html"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🧪 Test: Current File",
+      "type": "shell",
+      "command": "pytest",
+      "args": ["${file}", "-v", "--tb=short"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🧪 Test: Fast (no coverage)",
+      "type": "shell",
+      "command": "pytest",
+      "args": ["tests", "-v", "--tb=short", "-x"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Build & Install
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "label": "📦 Install: Dev Mode",
+      "type": "shell",
+      "command": "pip",
+      "args": ["install", "-e", ".[dev]"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "📦 Install: Poetry",
+      "type": "shell",
+      "command": "poetry",
+      "args": ["install"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "📦 Build: Package",
+      "type": "shell",
+      "command": "poetry",
+      "args": ["build"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CLI Commands
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "label": "⚙️ CLI: Config List",
+      "type": "shell",
+      "command": "python",
+      "args": ["-m", "scriptman.cli", "config", "list"],
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔍 CLI: Observe Stats",
+      "type": "shell",
+      "command": "python",
+      "args": ["-m", "scriptman.cli", "observe", "stats"],
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Cleanup
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "label": "🧹 Clean: Caches",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-c",
+        "import shutil; import os; [shutil.rmtree(d, ignore_errors=True) for d in ['__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache', 'coverage_html', 'dist', 'build'] if os.path.exists(d)]; print('✅ Cleaned caches')"
+      ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-Command",
+          "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue __pycache__, .pytest_cache, .mypy_cache, .ruff_cache, coverage_html, dist, build; Write-Host '✅ Cleaned caches'"
+        ]
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🧹 Clean: Data",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-c",
+        "import shutil; shutil.rmtree('.data', ignore_errors=True); print('✅ Cleaned .data directory')"
+      ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-Command",
+          "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue .data; Write-Host '✅ Cleaned .data directory'"
+        ]
+      },
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Combined Tasks
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "label": "🎨 Format All (format + sort imports)",
+      "dependsOn": ["🎨 Sort Imports: Ruff", "🎨 Format: Ruff"],
+      "dependsOrder": "sequence",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "🔍 Lint All (ruff + mypy)",
+      "dependsOn": ["🔍 Lint: Ruff", "🔍 Lint: MyPy"],
+      "dependsOrder": "parallel",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "✨ Check All (format + lint + test)",
+      "dependsOn": ["🎨 Format All (format + sort imports)", "🔍 Lint All (ruff + mypy)", "🧪 Test: All"],
+      "dependsOrder": "sequence",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "🚀 Pre-commit (format + fix)",
+      "dependsOn": ["🎨 Sort Imports: Ruff", "🎨 Format: Ruff", "🔍 Lint: Ruff (fix)"],
+      "dependsOrder": "sequence",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,36 +1,230 @@
 {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCRIPTMAN - VSCode/Cursor Workspace Settings
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Python Configuration
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.diagnosticMode": "workspace",
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Formatting & Linting (Ruff - native server)
+  // https://docs.astral.sh/ruff/editors/migration/
+  // Ruff handles: formatting, import sorting, and linting (replaces Black + isort)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": false,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports.ruff": "explicit",
+      "source.fixAll.ruff": "explicit"
+    }
+  },
+
+  // Ruff native server settings
+  "ruff.enable": true,
+  "ruff.lineLength": 90,
+
+  // Lint rules (matches pyproject.toml)
+  "ruff.lint.select": [
+    "E", // pycodestyle errors
+    "W", // pycodestyle warnings
+    "F", // pyflakes
+    "I", // isort (import sorting)
+    "B", // flake8-bugbear
+    "C4", // flake8-comprehensions
+    "UP", // pyupgrade
+    "ARG", // flake8-unused-arguments
+    "SIM" // flake8-simplify
+  ],
+
+  "ruff.lint.ignore": [
+    "E501", // line too long (handled by formatter)
+    "B008", // function call in default argument
+    "ARG001" // unused function argument
+  ],
+
+  // Additional configuration
+  "ruff.configuration": {
+    "target-version": "py312"
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Type Checking (MyPy)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "mypy-type-checker.args": ["--strict"],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Testing (Pytest)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": ["tests", "-v", "--tb=short"],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Editor Settings
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "editor.rulers": [90],
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.trimAutoWhitespace": true,
+  "editor.renderWhitespace": "trailing",
+
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // File Associations
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "files.associations": {
+    "*.toml": "toml",
+    "*.mdc": "markdown",
+    "scriptman.toml": "toml",
+    "pyproject.toml": "toml",
+    ".secrets.toml": "toml"
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // File Exclusions (Explorer)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/.ruff_cache": true,
+    "**/coverage_html": true,
+    "**/*.egg-info": true
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Search Exclusions
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "search.exclude": {
+    "**/__pycache__": true,
+    "**/.venv": true,
+    "**/coverage_html": true,
+    "**/.data": true,
+    "**/poetry.lock": true
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Markdown
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "[markdown]": {
+    "editor.wordWrap": "on",
+    "editor.quickSuggestions": {
+      "other": true,
+      "comments": false,
+      "strings": true
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TOML
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml"
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Spell Checker
+  // ─────────────────────────────────────────────────────────────────────────
+
   "cSpell.words": [
+    "aaron",
     "abstractmethod",
+    "addopts",
+    "aiohttp",
+    "astral",
     "asyncio",
+    "backtrace",
+    "charliermarsh",
+    "colorize",
     "contextlib",
     "contextmanager",
+    "coro",
+    "coroutine",
     "dataclass",
     "dataclasses",
+    "debugpy",
+    "diagnose",
     "docstrings",
     "drivedownload",
     "driveupload",
+    "eamodio",
+    "errorlens",
+    "evict",
     "executemany",
     "executescript",
+    "fastapi",
     "functools",
     "getattr",
     "hashlib",
     "htmlcov",
+    "isort",
+    "kohler",
     "kwargs",
     "loguru",
+    "mhutchie",
     "mypy",
+    "nelsonombuya",
+    "observability",
+    "oderwat",
+    "Ombuya",
     "pathlib",
     "postgresql",
     "pycache",
+    "pycodestyle",
     "pydantic",
     "Pydantic",
+    "pyflakes",
+    "pylance",
+    "pylint",
     "pyproject",
     "pytest",
+    "pyupgrade",
     "qodo",
+    "redhat",
+    "repr",
+    "ruff",
     "scanability",
     "scriptman",
     "Scriptman",
     "SCRIPTMAN",
+    "sharded",
+    "sqlite",
+    "stampede",
     "stdlib",
-    "unflatten"
-  ]
+    "tamasfe",
+    "telemetry",
+    "testpaths",
+    "tomlkit",
+    "unflatten",
+    "usernamehw",
+    "uvicorn",
+    "venv",
+    "wayou",
+    "wrappers",
+    "yzhang"
+  ],
+
+  "cSpell.ignorePaths": [".venv", "__pycache__", "poetry.lock", "coverage_html"]
 }

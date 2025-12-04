@@ -1,0 +1,81 @@
+{
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCRIPTMAN - Recommended Extensions
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  "recommendations": [
+    // ─────────────────────────────────────────────────────────────────────────
+    // Python Development
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Python language support
+    "ms-python.python",
+
+    // Python debugger
+    "ms-python.debugpy",
+
+    // Pylance (IntelliSense, type checking)
+    "ms-python.vscode-pylance",
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Formatting, Linting & Import Sorting (Ruff - all in one)
+    // https://docs.astral.sh/ruff/
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Ruff (fast linter + formatter + import sorting)
+    "charliermarsh.ruff",
+
+    // MyPy type checker
+    "ms-python.mypy-type-checker",
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // File Support
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // TOML support
+    "tamasfe.even-better-toml",
+
+    // YAML support
+    "redhat.vscode-yaml",
+
+    // Markdown preview
+    "yzhang.markdown-all-in-one",
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Code Quality
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Error Lens (inline errors)
+    "usernamehw.errorlens",
+
+    // Code Spell Checker
+    "streetsidesoftware.code-spell-checker",
+
+    // Todo Tree (TODO tracking with sidebar tree view)
+    "Gruntfuggly.todo-tree",
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Productivity
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Better Comments (colorful comments)
+    "aaron-bond.better-comments",
+
+    // Path Intellisense
+    "christian-kohler.path-intellisense",
+
+    // indent-rainbow
+    "oderwat.indent-rainbow"
+  ],
+
+  "unwantedRecommendations": [
+    // Ruff replaces these - don't install them
+    "ms-python.black-formatter",
+    "ms-python.isort",
+    "ms-python.pylint",
+    "ms-python.flake8",
+
+    // Todo Tree replaces this
+    "wayou.vscode-todo-highlight"
+  ]
+}

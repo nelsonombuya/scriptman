@@ -535,12 +535,12 @@ Before marking any feature complete:
 - [ ] No magic attribute access (use explicit methods)
 - [ ] Decorators work with both sync AND async functions
 - [ ] Observer integration for telemetry (log operations, emit events)
-- [ ] Update `FEATURE_GUIDE.md` with new feature status
+- [ ] Update `.migration/FEATURE_GUIDE.md` with new feature status
 
 ### 9. Project Documentation
 
 **Feature Tracking**
-- All features (implemented, planned, future) are tracked in `FEATURE_GUIDE.md`
+- All features (implemented, planned, future) are tracked in `.migration/FEATURE_GUIDE.md`
 - Update feature status as work progresses (📋 → 🚧 → ✅)
 - Use status legend: ✅ Implemented, 🚧 In Progress, 📋 Planned, 💡 Idea, ❌ Removed
 
@@ -878,5 +878,5 @@ with config.temporary(concurrent=False):
 - Observer integration everywhere — if it happens, we should be able to query it later
 - Internal modules use `_internal.log`, external users use `observe` — prevents circular imports
 - SQLite first, scale later — local-first design with upgrade path to Redis/Postgres
-- Track everything in `FEATURE_GUIDE.md` — our secondary memory for v3 migration
+- Track everything in `.migration/FEATURE_GUIDE.md` — our secondary memory for v3 migration
 - Simple things simple, complex things possible — YAGNI with an escape hatch

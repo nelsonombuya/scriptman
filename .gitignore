@@ -1,30 +1,195 @@
-# File Extensions
-*.db*
-*.pyc
-*.env
-*.log
-*.aof
-*.rdb
-*.zip
-*.lock
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCRIPTMAN - Git Ignore Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Python
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Virtual Environments
+# ─────────────────────────────────────────────────────────────────────────────
+
+.venv/
+venv/
+ENV/
+env/
+.env/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Build & Distribution
+# ─────────────────────────────────────────────────────────────────────────────
+
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+.eggs/
+MANIFEST
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Testing & Coverage
+# ─────────────────────────────────────────────────────────────────────────────
+
+.pytest_cache/
+pytest_cache/
+.coverage
 *.coverage
+coverage.xml
+coverage_html/
+htmlcov/
+.tox/
+.nox/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Type Checking & Linting
+# ─────────────────────────────────────────────────────────────────────────────
+
+.mypy_cache/
+.ruff_cache/
+.pytype/
+*.pyi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IDE & Editor
+# ─────────────────────────────────────────────────────────────────────────────
+
+# VSCode / Cursor (keep workspace settings)
+# .vscode/  # Tracked for shared settings
+*.code-workspace
+
+# PyCharm / IntelliJ
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Environment & Secrets
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Environment files
+*.env
+.env.*
+!.env.example
+
+# Secrets (Scriptman pattern)
 *.secrets.*
+.secrets.toml
+.secrets.yaml
+.secrets.json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Scriptman Data Directory
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Default data directory (contains SQLite DBs, cache, logs)
+.data/
+
+# Log files
+*.log
+logs/
+
+# SQLite databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OS Generated
+# ─────────────────────────────────────────────────────────────────────────────
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 desktop.ini
+
+# Linux
+*~
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Documentation
+# ─────────────────────────────────────────────────────────────────────────────
+
+docs/_build/
+site/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Temporary & Misc
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+tmp/
+temp/
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Drive sync artifacts
+.tmp.driveupload/
+.tmp.drivedownload/
+
+# AI/Code assistants
+.qodo/
+.cursor/mcp.json
 codium_*.py
 
-# Files
-# Useful for when you're testing something
+# Selenium/Browser automation
+.selenium/
+.downloads/
+
+# Debug files
 __debug__.py
 
-# Folders
-dist
-.qodo
-.data
-htmlcov
-.selenium
-.downloads
-__pycache__
-.mypy_cache
-pytest_cache
-.tmp.driveupload
-.tmp.drivedownload
+# Poetry lock
+poetry.lock
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Project-Specific Exceptions (DO NOT IGNORE)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Keep Cursor rules
+!.cursor/rules/
+
+# Keep VSCode/Cursor workspace settings
+!.vscode/
+
+# Keep migration plans
+!.migration/
+
+# Keep example configs
+!*.example
+!scriptman.toml.example

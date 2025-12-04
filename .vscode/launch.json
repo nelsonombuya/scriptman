@@ -1,24 +1,155 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCRIPTMAN - Debug Configurations
+  // ═══════════════════════════════════════════════════════════════════════════
+
   "version": "0.2.0",
   "configurations": [
+    // ─────────────────────────────────────────────────────────────────────────
+    // Current File
+    // ─────────────────────────────────────────────────────────────────────────
     {
-      "name": "Debug File",
+      "name": "🐍 Debug Current File",
       "type": "debugpy",
       "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
       "justMyCode": false,
+      "cwd": "${workspaceFolder}"
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Debug File (scriptman/__debug__.py)
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "name": "🔍 Debug File (__debug__.py)",
+      "type": "debugpy",
+      "request": "launch",
       "program": "${workspaceFolder}/scriptman/__debug__.py",
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}"
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CLI Commands
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "name": "⚙️ CLI: config list",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scriptman.cli",
+      "args": ["config", "list"],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}"
     },
     {
-      "name": "Library __init__ File",
+      "name": "🔍 CLI: observe query",
       "type": "debugpy",
       "request": "launch",
+      "module": "scriptman.cli",
+      "args": ["observe", "query", "--limit", "10"],
+      "console": "integratedTerminal",
       "justMyCode": false,
-      "program": "${workspaceFolder}/scriptman/__init__.py",
-      "console": "integratedTerminal"
+      "cwd": "${workspaceFolder}"
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Tests
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "name": "🧪 Run All Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests", "-v", "--tb=short"],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "🧪 Run Current Test File",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-v", "--tb=short"],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "🧪 Run Tests with Coverage",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests",
+        "-v",
+        "--cov=scriptman",
+        "--cov-report=term-missing",
+        "--cov-report=html:coverage_html"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}"
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Module Testing
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "name": "📦 Test Config Module",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests/test_config.py", "-v"],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "📦 Test Cache Module",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests/test_cache.py", "-v"],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "📦 Test Observer Module",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests/test_observe.py", "-v"],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}"
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Interactive REPL
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+      "name": "🐚 Python REPL with Scriptman",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "code",
+      "args": [
+        "-i",
+        "-c",
+        "import scriptman; from scriptman import config, cache, observe; print('\\n🦸 Scriptman loaded! Available: config, cache, observe\\n')"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}"
     }
-  ]
+  ],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Compound Configurations
+  // ─────────────────────────────────────────────────────────────────────────
+  "compounds": []
 }

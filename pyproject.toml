@@ -60,15 +60,14 @@ api = ["fastapi>=0.100.0", "uvicorn>=0.23.0"]
 all = ["fastapi>=0.100.0", "uvicorn>=0.23.0"]
 
 # Development (for contributors)
+# Note: Ruff handles formatting + linting + import sorting
 dev = [
-    "black>=24.10.0",
-    "isort>=5.13.2",
     "mypy>=1.13.0",
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.0",
     "pytest-cov>=6.0.0",
     "pytest-mock>=3.14.0",
-    "ruff>=0.8.0",
+    "ruff>=0.9.8",
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -104,51 +103,23 @@ build-backend = "poetry.core.masonry.api"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Black (Code Formatter)
-# ─────────────────────────────────────────────────────────────────────────────
-
-[tool.black]
-line-length = 90
-target-version = ["py312", "py313"]
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-    | \.venv
-    | \.mypy_cache
-    | \.pytest_cache
-    | __pycache__
-    | dist
-    | build
-)/
-'''
-
-# ─────────────────────────────────────────────────────────────────────────────
-# isort (Import Sorting)
-# ─────────────────────────────────────────────────────────────────────────────
-
-[tool.isort]
-profile = "black"
-line_length = 90
-known_first_party = ["scriptman"]
-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
-skip = [".venv", ".git", "__pycache__"]
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Ruff (Fast Linter)
+# Ruff (Linter + Formatter + Import Sorting)
+# https://docs.astral.sh/ruff/
+# Ruff replaces: Black, isort, Flake8, pyupgrade, and more
 # ─────────────────────────────────────────────────────────────────────────────
 
 [tool.ruff]
 line-length = 90
 target-version = "py312"
-exclude = [".venv", ".git", "__pycache__", "dist", "build"]
+exclude = [".venv", ".git", "__pycache__", "dist", "build", ".data"]
 
+# Linting rules
 [tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
     "F",   # pyflakes
-    "I",   # isort
+    "I",   # isort (import sorting)
     "B",   # flake8-bugbear
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
@@ -156,10 +127,28 @@ select = [
     "SIM", # flake8-simplify
 ]
 ignore = [
-    "E501",   # line too long (handled by black)
+    "E501",   # line too long (handled by formatter)
     "B008",   # function call in default argument
     "ARG001", # unused function argument
 ]
+
+# Import sorting (replaces isort)
+[tool.ruff.lint.isort]
+known-first-party = ["scriptman"]
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+
+# Formatter (replaces Black)
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MyPy (Type Checking)
@@ -231,17 +220,15 @@ exclude_lines = [
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# POETRY (Legacy - for dev dependencies)
+# POETRY (for dev workflow)
 # ═══════════════════════════════════════════════════════════════════════════════
 # Note: Poetry groups are used for development workflow.
 # Production dependencies are in [project.dependencies] above.
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.10.0"
-isort = "^5.13.2"
 mypy = "^1.13.0"
 pytest = "^8.3.4"
 pytest-asyncio = "^0.25.0"
 pytest-cov = "^6.0.0"
 pytest-mock = "^3.14.0"
-ruff = "^0.8.0"
+ruff = "^0.9.8"

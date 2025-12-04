@@ -231,9 +231,15 @@ def _loguru_fallback(level: str, message: str, **data: Any) -> None:
     """📝 Direct loguru output when observe isn't available."""
     log_method = getattr(logger, level.lower(), logger.info)
 
-    # Format data for console
+    # Format data for console (serialize for consistency with observe)
     if data:
-        data_str = " | " + " ".join(f"{k}={v}" for k, v in data.items())
+        try:
+            from scriptman.serialization import serialize
+
+            data_str = " | " + " ".join(f"{k}={serialize(v)}" for k, v in data.items())
+        except ImportError:
+            # Serialization not available during early init — use str()
+            data_str = " | " + " ".join(f"{k}={v}" for k, v in data.items())
         log_method(f"{message}{data_str}")
     else:
         log_method(message)
@@ -1008,7 +1014,7 @@ assert value == "test_value"
 | `cache/backends/sqlite.py` updates   | ~20 changes  | Low        | ✅ Complete |
 | `cache/backends/sharded.py` updates  | ~8 changes   | Low        | ✅ Complete |
 | `database/sqlite.py` updates         | ~15 changes  | Low        | ✅ Complete |
-| `tests/test_internal_log.py`         | ~870         | Medium     | ✅ Complete |
+| `tests/test_internal_log.py`         | ~908         | Medium     | ✅ Complete |
 
 **Total:** ~620+ lines new/changed — **ALL IMPLEMENTED**
 
@@ -1137,7 +1143,11 @@ When observe isn't available (early initialization or errors):
 def _loguru_fallback(level: str, message: str, **data: Any) -> None:
     log_method = getattr(logger, level.lower(), logger.info)
     if data:
-        data_str = " | " + " ".join(f"{k}={v}" for k, v in data.items())
+        try:
+            from scriptman.serialization import serialize
+            data_str = " | " + " ".join(f"{k}={serialize(v)}" for k, v in data.items())
+        except ImportError:
+            data_str = " | " + " ".join(f"{k}={v}" for k, v in data.items())
         log_method(f"{message}{data_str}")
     else:
         log_method(message)
@@ -1145,7 +1155,8 @@ def _loguru_fallback(level: str, message: str, **data: Any) -> None:
 
 This path:
 - Uses loguru's currently active configuration (if `configure_logging()` was called)
-- Has hardcoded data formatting (` | key=value`) for consistency
+- Uses `serialize()` for consistent data formatting with observe module
+- Falls back to `str()` if serialization isn't available during early init
 - Works even before config is loaded (uses loguru defaults)
 
 ### Key Design Decisions

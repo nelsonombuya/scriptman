@@ -6,8 +6,10 @@
 #     'INFO'
 #     >>> scriptman.serialize(Path(".logs"))
 #     '.logs'
-#     >>> scriptman.to_path(".logs")
-#     PosixPath('.logs')
+#     >>> from scriptman import observe
+#     >>> observe.info("Processing started")
+#     >>> from scriptman import cache
+#     >>> cache.set("key", "value", ttl=3600)
 
 from __future__ import annotations
 
@@ -18,7 +20,43 @@ __version__ = "3.0.0"
 # Re-export config module for scriptman.config.get() style access
 from scriptman import config, database
 
-# Serialization utilities
-from scriptman.serialization import serialize, to_path
+# Cache module for caching
+from scriptman.cache import cache
 
-__all__ = ["__version__", "config", "database", "serialize", "to_path"]
+# Observer module for telemetry and observability
+from scriptman.observe import observe
+
+# Serialization utilities
+from scriptman.serialization import serialize
+
+# Type utilities for generic programming and sync/async handling
+from scriptman.types import (
+    AsyncFunc,
+    AsyncLock,
+    BaseModelT,
+    Func,
+    P,
+    R,
+    StampedeLock,
+    T,
+    is_async,
+)
+
+__all__ = [
+    "__version__",
+    "cache",
+    "config",
+    "database",
+    "observe",
+    "serialize",
+    # Type utilities
+    "T",
+    "P",
+    "R",
+    "BaseModelT",
+    "Func",
+    "AsyncFunc",
+    "is_async",
+    "AsyncLock",
+    "StampedeLock",
+]

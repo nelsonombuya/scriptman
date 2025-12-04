@@ -1,27 +1,27 @@
-"""🔧 Reusable type definitions and decorator utilities.
+"""🔧 Reusable type definitions for generic programming.
 
 This module provides:
-- Common type aliases for generic programming
-- Sync/async function detection and wrapping
-- Decorator utilities that work with both sync and async functions
-- Lock utilities for stampede prevention
+- Type variables: T, P, R, C, BaseModelT
+- Function types: Func, AsyncFunc
+- Utilities: is_async()
+- Locks: AsyncLock, StampedeLock
+
+For decorator patterns using @overload, see docs/sync-async-decorators.md
 
 Usage:
-    >>> from scriptman.types import T, P, R, wrap_function
+    >>> from scriptman.types import T, P, R, Func, is_async
     >>>
-    >>> # Create a decorator that works with sync and async
-    >>> def my_decorator(func: Func[P, R]) -> Func[P, R]:
-    ...     return wrap_function(func, before=lambda: print("before"))
+    >>> # Create a decorator using @overload pattern
+    >>> # See docs/sync-async-decorators.md for the full pattern
 """
 
 from __future__ import annotations
 
 from asyncio import Lock as AsyncIOLock
-from contextlib import AbstractContextManager
-from functools import wraps
+from collections.abc import Callable, Coroutine
 from inspect import iscoroutinefunction
 from threading import Lock as ThreadingLock
-from typing import Any, Awaitable, Callable, ParamSpec, TypeVar, Union, cast
+from typing import Any, ParamSpec, TypeVar
 
 from pydantic import BaseModel
 
@@ -33,14 +33,10 @@ __all__ = [
     "C",
     "BaseModelT",
     # Function type aliases
-    "SyncFunc",
-    "AsyncFunc",
     "Func",
+    "AsyncFunc",
     # Utilities
     "is_async",
-    "wrap_function",
-    "wrap_function_in_context",
-    "make_sync_async_decorator",
     # Locks
     "AsyncLock",
     "StampedeLock",
@@ -71,31 +67,63 @@ BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
 # FUNCTION TYPE ALIASES
 # ═══════════════════════════════════════════════════════════════════════════════
 
-SyncFunc = Callable[P, R]
-"""Type alias for synchronous functions."""
+Func = Callable[P, R]
+"""Type alias for any callable function.
 
-AsyncFunc = Callable[P, Awaitable[R]]
-"""Type alias for asynchronous functions."""
+Use this as the PRIMARY type for decorator signatures with @overload.
+The type variable R captures the full return type, including Coroutine
+for async functions.
 
-Func = Union[SyncFunc[P, R], AsyncFunc[P, R]]
-"""Type alias for functions that can be either sync or async."""
+Example:
+    >>> from typing import overload
+    >>> from collections.abc import Callable, Coroutine
+    >>>
+    >>> @overload
+    >>> def my_decorator(
+    ...     func: Callable[P, Coroutine[Any, Any, T]]
+    ... ) -> Callable[P, Coroutine[Any, Any, T]]: ...
+    >>> @overload
+    >>> def my_decorator(func: Callable[P, R]) -> Callable[P, R]: ...
+    >>> def my_decorator(func: Callable[P, R]) -> Callable[P, R]:
+    ...     # Implementation using is_async() for runtime detection
+    ...     ...
+
+See docs/sync-async-decorators.md for the complete pattern.
+"""
+
+AsyncFunc = Callable[P, Coroutine[Any, Any, R]]
+"""Type alias for async functions.
+
+Use for explicit async typing or casting inside decorator implementations.
+
+Note: async def functions ALWAYS return Coroutine, not just Awaitable.
+This is why we use Coroutine[Any, Any, R] instead of Awaitable[R].
+
+Example:
+    >>> from typing import cast
+    >>>
+    >>> if is_async(func):
+    ...     async_fn = cast(AsyncFunc[P, R], func)
+    ...     result = await async_fn(*args, **kwargs)
+"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# DECORATOR UTILITIES
+# UTILITIES
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 def is_async(func: Callable[..., Any]) -> bool:
-    """🔍 Check if a function is asynchronous.
+    """🔍 Check if a function is an async def.
 
-    Works with regular async functions and async methods.
+    Uses iscoroutinefunction() which detects async def functions.
+    Does NOT detect sync functions that return awaitables (Future, Task, etc.).
 
     Args:
         func: Function to check
 
     Returns:
-        True if function is async, False otherwise
+        True if func is an async def, False otherwise
 
     Example:
         >>> async def async_fn(): pass
@@ -106,233 +134,6 @@ def is_async(func: Callable[..., Any]) -> bool:
         False
     """
     return iscoroutinefunction(func)
-
-
-def wrap_function(
-    func: Func[P, R],
-    *,
-    before: Callable[[], None] | None = None,
-    after: Callable[[R], None] | None = None,
-    on_error: Callable[[Exception], None] | None = None,
-    transform_result: Callable[[R], R] | None = None,
-) -> Func[P, R]:
-    """🔄 Wrap a function with before/after hooks (works with sync and async).
-
-    This is a building block for creating decorators that need to work
-    with both synchronous and asynchronous functions.
-
-    Args:
-        func: Function to wrap
-        before: Called before function execution
-        after: Called after successful execution with result
-        on_error: Called on exception (exception still propagates)
-        transform_result: Transform the result before returning
-
-    Returns:
-        Wrapped function (same sync/async type as input)
-
-    Example:
-        >>> def log_start():
-        ...     print("Starting...")
-        >>>
-        >>> def log_end(result):
-        ...     print(f"Done: {result}")
-        >>>
-        >>> @lambda f: wrap_function(f, before=log_start, after=log_end)
-        ... def process(x: int) -> int:
-        ...     return x * 2
-        >>>
-        >>> process(5)
-        Starting...
-        Done: 10
-        10
-    """
-    if is_async(func):
-
-        @wraps(func)
-        async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            if before:
-                before()
-            try:
-                result = await cast(AsyncFunc[P, R], func)(*args, **kwargs)
-                if transform_result:
-                    result = transform_result(result)
-                if after:
-                    after(result)
-                return result
-            except Exception as e:
-                if on_error:
-                    on_error(e)
-                raise
-
-        return cast(AsyncFunc[P, R], async_wrapper)
-
-    else:
-
-        @wraps(func)
-        def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            if before:
-                before()
-            try:
-                result = cast(SyncFunc[P, R], func)(*args, **kwargs)
-                if transform_result:
-                    result = transform_result(result)
-                if after:
-                    after(result)
-                return result
-            except Exception as e:
-                if on_error:
-                    on_error(e)
-                raise
-
-        return cast(SyncFunc[P, R], sync_wrapper)
-
-
-def make_sync_async_decorator(
-    decorator_logic: Callable[
-        [Func[P, R], tuple[Any, ...], dict[str, Any]],
-        tuple[Callable[[], None] | None, Callable[[R], R] | None],
-    ],
-) -> Callable[[Func[P, R]], Func[P, R]]:
-    """🎀 Create a decorator that works with both sync and async functions.
-
-    This is a higher-order function for building decorators. You provide
-    a function that receives (func, args, kwargs) and returns (before_hook,
-    transform_result), and it handles the sync/async wrapping.
-
-    Args:
-        decorator_logic: Function that takes (func, args, kwargs) and returns
-                        (before_callback, result_transformer)
-
-    Returns:
-        A decorator that works with both sync and async functions
-
-    Example:
-        >>> def timing_logic(func, args, kwargs):
-        ...     start = [0.0]
-        ...     def before():
-        ...         import time
-        ...         start[0] = time.time()
-        ...     def transform(result):
-        ...         duration = time.time() - start[0]
-        ...         print(f"Took {duration:.2f}s")
-        ...         return result
-        ...     return before, transform
-        >>>
-        >>> timing = make_sync_async_decorator(timing_logic)
-        >>>
-        >>> @timing
-        ... def slow_function():
-        ...     import time
-        ...     time.sleep(0.1)
-        ...     return "done"
-    """
-
-    def decorator(func: Func[P, R]) -> Func[P, R]:
-        if is_async(func):
-
-            @wraps(func)
-            async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-                before, transform = decorator_logic(func, args, kwargs)
-                if before:
-                    before()
-                result = await cast(AsyncFunc[P, R], func)(*args, **kwargs)
-                if transform:
-                    result = transform(result)
-                return result
-
-            return cast(AsyncFunc[P, R], async_wrapper)
-        else:
-
-            @wraps(func)
-            def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-                before, transform = decorator_logic(func, args, kwargs)
-                if before:
-                    before()
-                result = cast(SyncFunc[P, R], func)(*args, **kwargs)
-                if transform:
-                    result = transform(result)
-                return result
-
-            return cast(SyncFunc[P, R], sync_wrapper)
-
-    return decorator
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# CONTEXT MANAGER WRAPPER
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-def wrap_function_in_context(
-    func: Func[P, R],
-    *,
-    context_factory: Callable[..., AbstractContextManager[C]],
-    context_args: (
-        Callable[[tuple[Any, ...], dict[str, Any]], dict[str, Any]] | None
-    ) = None,
-    on_result: Callable[[C, R], None] | None = None,
-) -> Func[P, R]:
-    """🔄 Wrap a function inside a context manager (works with sync and async).
-
-    This utility wraps function execution inside a context manager, useful for
-    decorators that need tracing spans, database transactions, or resource locks.
-
-    The context manager is created fresh for each function call using the
-    `context_factory`. Arguments for the context can be derived from the
-    function's args/kwargs using `context_args`.
-
-    Args:
-        func: Function to wrap
-        context_factory: Callable that creates the context manager (e.g., Span)
-        context_args: Optional function to build context kwargs from (args, kwargs)
-        on_result: Optional callback receiving (context, result) after execution
-
-    Returns:
-        Wrapped function (same sync/async type as input)
-
-    Example:
-        >>> from scriptman.observe.span import Span
-        >>>
-        >>> def make_span_args(args, kwargs):
-        ...     return {"operation": "my_op", "entity_id": kwargs.get("id")}
-        >>>
-        >>> @lambda f: wrap_function_in_context(
-        ...     f,
-        ...     context_factory=Span,
-        ...     context_args=make_span_args,
-        ...     on_result=lambda span, result: span.set_data(result=result),
-        ... )
-        ... def process(id: str) -> dict:
-        ...     return {"processed": id}
-    """
-    if is_async(func):
-        async_fn = cast(AsyncFunc[P, R], func)
-
-        @wraps(func)
-        async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            ctx_kwargs = context_args(args, kwargs) if context_args else {}
-            with context_factory(**ctx_kwargs) as ctx:
-                result = await async_fn(*args, **kwargs)
-                if on_result:
-                    on_result(ctx, result)
-                return result
-
-        return cast(AsyncFunc[P, R], async_wrapper)
-
-    else:
-        sync_fn = cast(SyncFunc[P, R], func)
-
-        @wraps(func)
-        def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            ctx_kwargs = context_args(args, kwargs) if context_args else {}
-            with context_factory(**ctx_kwargs) as ctx:
-                result = sync_fn(*args, **kwargs)
-                if on_result:
-                    on_result(ctx, result)
-                return result
-
-        return cast(SyncFunc[P, R], sync_wrapper)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -365,7 +166,7 @@ class AsyncLock:
 
     @property
     def _async(self) -> AsyncIOLock:
-        """Lazily create async lock (must be in async context)."""
+        """🔐 Lazily create async lock (must be in async context)."""
         if self._async_lock is None:
             self._async_lock = AsyncIOLock()
         return self._async_lock
@@ -393,7 +194,8 @@ class StampedeLock:
         ...     compute_value()
         >>>
         >>> # Async usage
-        >>> async with locks.acquire_async("key123"):
+        >>> lock = await locks.acquire_async("key123")
+        >>> async with lock:
         ...     await compute_value()
     """
 
@@ -427,6 +229,8 @@ class StampedeLock:
         Returns:
             asyncio.Lock for use with `async with` statement
         """
+        # Lazy initialization is safe here: asyncio runs in a single-threaded
+        # event loop, so two coroutines cannot truly race on this check.
         if self._async_locks_lock is None:
             self._async_locks_lock = AsyncIOLock()
 
@@ -446,3 +250,15 @@ class StampedeLock:
             return
         async with self._async_locks_lock:
             self._async_locks.pop(key, None)
+
+    def clear_all_sync(self) -> None:
+        """🧹 Remove all sync locks."""
+        with self._sync_locks_lock:
+            self._sync_locks.clear()
+
+    async def clear_all_async(self) -> None:
+        """🧹 Remove all async locks."""
+        if self._async_locks_lock is None:
+            return
+        async with self._async_locks_lock:
+            self._async_locks.clear()

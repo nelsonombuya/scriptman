@@ -88,7 +88,7 @@ class TestConnection:
         assert not db.is_connected
         db.connect()
         assert db.is_connected
-        db.close()
+        db.close()  # type:ignore
 
     def test_close_releases_connection(self):
         """🔌 close() should release database connection."""
@@ -143,7 +143,7 @@ class TestConnection:
         assert not db.is_connected
         db.execute("SELECT 1")  # Should auto-connect
         assert db.is_connected
-        db.close()
+        db.close()  # type:ignore
 
     def test_del_closes_connection(self):
         """🧹 __del__ should close connection gracefully."""

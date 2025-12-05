@@ -58,7 +58,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, TYPE_CHECKING
+from typing import Any, Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -304,7 +304,7 @@ class CacheBackend(ABC):
     def get_or_set(
         self,
         key: str,
-        factory: callable,
+        factory: Callable[[], Any],
         ttl: int | None = None,
         tags: list[str] | None = None,
     ) -> Any:
@@ -315,7 +315,7 @@ class CacheBackend(ABC):
 
         Args:
             key: Cache key
-            factory: Callable that produces the value
+            factory: Callable that produces the value (sync or async)
             ttl: TTL for the cached value
             tags: Tags for the cached value
 
@@ -329,12 +329,23 @@ class CacheBackend(ABC):
 _backends: dict[str, type[CacheBackend]] = {}
 
 
-def register_backend(name: str):
-    """🏷️ Decorator to register a cache backend."""
-    def decorator(cls: type[CacheBackend]) -> type[CacheBackend]:
-        _backends[name] = cls
-        return cls
-    return decorator
+def register_backend(name: str, cls: type[CacheBackend]) -> None:
+    """🏷️ Register a cache backend by name.
+
+    Note: This is a function call (not a decorator) to preserve type
+    information for strict type checkers like basedpyright.
+    """
+    if name in _backends:
+        raise ValueError(f"Backend '{name}' is already registered")
+    _backends[name] = cls
+
+
+def unregister_backend(name: str) -> bool:
+    """🧹 Unregister a cache backend by name."""
+    if name in _backends:
+        del _backends[name]
+        return True
+    return False
 
 
 def get_backend(name: str) -> type[CacheBackend]:
@@ -350,7 +361,9 @@ __all__ = [
     "CacheStats",
     "CacheEntry",
     "register_backend",
+    "unregister_backend",
     "get_backend",
+    "list_backends",
 ]
 ```
 
@@ -472,14 +485,92 @@ Create the main `Cache` class with:
 
 4. **Use `scriptman.types` utilities:**
    - `is_async()` to detect function type
-   - `StampedeLock` for async stampede prevention
+   - `StampedeLock` for stampede prevention (sync and async)
    - Separate sync and async wrapper implementations
+
+   ```python
+   from functools import wraps
+   from scriptman.types import is_async, StampedeLock, Func, P, R
+
+   _stampede_locks = StampedeLock()
+
+   def result(
+       self,
+       ttl: int | None = None,
+       tags: list[str] | None = None,
+       key_fn: Callable[..., str] | None = None,
+   ) -> Callable[[Func[P, R]], Func[P, R]]:
+       """🗄️ Decorator to cache function results."""
+
+       def decorator(func: Func[P, R]) -> Func[P, R]:
+           if is_async(func):
+               @wraps(func)
+               async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                   cache_key = key_fn(*args, **kwargs) if key_fn else self._generate_key(func, args, kwargs)
+
+                   # Check cache first
+                   cached = self.get(cache_key)
+                   if cached is not None:
+                       observe.debug("🗄️ Cache hit", key=cache_key)
+                       return cached
+
+                   # Stampede prevention: acquire async lock
+                   lock = await _stampede_locks.acquire_async(cache_key)
+                   async with lock:
+                       # Double-check after acquiring lock
+                       cached = self.get(cache_key)
+                       if cached is not None:
+                           return cached
+
+                       # Compute and cache
+                       result = await func(*args, **kwargs)
+                       self.set(cache_key, result, ttl=ttl, tags=tags)
+                       return result
+
+               return async_wrapper
+           else:
+               @wraps(func)
+               def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                   cache_key = key_fn(*args, **kwargs) if key_fn else self._generate_key(func, args, kwargs)
+
+                   # Check cache first
+                   cached = self.get(cache_key)
+                   if cached is not None:
+                       observe.debug("🗄️ Cache hit", key=cache_key)
+                       return cached
+
+                   # Stampede prevention: acquire sync lock
+                   with _stampede_locks.acquire_sync(cache_key):
+                       # Double-check after acquiring lock
+                       cached = self.get(cache_key)
+                       if cached is not None:
+                           return cached
+
+                       # Compute and cache
+                       result = func(*args, **kwargs)
+                       self.set(cache_key, result, ttl=ttl, tags=tags)
+                       return result
+
+               return sync_wrapper
+
+       return decorator
+   ```
 
 5. **Key generation:**
    ```python
-   def _generate_key(self, func, args, kwargs) -> str:
-       # Hash function name + filtered args + sorted kwargs
-       # Use MD5 for short, consistent keys
+   def _generate_key(self, func: Callable, args: tuple, kwargs: dict) -> str:
+       """🔑 Generate cache key from function signature."""
+       import hashlib
+       import json
+
+       key_parts = [
+           func.__module__,
+           func.__qualname__,
+           json.dumps(args, sort_keys=True, default=str),
+           json.dumps(kwargs, sort_keys=True, default=str),
+       ]
+       key_string = ":".join(key_parts)
+       return hashlib.md5(key_string.encode()).hexdigest()
    ```
 
 ---
@@ -603,14 +694,14 @@ cache.clear()
 
 ## 📊 Implementation Summary
 
-| Component | Lines (est.) | Complexity |
-|-----------|-------------|------------|
-| `backends/__init__.py` | ~120 | Low |
-| `backends/sqlite.py` | ~350 | Medium |
-| `backends/sharded.py` | ~150 | Low |
-| `__init__.py` | ~250 | Medium |
-| Config schema update | ~15 | Low |
-| Main `__init__.py` update | ~5 | Low |
+| Component                 | Lines (est.) | Complexity |
+| ------------------------- | ------------ | ---------- |
+| `backends/__init__.py`    | ~120         | Low        |
+| `backends/sqlite.py`      | ~350         | Medium     |
+| `backends/sharded.py`     | ~150         | Low        |
+| `__init__.py`             | ~250         | Medium     |
+| Config schema update      | ~15          | Low        |
+| Main `__init__.py` update | ~5           | Low        |
 
 **Total:** ~890 lines
 
@@ -641,3 +732,62 @@ cache.clear()
 
 5. **Size Limits:** When `max_size_bytes` is set, LRU eviction runs automatically after each `set()`.
 
+---
+
+## 💡 Future Backends
+
+The `CacheBackend` ABC enables adding new backends without changing the API:
+
+### MemoryCacheBackend (📋 Planned)
+
+**File:** `scriptman/cache/backends/memory.py`
+
+In-memory cache for testing and ephemeral storage:
+- Fast: no disk I/O
+- Ephemeral: lost on process exit
+- Use case: unit tests, short-lived processes
+
+```python
+class MemoryCacheBackend(CacheBackend):
+    """🧠 In-memory cache for testing."""
+
+    def __init__(self, max_entries: int | None = None):
+        self._store: dict[str, tuple[Any, float | None, list[str]]] = {}
+        self._max_entries = max_entries
+        # ... implement CacheBackend methods
+
+
+# Register after class definition (preserves type information)
+register_backend("memory", MemoryCacheBackend)
+```
+
+### RedisCacheBackend (💡 Future)
+
+**File:** `scriptman/cache/backends/redis.py`
+
+Distributed caching for multi-process/multi-server scenarios:
+- Requires: `pip install scriptman[redis]`
+- Use case: shared cache across workers
+
+```python
+class RedisCacheBackend(CacheBackend):
+    """📡 Redis-backed distributed cache."""
+
+    def __init__(self, url: str = "redis://localhost:6379"):
+        import redis
+        self._client = redis.Redis.from_url(url)
+        # ... implement CacheBackend methods
+
+
+# Register after class definition (preserves type information)
+register_backend("redis", RedisCacheBackend)
+```
+
+### Backend Selection Strategy
+
+| Scenario                    | Backend           | Why                  |
+| --------------------------- | ----------------- | -------------------- |
+| Unit tests                  | Memory            | Fast, no cleanup     |
+| Local development           | SQLite            | Persistent, no setup |
+| Production (single process) | SQLite or Sharded | Reliable, observable |
+| Production (multi-process)  | Redis             | Shared state         |

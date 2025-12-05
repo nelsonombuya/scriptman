@@ -196,6 +196,11 @@ module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
+# Optional dependencies - ignore missing imports
+[[tool.mypy.overrides]]
+module = "pyodbc"
+ignore_missing_imports = true
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Pytest (Testing)
 # ─────────────────────────────────────────────────────────────────────────────

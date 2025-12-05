@@ -309,7 +309,7 @@ SQLite-backed caching with TTL, tags, LRU eviction, and sharding.
 
 **Location:** `scriptman/queue/`
 
-Kafka-inspired SQLite queue with consumer groups, position tracking, and DLQ.
+Kafka-inspired SQLite queue with consumer groups, position tracking, DLQ, and visibility timeout.
 
 | Feature                            | Status | Description                            |
 | ---------------------------------- | ------ | -------------------------------------- |
@@ -317,28 +317,44 @@ Kafka-inspired SQLite queue with consumer groups, position tracking, and DLQ.
 | `queue.push(topic, data)`          | 📋      | Push message to topic                  |
 | `queue.push_many(topic, messages)` | 📋      | Batch push                             |
 | Idempotency (default ON)           | 📋      | Auto-generated keys prevent duplicates |
+| Idempotency control                | 📋      | `idempotency_key=False` to disable     |
 | Delayed messages                   | 📋      | `delay=seconds` parameter              |
+| Message TTL                        | 📋      | `ttl=seconds` for expiration           |
 | **Consumer API**                   |        |                                        |
 | `@queue.consumer(topic)`           | 📋      | Process messages from topic            |
 | `msg.accept()`                     | 📋      | Mark as successfully processed         |
 | `msg.reject(reason)`               | 📋      | Move to DLQ                            |
 | `msg.retry(delay)`                 | 📋      | Schedule retry with backoff            |
+| `msg.extend_lease(seconds)`        | 📋      | Extend visibility timeout              |
 | **Consumer Groups**                | 📋      | Multiple groups process independently  |
+| **Visibility Timeout**             |        |                                        |
+| Lease management                   | 📋      | Prevents stuck messages                |
+| `reclaim_expired_leases()`         | 📋      | Return stuck messages to pending       |
+| Configurable timeout               | 📋      | Default 300s, customizable             |
 | **Decorators**                     |        |                                        |
 | `@queue.producer(topic)`           | 📋      | Fire-and-forget (API routes)           |
 | `@queue.consumer(topic, group)`    | 📋      | Process queued messages                |
 | `@queue.defer(topic)`              | 📋      | Queue function call for later          |
+| Decorator `@overload` types        | 📋      | Proper sync/async type preservation    |
+| `DeferredResult` return type       | 📋      | Clear return type for @defer           |
 | **Position Tracking**              |        |                                        |
 | `queue.current_position()`         | 📋      | Get current position                   |
 | `queue.jump_to_position()`         | 📋      | Replay from position                   |
 | `queue.restart()`                  | 📋      | Replay all messages                    |
+| `queue.skip_to_end()`              | 📋      | Skip backlog                           |
 | **DLQ (Dead Letter Queue)**        |        |                                        |
 | `queue.dlq(topic)`                 | 📋      | Get failed messages                    |
 | `queue.retry_dlq(topic)`           | 📋      | Move back to main queue                |
+| `queue.purge_dlq(topic)`           | 📋      | Clear DLQ                              |
 | **Observability**                  |        |                                        |
 | `queue.pending(topic)`             | 📋      | Count of waiting messages              |
 | `queue.stats(topic)`               | 📋      | Full statistics                        |
 | Correlation ID flow                | 📋      | Producer → Consumer tracing            |
+| **Worker Execution**               |        |                                        |
+| `queue.run_workers()`              | 📋      | Sync worker loop                       |
+| `queue.run_workers_async()`        | 📋      | Async worker loop (FastAPI)            |
+| Graceful shutdown                  | 📋      | SIGTERM/SIGINT handling                |
+| `queue.stop_workers()`             | 📋      | Programmatic stop                      |
 | **Storage**                        |        |                                        |
 | Topic sharding                     | 📋      | One SQLite file per topic              |
 | WAL mode                           | 📋      | Concurrent reads/writes                |
@@ -351,6 +367,10 @@ Kafka-inspired SQLite queue with consumer groups, position tracking, and DLQ.
 - SQLite for local/development/simple production
 - Redis for distributed, multi-worker scenarios
 - For enterprise (Celery/RabbitMQ): use directly with Observer middleware
+
+**Pre-requisites:**
+- Add `"queue"` to `DataCategory` in `scriptman/config/schema/data.py`
+- Add `queue` path to `DataConfig`
 
 ---
 
@@ -471,6 +491,10 @@ The `powers/` module from v2 contains valuable features to migrate:
 ├── cache/                      # Cache storage
 │   ├── cache.db                # Single-shard cache
 │   └── cache_*.db              # Sharded cache files
+├── queue/                      # Queue storage
+│   ├── orders.db               # Topic: orders
+│   ├── payments.db             # Topic: payments
+│   └── _groups.db              # Consumer positions & DLQ
 ├── observe/                    # Observer storage
 │   └── events.db               # Event store
 ├── logs/                       # Log files
